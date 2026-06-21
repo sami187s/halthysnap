@@ -1,0 +1,202 @@
+[
+  {
+    "name": "sodium lauryl sulfate",
+    "aliases": ["sls", "sodium dodecyl sulfate"],
+    "riskLevel": "high",
+    "score": 15,
+    "description": "Harsh surfactant that can cause skin and eye irritation. May disrupt skin barrier function.",
+    "category": "surfactant"
+  },
+  {
+    "name": "parabens",
+    "aliases": ["methylparaben", "propylparaben", "butylparaben", "ethylparaben"],
+    "riskLevel": "medium",
+    "score": 35,
+    "description": "Preservatives that may disrupt hormone function and cause allergic reactions.",
+    "category": "preservative"
+  },
+  {
+    "name": "formaldehyde",
+    "aliases": ["formalin", "methylene glycol"],
+    "riskLevel": "high",
+    "score": 5,
+    "description": "Known carcinogen that can cause allergic reactions and respiratory issues.",
+    "category": "preservative"
+  },
+  {
+    "name": "triclosan",
+    "aliases": ["triclocarban"],
+    "riskLevel": "high",
+    "score": 20,
+    "description": "Antimicrobial agent that may contribute to antibiotic resistance and hormone disruption.",
+    "category": "antimicrobial"
+  },
+  {
+    "name": "phthalates",
+    "aliases": ["dibutyl phthalate", "diethyl phthalate"],
+    "riskLevel": "medium",
+    "score": 30,
+    "description": "Plasticizers that may disrupt hormones and affect reproductive health.",
+    "category": "plasticizer"
+  },
+  {
+    "name": "aluminum chloride",
+    "aliases": ["aluminum chlorohydrate"],
+    "riskLevel": "medium",
+    "score": 40,
+    "description": "May cause skin irritation and there are concerns about aluminum exposure.",
+    "category": "antiperspirant"
+  },
+  {
+    "name": "synthetic fragrances",
+    "aliases": ["parfum", "fragrance"],
+    "riskLevel": "medium",
+    "score": 45,
+    "description": "May contain allergens and chemicals that can cause reactions.",
+    "category": "fragrance"
+  },
+  {
+    "name": "glycerin",
+    "aliases": ["glycerol"],
+    "riskLevel": "low",
+    "score": 85,
+    "description": "Natural humectant that helps retain moisture. Generally safe and beneficial.",
+    "category": "humectant"
+  },
+  {
+    "name": "hyaluronic acid",
+    "aliases": ["sodium hyaluronate"],
+    "riskLevel": "low",
+    "score": 90,
+    "description": "Excellent moisturizing ingredient that helps skin retain water.",
+    "category": "humectant"
+  },
+  {
+    "name": "vitamin e",
+    "aliases": ["tocopherol", "tocopheryl acetate"],
+    "riskLevel": "low",
+    "score": 88,
+    "description": "Antioxidant that protects skin from free radical damage.",
+    "category": "antioxidant"
+  },
+  {
+    "name": "ceramides",
+    "aliases": ["ceramide np", "ceramide ap"],
+    "riskLevel": "low",
+    "score": 92,
+    "description": "Natural lipids that help restore and maintain skin barrier function.",
+    "category": "emollient"
+  },
+  {
+    "name": "niacinamide",
+    "aliases": ["nicotinamide", "vitamin b3"],
+    "riskLevel": "low",
+    "score": 87,
+    "description": "Beneficial ingredient that helps improve skin texture and reduce inflammation.",
+    "category": "vitamin"
+  },
+  {
+    "name": "retinol",
+    "aliases": ["vitamin a"],
+    "riskLevel": "low",
+    "score": 75,
+    "description": "Anti-aging ingredient, but can cause irritation in sensitive skin.",
+    "category": "vitamin"
+  },
+  {
+    "name": "salicylic acid",
+    "aliases": ["bha"],
+    "riskLevel": "low",
+    "score": 78,
+    "description": "Exfoliating ingredient that helps unclog pores. May cause dryness.",
+    "category": "exfoliant"
+  },
+  {
+    "name": "zinc oxide",
+    "aliases": [],
+    "riskLevel": "low",
+    "score": 95,
+    "description": "Natural mineral sunscreen ingredient that provides broad spectrum protection.",
+    "category": "sunscreen"
+  },
+  {
+    "name": "titanium dioxide",
+    "aliases": [],
+    "riskLevel": "low",
+    "score": 93,
+    "description": "Natural mineral sunscreen ingredient, safe and effective UV protection.",
+    "category": "sunscreen"
+  },
+  {
+    "name": "oxybenzone",
+    "aliases": ["benzophenone-3"],
+    "riskLevel": "high",
+    "score": 25,
+    "description": "Chemical sunscreen that may disrupt hormones and cause coral reef damage.",
+    "category": "sunscreen"
+  },
+  {
+    "name": "octinoxate",
+    "aliases": ["ethylhexyl methoxycinnamate"],
+    "riskLevel": "medium",
+    "score": 35,
+    "description": "Chemical sunscreen with potential hormone disrupting effects.",
+    "category": "sunscreen"
+  },
+  {
+    "name": "mineral oil",
+    "aliases": ["petrolatum", "petroleum jelly"],
+    "riskLevel": "medium",
+    "score": 55,
+    "description": "May clog pores and prevent skin breathing, but generally safe.",
+    "category": "emollient"
+  },
+  {
+    "name": "phenoxyethanol",
+    "aliases": [],
+    "riskLevel": "low",
+    "score": 65,
+    "description": "Mild preservative, generally safe but may cause irritation in sensitive skin.",
+    "category": "preservative"
+  },
+  {
+    "name": "sodium laureth sulfate",
+    "aliases": ["sles"],
+    "riskLevel": "medium",
+    "score": 45,
+    "description": "Milder surfactant than SLS but can still cause irritation. May contain traces of carcinogenic compounds.",
+    "category": "surfactant"
+  },
+  {
+    "name": "cetyl alcohol",
+    "aliases": ["cetanol"],
+    "riskLevel": "low",
+    "score": 78,
+    "description": "Fatty alcohol that acts as emollient and emulsifier. Generally safe and beneficial.",
+    "category": "emollient"
+  },
+  {
+    "name": "dimethicone",
+    "aliases": ["polydimethylsiloxane"],
+    "riskLevel": "low",
+    "score": 72,
+    "description": "Silicone that provides smooth feel and protects skin. Generally safe but may cause buildup.",
+    "category": "silicone"
+  },
+  {
+    "name": "panthenol",
+    "aliases": ["pro-vitamin b5", "dexpanthenol"],
+    "riskLevel": "low",
+    "score": 85,
+    "description": "Soothing and moisturizing ingredient. Helps repair skin barrier.",
+    "category": "vitamin"
+  },
+  {
+    "name": "allantoin",
+    "aliases": [],
+    "riskLevel": "low",
+    "score": 88,
+    "description": "Gentle soothing ingredient that promotes skin healing and reduces irritation.",
+    "category": "soothing"
+  }
+]

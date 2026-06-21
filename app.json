@@ -1,0 +1,169 @@
+{
+  "expo": {
+    "owner": "sami187s1",
+    "name": "HealthyScan: Food & Beauty Check",
+    "slug": "healthyscan",
+    "version": "3.7.12",
+    "orientation": "portrait",
+    "icon": "./assets/vee-logo.png",
+    "userInterfaceStyle": "light",
+    "description": "Scan barcodes to analyze food nutrition and cosmetic ingredient safety. Get instant health scores and detailed ingredient analysis for both food and personal care products.",
+    "privacy": "public",
+    "splash": {
+      "image": "./assets/vee-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0a0a"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.healthyscan.app",
+      "buildNumber": "62",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "appStoreUrl": "https://apps.apple.com/app/healthyscan/id123456789",
+      "infoPlist": {
+        "UIDeviceFamily": [
+          1,
+          2
+        ],
+        "NSCameraUsageDescription": "HealthyScan uses the camera to scan product barcodes for health analysis.",
+        "NSPhotoLibraryUsageDescription": "HealthyScan needs access to your photo library to select product images for analysis.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "openbeautyfacts.org": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "openfoodfacts.org": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "productopenfacts.org": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "nal.usda.gov": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "turso.io": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "aws-us-east-2.turso.io": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "upcitemdb.com": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            },
+            "api.nal.usda.gov": {
+              "NSIncludesSubdomains": false,
+              "NSExceptionRequiresForwardSecrecy": false,
+              "NSExceptionAllowsInsecureHTTPLoads": false
+            }
+          }
+        },
+        "UIRequiredDeviceCapabilities": [
+          "arm64"
+        ],
+        "LSRequiresIPhoneOS": true,
+        "CFBundleDevelopmentRegion": "en",
+        "UIViewControllerBasedStatusBarAppearance": false,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "UISupportedInterfaceOrientations": [
+          "UIInterfaceOrientationPortrait"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/vee-logo.png",
+        "backgroundColor": "#0a0a0a"
+      },
+      "package": "com.healthyscan.app",
+      "versionCode": 7,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "web": {
+      "favicon": "./assets/logo.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1"
+          },
+          "android": {
+            "minSdkVersion": 23,
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34
+          }
+        }
+      ],
+      "./plugins/withIOSDeploymentTarget",
+      "./plugins/fix-gradle-plugin",
+      "./plugins/withAndroidVariantFix",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow HealthyScan to access camera to scan product barcodes for health analysis."
+        }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "sami-rz"
+        }
+      ],
+      "expo-font",
+      "expo-localization",
+      "@sentry/react-native"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "451587d1-e392-4242-9abe-071672afc861"
+      },
+      "usdaApiKey": "9PFcnzr3jitMIFX7wwluYn8FMIh56ioCiYoy0prl",
+      "goMarketMeApiKey": "wNFYLjrCan85Ra1KMqYxI87W2gBwbQPr1RHvw0yj"
+    },
+    "runtimeVersion": {
+      "policy": "sdkVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/451587d1-e392-4242-9abe-071672afc861",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
+    }
+  }
+}

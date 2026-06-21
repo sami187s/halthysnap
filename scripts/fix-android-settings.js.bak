@@ -1,0 +1,38 @@
+#!/usr/bin/env node
+
+/**
+ * Fix Android settings.gradle to resolve React Native path issue
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+const settingsGradlePath = path.join(__dirname, '..', 'android', 'settings.gradle');
+
+console.log('🔧 Fixing Android settings.gradle...');
+
+try {
+  if (fs.existsSync(settingsGradlePath)) {
+    let content = fs.readFileSync(settingsGradlePath, 'utf8');
+    
+    // Fix null path issue by ensuring React Native path is correctly resolved
+    const fixedContent = content.replace(
+      /includeBuild\(new File\(\["node"[\s\S]*?\)\)/g,
+      `def rnDir = new File(["node", "-e", "console.log(require.resolve('react-native/package.json'))"].execute(null, rootDir).text.trim()).getParentFile()
+includeBuild(rnDir)`
+    );
+    
+    if (fixedContent !== content) {
+      fs.writeFileSync(settingsGradlePath, fixedContent);
+      console.log('✅ Successfully fixed settings.gradle');
+    } else {
+      console.log('✅ settings.gradle looks good');
+    }
+  } else {
+    console.log('⚠️  settings.gradle not found yet');
+  }
+} catch (error) {
+  console.error('⚠️  Error:', error.message);
+  process.exit(0);
+}
+

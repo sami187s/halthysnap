@@ -1,0 +1,2016 @@
+{
+  "metadata": {
+    "integrated": "2025-09-01T21:45:59.824Z",
+    "cosmetic_count": 117,
+    "food_count": 23,
+    "total_coverage": 140
+  },
+  "cosmetic": {
+    "metadata": {
+      "source": "CosIng EU Database + Industry Standards",
+      "updated": "2025-08-31T18:21:08.717Z",
+      "count": 2500,
+      "coverage": "Professional cosmetic ingredients with INCI names"
+    },
+    "ingredients": {
+      "retinol": {
+        "inci": "Retinol",
+        "cas": "68-26-8",
+        "function": "Skin conditioning agent",
+        "safety": 85,
+        "acne": 0,
+        "irritation": 2,
+        "pregnancy": false,
+        "concentration_limit": 1,
+        "ph_stability": "5.5-7.0",
+        "evidence": "high",
+        "notes": "Vitamin A derivative, proven anti-aging"
+      },
+      "niacinamide": {
+        "inci": "Niacinamide",
+        "cas": "98-92-0",
+        "function": "Skin conditioning agent",
+        "safety": 96,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "5.0-7.0",
+        "evidence": "high",
+        "notes": "Vitamin B3, reduces sebum and inflammation"
+      },
+      "ascorbic_acid": {
+        "inci": "Ascorbic Acid",
+        "cas": "50-81-7",
+        "function": "Antioxidant",
+        "safety": 88,
+        "acne": 0,
+        "irritation": 1,
+        "pregnancy": true,
+        "concentration_limit": 20,
+        "ph_stability": "3.5-4.0",
+        "evidence": "high",
+        "notes": "Vitamin C, potent antioxidant"
+      },
+      "hyaluronic_acid": {
+        "inci": "Sodium Hyaluronate",
+        "cas": "9067-32-7",
+        "function": "Humectant",
+        "safety": 98,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 2,
+        "ph_stability": "4.0-8.0",
+        "evidence": "high",
+        "notes": "Holds 1000x its weight in water"
+      },
+      "salicylic_acid": {
+        "inci": "Salicylic Acid",
+        "cas": "69-72-7",
+        "function": "Exfoliant",
+        "safety": 82,
+        "acne": 5,
+        "irritation": 2,
+        "pregnancy": false,
+        "concentration_limit": 2,
+        "ph_stability": "3.0-4.0",
+        "evidence": "high",
+        "notes": "BHA, oil-soluble exfoliant"
+      },
+      "glycolic_acid": {
+        "inci": "Glycolic Acid",
+        "cas": "79-14-1",
+        "function": "Exfoliant",
+        "safety": 78,
+        "acne": 3,
+        "irritation": 3,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "3.0-4.0",
+        "evidence": "high",
+        "notes": "AHA, smallest molecule for deep penetration"
+      },
+      "glycerin": {
+        "inci": "Glycerin",
+        "cas": "56-81-5",
+        "function": "Humectant",
+        "safety": 95,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 30,
+        "ph_stability": "4.0-10.0",
+        "evidence": "high",
+        "notes": "Draws moisture from environment"
+      },
+      "shea_butter": {
+        "inci": "Butyrospermum Parkii (Shea) Butter",
+        "cas": "194043-92-0",
+        "function": "Emollient",
+        "safety": 94,
+        "acne": 1,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 25,
+        "ph_stability": "5.0-8.0",
+        "evidence": "high",
+        "notes": "African tree nut butter, very low comedogenicity"
+      },
+      "ceramide_np": {
+        "inci": "Ceramide NP",
+        "cas": "100403-19-8",
+        "function": "Skin conditioning agent",
+        "safety": 97,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 5,
+        "ph_stability": "5.0-7.0",
+        "evidence": "high",
+        "notes": "Identical to natural skin barrier lipids"
+      },
+      "squalane": {
+        "inci": "Squalane",
+        "cas": "111-01-3",
+        "function": "Emollient",
+        "safety": 96,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 100,
+        "ph_stability": "4.0-9.0",
+        "evidence": "high",
+        "notes": "Stable version of natural skin oil"
+      },
+      "aloe_vera": {
+        "inci": "Aloe Barbadensis Leaf Juice",
+        "cas": "85507-69-3",
+        "function": "Soothing agent",
+        "safety": 95,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 100,
+        "ph_stability": "4.0-8.0",
+        "evidence": "high",
+        "notes": "Anti-inflammatory, wound healing"
+      },
+      "green_tea_extract": {
+        "inci": "Camellia Sinensis Leaf Extract",
+        "cas": "84650-60-2",
+        "function": "Antioxidant",
+        "safety": 89,
+        "acne": 1,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "4.0-7.0",
+        "evidence": "medium",
+        "notes": "Rich in polyphenols, anti-inflammatory"
+      },
+      "centella_asiatica": {
+        "inci": "Centella Asiatica Extract",
+        "cas": "84696-21-9",
+        "function": "Soothing agent",
+        "safety": 92,
+        "acne": 1,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "5.0-7.0",
+        "evidence": "medium",
+        "notes": "K-beauty favorite, wound healing"
+      },
+      "phenoxyethanol": {
+        "inci": "Phenoxyethanol",
+        "cas": "122-99-6",
+        "function": "Preservative",
+        "safety": 65,
+        "acne": 0,
+        "irritation": 1,
+        "pregnancy": true,
+        "concentration_limit": 1,
+        "ph_stability": "3.0-8.0",
+        "evidence": "high",
+        "notes": "Glycol ether, broad spectrum preservative"
+      },
+      "methylparaben": {
+        "inci": "Methylparaben",
+        "cas": "99-76-3",
+        "function": "Preservative",
+        "safety": 35,
+        "acne": 0,
+        "irritation": 2,
+        "pregnancy": false,
+        "concentration_limit": 0.4,
+        "ph_stability": "4.0-8.0",
+        "evidence": "high",
+        "notes": "Endocrine disruption concerns"
+      },
+      "propylparaben": {
+        "inci": "Propylparaben",
+        "cas": "94-13-3",
+        "function": "Preservative",
+        "safety": 30,
+        "acne": 0,
+        "irritation": 2,
+        "pregnancy": false,
+        "concentration_limit": 0.4,
+        "ph_stability": "4.0-8.0",
+        "evidence": "high",
+        "notes": "Higher estrogenic activity than methylparaben"
+      },
+      "sodium_lauryl_sulfate": {
+        "inci": "Sodium Lauryl Sulfate",
+        "cas": "151-21-3",
+        "function": "Surfactant-cleansing agent",
+        "safety": 40,
+        "acne": 0,
+        "irritation": 4,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "6.0-8.0",
+        "evidence": "high",
+        "notes": "Harsh detergent, strips natural oils"
+      },
+      "sodium_laureth_sulfate": {
+        "inci": "Sodium Laureth Sulfate",
+        "cas": "68585-34-2",
+        "function": "Surfactant-cleansing agent",
+        "safety": 62,
+        "acne": 0,
+        "irritation": 2,
+        "pregnancy": true,
+        "concentration_limit": 15,
+        "ph_stability": "6.0-8.0",
+        "evidence": "high",
+        "notes": "Milder than SLS, ethoxylated"
+      },
+      "cocamidopropyl_betaine": {
+        "inci": "Cocamidopropyl Betaine",
+        "cas": "61789-40-0",
+        "function": "Surfactant-foam boosting agent",
+        "safety": 75,
+        "acne": 0,
+        "irritation": 1,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "4.0-10.0",
+        "evidence": "high",
+        "notes": "Amphoteric, gentler cleansing"
+      },
+      "dimethicone": {
+        "inci": "Dimethicone",
+        "cas": "63148-62-9",
+        "function": "Skin conditioning agent",
+        "safety": 82,
+        "acne": 1,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 20,
+        "ph_stability": "4.0-10.0",
+        "evidence": "high",
+        "notes": "Forms protective barrier, can clog pores"
+      },
+      "cyclomethicone": {
+        "inci": "Cyclopentasiloxane",
+        "cas": "541-02-6",
+        "function": "Skin conditioning agent",
+        "safety": 78,
+        "acne": 2,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 85,
+        "ph_stability": "4.0-10.0",
+        "evidence": "high",
+        "notes": "Volatile silicone, evaporates after application"
+      },
+      "titanium_dioxide": {
+        "inci": "Titanium Dioxide",
+        "cas": "13463-67-7",
+        "function": "UV filter",
+        "safety": 88,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 25,
+        "ph_stability": "6.0-9.0",
+        "evidence": "high",
+        "notes": "Physical sunscreen, broad spectrum"
+      },
+      "zinc_oxide": {
+        "inci": "Zinc Oxide",
+        "cas": "1314-13-2",
+        "function": "UV filter",
+        "safety": 89,
+        "acne": 0,
+        "irritation": 0,
+        "pregnancy": true,
+        "concentration_limit": 25,
+        "ph_stability": "6.0-9.0",
+        "evidence": "high",
+        "notes": "Physical sunscreen, anti-inflammatory"
+      },
+      "avobenzone": {
+        "inci": "Butyl Methoxydibenzoylmethane",
+        "cas": "70356-09-1",
+        "function": "UV filter",
+        "safety": 72,
+        "acne": 0,
+        "irritation": 1,
+        "pregnancy": true,
+        "concentration_limit": 10,
+        "ph_stability": "6.0-8.0",
+        "evidence": "high",
+        "notes": "Chemical UVA filter, can be unstable"
+      },
+      "oxybenzone": {
+        "inci": "Benzophenone-3",
+        "cas": "131-57-7",
+        "function": "UV filter",
+        "safety": 30,
+        "acne": 0,
+        "irritation": 3,
+        "pregnancy": false,
+        "concentration_limit": 10,
+        "ph_stability": "6.0-8.0",
+        "evidence": "high",
+        "notes": "Hormone disruption concerns"
+      },
+      "water": {
+        "name": "Water",
+        "inci_name": "Aqua/Water/Eau",
+        "cas_number": "7732-18-5",
+        "safety_score": 100,
+        "function": "Solvent and hydration vehicle",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Aqua",
+          "Eau"
+        ],
+        "concentration_limit": "—",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_hyaluronate": {
+        "name": "Sodium Hyaluronate",
+        "inci_name": "Sodium Hyaluronate",
+        "cas_number": "9067-32-7",
+        "safety_score": 95,
+        "function": "Humectant; salt form of hyaluronic acid",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Hyaluronic Acid (salt)"
+        ],
+        "concentration_limit": "0.05-2%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "polymethyl_methacrylate": {
+        "name": "Polymethyl Methacrylate",
+        "inci_name": "Polymethyl Methacrylate",
+        "cas_number": "9011-14-7",
+        "safety_score": 85,
+        "function": "Film-forming agent and texture enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PMMA",
+          "Acrylic Polymer"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "hydroxyethyl_acrylate": {
+        "name": "Hydroxyethyl Acrylate",
+        "inci_name": "Hydroxyethyl Acrylate/Sodium Acryloyldimethyl Taurate Copolymer",
+        "cas_number": "25749-72-8",
+        "safety_score": 88,
+        "function": "Thickening and stabilizing polymer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "HEA Copolymer"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "5.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "propylene_glycol_dicaprylate": {
+        "name": "Propylene Glycol Dicaprylate",
+        "inci_name": "Propylene Glycol Dicaprylate/Dicaprate",
+        "cas_number": "68583-51-7",
+        "safety_score": 90,
+        "function": "Light emollient with excellent spreadability",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PGD"
+        ],
+        "concentration_limit": "2-15%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "isononyl_isononanoate": {
+        "name": "Isononyl Isononanoate",
+        "inci_name": "Isononyl Isononanoate",
+        "cas_number": "42131-25-9",
+        "safety_score": 92,
+        "function": "Lightweight emollient with silky feel",
+        "pregnancy_safe": true,
+        "common_names": [
+          "ININ"
+        ],
+        "concentration_limit": "5-30%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "pentylene_glycol": {
+        "name": "Pentylene Glycol",
+        "inci_name": "Pentylene Glycol",
+        "cas_number": "5343-92-0",
+        "safety_score": 90,
+        "function": "Humectant and preservation enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "1,2-Pentanediol"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "polyquaternium_10": {
+        "name": "Polyquaternium-10",
+        "inci_name": "Polyquaternium-10",
+        "cas_number": "68610-92-4",
+        "safety_score": 88,
+        "function": "Hair conditioning polymer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PQ-10"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "5.0-7.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_acrylates_copolymer": {
+        "name": "Sodium Acrylates Copolymer",
+        "inci_name": "Sodium Acrylates Copolymer",
+        "cas_number": "25987-30-8",
+        "safety_score": 85,
+        "function": "Film-forming and thickening agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SAC"
+        ],
+        "concentration_limit": "0.5-2%",
+        "ph_stability": "5.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "hydroxypropyl_methylcellulose": {
+        "name": "Hydroxypropyl Methylcellulose",
+        "inci_name": "Hydroxypropyl Methylcellulose",
+        "cas_number": "9004-65-3",
+        "safety_score": 95,
+        "function": "Natural thickener and film former",
+        "pregnancy_safe": true,
+        "common_names": [
+          "HPMC"
+        ],
+        "concentration_limit": "0.1-2%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ceteareth_25": {
+        "name": "Ceteareth-25",
+        "inci_name": "Ceteareth-25",
+        "cas_number": "68439-49-6",
+        "safety_score": 78,
+        "function": "Emulsifier for oil-in-water formulations",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Cetostearyl Alcohol Ethoxylate"
+        ],
+        "concentration_limit": "1-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "butylene_glycol": {
+        "name": "Butylene Glycol",
+        "inci_name": "Butylene Glycol",
+        "cas_number": "107-88-0",
+        "safety_score": 85,
+        "function": "Humectant and solvent enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "1,3-Butanediol"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ammonium_lauryl_sulfate": {
+        "name": "Ammonium Lauryl Sulfate",
+        "inci_name": "Ammonium Lauryl Sulfate",
+        "cas_number": "2235-54-3",
+        "safety_score": 58,
+        "function": "Foaming surfactant for shampoos",
+        "pregnancy_safe": true,
+        "common_names": [
+          "ALS"
+        ],
+        "concentration_limit": "5-15%",
+        "ph_stability": "6.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "magnesium_aluminum_silicate": {
+        "name": "Magnesium Aluminum Silicate",
+        "inci_name": "Magnesium Aluminum Silicate",
+        "cas_number": "12511-31-8",
+        "safety_score": 90,
+        "function": "Natural clay thickener and stabilizer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Attapulgite"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "6.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "disodium_laureth_sulfosuccinate": {
+        "name": "Disodium Laureth Sulfosuccinate",
+        "inci_name": "Disodium Laureth Sulfosuccinate",
+        "cas_number": "39354-45-5",
+        "safety_score": 88,
+        "function": "Ultra-mild surfactant for sensitive skin",
+        "pregnancy_safe": true,
+        "common_names": [
+          "DLSS"
+        ],
+        "concentration_limit": "5-20%",
+        "ph_stability": "5.0-7.5",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "peg_40_hydrogenated_castor_oil": {
+        "name": "PEG-40 Hydrogenated Castor Oil",
+        "inci_name": "PEG-40 Hydrogenated Castor Oil",
+        "cas_number": "61788-85-0",
+        "safety_score": 82,
+        "function": "Solubilizer for essential oils and fragrances",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Cremophor RH40"
+        ],
+        "concentration_limit": "0.5-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "polyglyceryl_4_oleate": {
+        "name": "Polyglyceryl-4 Oleate",
+        "inci_name": "Polyglyceryl-4 Oleate",
+        "cas_number": "9007-48-1",
+        "safety_score": 92,
+        "function": "Natural emulsifier from vegetable sources",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PG-4 Oleate"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_cocoyl_glutamate": {
+        "name": "Sodium Cocoyl Glutamate",
+        "inci_name": "Sodium Cocoyl Glutamate",
+        "cas_number": "68187-30-4",
+        "safety_score": 90,
+        "function": "Amino acid-based gentle cleanser",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SCG"
+        ],
+        "concentration_limit": "5-15%",
+        "ph_stability": "5.5-7.5",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "hydroxyacetophenone": {
+        "name": "Hydroxyacetophenone",
+        "inci_name": "Hydroxyacetophenone",
+        "cas_number": "99-93-4",
+        "safety_score": 85,
+        "function": "Antioxidant and preservation booster",
+        "pregnancy_safe": true,
+        "common_names": [
+          "p-Hydroxyacetophenone"
+        ],
+        "concentration_limit": "0.1-0.5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "acrylates_crosspolymer": {
+        "name": "Acrylates Crosspolymer",
+        "inci_name": "Acrylates/C10-30 Alkyl Acrylate Crosspolymer",
+        "cas_number": "90780-56-8",
+        "safety_score": 88,
+        "function": "Gel-forming thickener and stabilizer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Crosslinked Polyacrylate"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "5.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "dipotassium_glycyrrhizate": {
+        "name": "Dipotassium Glycyrrhizate",
+        "inci_name": "Dipotassium Glycyrrhizate",
+        "cas_number": "68797-35-3",
+        "safety_score": 88,
+        "function": "Licorice extract - anti-inflammatory and soothing",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Licorice Root Extract"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_lauroyl_methyl_isethionate": {
+        "name": "Sodium Lauroyl Methyl Isethionate",
+        "inci_name": "Sodium Lauroyl Methyl Isethionate",
+        "cas_number": "66161-58-2",
+        "safety_score": 90,
+        "function": "Ultra-mild surfactant for dry skin",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SLMI"
+        ],
+        "concentration_limit": "10-30%",
+        "ph_stability": "5.5-7.5",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ethylhexyl_olivate": {
+        "name": "Ethylhexyl Olivate",
+        "inci_name": "Ethylhexyl Olivate",
+        "cas_number": "226461-96-3",
+        "safety_score": 94,
+        "function": "Natural emollient from olive oil",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Olive Oil Derivative"
+        ],
+        "concentration_limit": "2-15%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "silica": {
+        "name": "Silica",
+        "inci_name": "Silica",
+        "cas_number": "7631-86-9",
+        "safety_score": 90,
+        "function": "Oil-absorbing and mattifying agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Silicon Dioxide"
+        ],
+        "concentration_limit": "1-15%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ethylhexyl_methoxycinnamate": {
+        "name": "Ethylhexyl Methoxycinnamate",
+        "inci_name": "Ethylhexyl Methoxycinnamate",
+        "cas_number": "5466-77-3",
+        "safety_score": 70,
+        "function": "UVB chemical sunscreen filter",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Octinoxate"
+        ],
+        "concentration_limit": "7.5-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "polyethylene": {
+        "name": "Polyethylene",
+        "inci_name": "Polyethylene",
+        "cas_number": "9002-88-4",
+        "safety_score": 85,
+        "function": "Exfoliating microspheres and texture enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PE Microspheres"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "hydrogenated_lecithin": {
+        "name": "Hydrogenated Lecithin",
+        "inci_name": "Hydrogenated Lecithin",
+        "cas_number": "92128-87-5",
+        "safety_score": 92,
+        "function": "Stable emulsifier and skin conditioning agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Stabilized Lecithin"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "triethanolamine": {
+        "name": "Triethanolamine",
+        "inci_name": "Triethanolamine",
+        "cas_number": "102-71-6",
+        "safety_score": 65,
+        "function": "pH adjuster and emulsifying agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "TEA"
+        ],
+        "concentration_limit": "0.1-2%",
+        "ph_stability": "8.0-10.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "polyglyceryl_6_distearate": {
+        "name": "Polyglyceryl-6 Distearate",
+        "inci_name": "Polyglyceryl-6 Distearate",
+        "cas_number": "34424-98-1",
+        "safety_score": 90,
+        "function": "Natural emulsifier and skin conditioner",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PG-6 Distearate"
+        ],
+        "concentration_limit": "1-4%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_methyl_cocoyl_taurate": {
+        "name": "Sodium Methyl Cocoyl Taurate",
+        "inci_name": "Sodium Methyl Cocoyl Taurate",
+        "cas_number": "12765-39-8",
+        "safety_score": 88,
+        "function": "Mild amino acid-based surfactant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SMCT"
+        ],
+        "concentration_limit": "5-20%",
+        "ph_stability": "5.0-7.5",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "isohexadecane": {
+        "name": "Isohexadecane",
+        "inci_name": "Isohexadecane",
+        "cas_number": "93685-81-5",
+        "safety_score": 88,
+        "function": "Lightweight volatile emollient",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Branched Alkane"
+        ],
+        "concentration_limit": "5-40%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "hydroxyethylcellulose": {
+        "name": "Hydroxyethylcellulose",
+        "inci_name": "Hydroxyethylcellulose",
+        "cas_number": "9004-62-0",
+        "safety_score": 95,
+        "function": "Natural cellulose thickener",
+        "pregnancy_safe": true,
+        "common_names": [
+          "HEC"
+        ],
+        "concentration_limit": "0.1-2%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "cetyl_palmitate": {
+        "name": "Cetyl Palmitate",
+        "inci_name": "Cetyl Palmitate",
+        "cas_number": "540-10-3",
+        "safety_score": 92,
+        "function": "Emollient and consistency enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Palmitic Acid Cetyl Ester"
+        ],
+        "concentration_limit": "1-8%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "disodium_edta": {
+        "name": "Disodium EDTA",
+        "inci_name": "Disodium EDTA",
+        "cas_number": "139-33-3",
+        "safety_score": 85,
+        "function": "Chelating agent that enhances preservation",
+        "pregnancy_safe": true,
+        "common_names": [
+          "EDTA",
+          "Ethylenediaminetetraacetic Acid"
+        ],
+        "concentration_limit": "0.05-0.2%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "pvp": {
+        "name": "PVP",
+        "inci_name": "Polyvinylpyrrolidone",
+        "cas_number": "9003-39-8",
+        "safety_score": 88,
+        "function": "Film-forming agent and hair fixative",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Povidone"
+        ],
+        "concentration_limit": "0.5-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "dipropylene_glycol": {
+        "name": "Dipropylene Glycol",
+        "inci_name": "Dipropylene Glycol",
+        "cas_number": "25265-71-8",
+        "safety_score": 85,
+        "function": "Solvent and viscosity reducer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "DPG"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "bis_ethylhexyloxyphenol_methoxyphenyl_triazine": {
+        "name": "Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine",
+        "inci_name": "Bis-Ethylhexyloxyphenol Methoxyphenyl Triazine",
+        "cas_number": "187393-00-6",
+        "safety_score": 92,
+        "function": "Broad spectrum UV filter (Tinosorb S)",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Tinosorb S",
+          "Bemotrizinol"
+        ],
+        "concentration_limit": "2-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "potassium_cetyl_phosphate": {
+        "name": "Potassium Cetyl Phosphate",
+        "inci_name": "Potassium Cetyl Phosphate",
+        "cas_number": "19035-79-1",
+        "safety_score": 88,
+        "function": "Emulsifier for natural formulations",
+        "pregnancy_safe": true,
+        "common_names": [
+          "KCP"
+        ],
+        "concentration_limit": "1-3%",
+        "ph_stability": "5.0-7.5",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_cocoamphoacetate": {
+        "name": "Sodium Cocoamphoacetate",
+        "inci_name": "Sodium Cocoamphoacetate",
+        "cas_number": "68650-39-5",
+        "safety_score": 90,
+        "function": "Amphoteric surfactant for baby products",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SCA"
+        ],
+        "concentration_limit": "5-15%",
+        "ph_stability": "5.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "methylpropanediol": {
+        "name": "Methylpropanediol",
+        "inci_name": "Methylpropanediol",
+        "cas_number": "2163-42-0",
+        "safety_score": 88,
+        "function": "Humectant and preservation enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "MPD"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "polysilicone_11": {
+        "name": "Polysilicone-11",
+        "inci_name": "Polysilicone-11",
+        "cas_number": "27607-77-8",
+        "safety_score": 88,
+        "function": "Film-forming silicone for water resistance",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Crosslinked Silicone"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_polyglutamate": {
+        "name": "Sodium Polyglutamate",
+        "inci_name": "Sodium Polyglutamate",
+        "cas_number": "25513-46-6",
+        "safety_score": 95,
+        "function": "Moisture-binding amino acid polymer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Poly-γ-glutamic acid"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "caprylic_acid": {
+        "name": "Caprylic Acid",
+        "inci_name": "Caprylic Acid",
+        "cas_number": "124-07-2",
+        "safety_score": 82,
+        "function": "Antimicrobial fatty acid",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Octanoic Acid"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "4.0-7.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "polyacrylate_13": {
+        "name": "Polyacrylate-13",
+        "inci_name": "Polyacrylate-13",
+        "cas_number": "25035-69-2",
+        "safety_score": 85,
+        "function": "Emulsifier for lightweight textures",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PA-13"
+        ],
+        "concentration_limit": "0.5-2%",
+        "ph_stability": "5.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "ethylhexyl_stearate": {
+        "name": "Ethylhexyl Stearate",
+        "inci_name": "Ethylhexyl Stearate",
+        "cas_number": "22047-49-0",
+        "safety_score": 90,
+        "function": "Emollient with excellent spread",
+        "pregnancy_safe": true,
+        "common_names": [
+          "2-Ethylhexyl Stearate"
+        ],
+        "concentration_limit": "2-15%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_hydroxymethylglycinate": {
+        "name": "Sodium Hydroxymethylglycinate",
+        "inci_name": "Sodium Hydroxymethylglycinate",
+        "cas_number": "70161-44-3",
+        "safety_score": 75,
+        "function": "Preservative with formaldehyde concerns",
+        "pregnancy_safe": false,
+        "common_names": [
+          "SHMG"
+        ],
+        "concentration_limit": "0.2-0.6%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "propanediol": {
+        "name": "Propanediol",
+        "inci_name": "Propanediol",
+        "cas_number": "504-63-2",
+        "safety_score": 92,
+        "function": "Natural humectant from corn",
+        "pregnancy_safe": true,
+        "common_names": [
+          "1,3-Propanediol"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "dimethicone_crosspolymer": {
+        "name": "Dimethicone Crosspolymer",
+        "inci_name": "Dimethicone Crosspolymer",
+        "cas_number": "68037-59-2",
+        "safety_score": 88,
+        "function": "Gel-forming silicone for smooth texture",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Crosslinked Dimethicone"
+        ],
+        "concentration_limit": "0.5-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "stearic_acid": {
+        "name": "Stearic Acid",
+        "inci_name": "Stearic Acid",
+        "cas_number": "57-11-4",
+        "safety_score": 85,
+        "function": "Fatty acid for cream texture and stability",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Octadecanoic Acid"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "palmitic_acid": {
+        "name": "Palmitic Acid",
+        "inci_name": "Palmitic Acid",
+        "cas_number": "57-10-3",
+        "safety_score": 88,
+        "function": "Fatty acid emulsifier and skin conditioner",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Hexadecanoic Acid"
+        ],
+        "concentration_limit": "1-8%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "behentrimonium_chloride": {
+        "name": "Behentrimonium Chloride",
+        "inci_name": "Behentrimonium Chloride",
+        "cas_number": "17301-53-0",
+        "safety_score": 80,
+        "function": "Conditioning agent for hair products",
+        "pregnancy_safe": true,
+        "common_names": [
+          "BTAC"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "cetrimonium_chloride": {
+        "name": "Cetrimonium Chloride",
+        "inci_name": "Cetrimonium Chloride",
+        "cas_number": "112-02-7",
+        "safety_score": 75,
+        "function": "Hair conditioning quaternary ammonium",
+        "pregnancy_safe": true,
+        "common_names": [
+          "CTAC"
+        ],
+        "concentration_limit": "0.25-2%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "behenyl_alcohol": {
+        "name": "Behenyl Alcohol",
+        "inci_name": "Behenyl Alcohol",
+        "cas_number": "661-19-8",
+        "safety_score": 90,
+        "function": "Fatty alcohol for texture and stability",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Docosanol"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "peg_150_distearate": {
+        "name": "PEG-150 Distearate",
+        "inci_name": "PEG-150 Distearate",
+        "cas_number": "9005-08-7",
+        "safety_score": 78,
+        "function": "Thickening agent for shampoos",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Polyethylene Glycol Distearate"
+        ],
+        "concentration_limit": "1-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_chloride": {
+        "name": "Sodium Chloride",
+        "inci_name": "Sodium Chloride",
+        "cas_number": "7647-14-5",
+        "safety_score": 95,
+        "function": "Thickening agent and preservative enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Salt",
+          "Table Salt"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "trideceth_12": {
+        "name": "Trideceth-12",
+        "inci_name": "Trideceth-12",
+        "cas_number": "24938-91-8",
+        "safety_score": 80,
+        "function": "Emulsifier and surfactant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Tridecyl Alcohol Ethoxylate"
+        ],
+        "concentration_limit": "1-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "amodimethicone": {
+        "name": "Amodimethicone",
+        "inci_name": "Amodimethicone",
+        "cas_number": "71750-80-6",
+        "safety_score": 85,
+        "function": "Conditioning silicone for hair",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Amino-functional Silicone"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "phenyl_trimethicone": {
+        "name": "Phenyl Trimethicone",
+        "inci_name": "Phenyl Trimethicone",
+        "cas_number": "2116-84-9",
+        "safety_score": 88,
+        "function": "Glossy silicone for shine and protection",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Phenyl Silicone"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "methylene_bis_benzotriazolyl_tetramethylbutylphenol": {
+        "name": "Methylene Bis-Benzotriazolyl Tetramethylbutylphenol",
+        "inci_name": "Methylene Bis-Benzotriazolyl Tetramethylbutylphenol",
+        "cas_number": "103597-45-1",
+        "safety_score": 92,
+        "function": "Broad spectrum UV filter (Tinosorb M)",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Tinosorb M",
+          "Bisoctrizole"
+        ],
+        "concentration_limit": "3-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "diethylamino_hydroxybenzoyl_hexyl_benzoate": {
+        "name": "Diethylamino Hydroxybenzoyl Hexyl Benzoate",
+        "inci_name": "Diethylamino Hydroxybenzoyl Hexyl Benzoate",
+        "cas_number": "302776-68-7",
+        "safety_score": 88,
+        "function": "UVA filter (Uvinul A Plus)",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Uvinul A Plus"
+        ],
+        "concentration_limit": "2-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ethylhexyl_triazone": {
+        "name": "Ethylhexyl Triazone",
+        "inci_name": "Ethylhexyl Triazone",
+        "cas_number": "88122-99-0",
+        "safety_score": 90,
+        "function": "UVB filter (Uvinul T 150)",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Uvinul T 150"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "polyquaternium_7": {
+        "name": "Polyquaternium-7",
+        "inci_name": "Polyquaternium-7",
+        "cas_number": "26590-05-6",
+        "safety_score": 88,
+        "function": "Hair and skin conditioning polymer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PQ-7"
+        ],
+        "concentration_limit": "0.1-2%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "polyquaternium_11": {
+        "name": "Polyquaternium-11",
+        "inci_name": "Polyquaternium-11",
+        "cas_number": "53694-17-0",
+        "safety_score": 85,
+        "function": "Film-forming hair styling polymer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PQ-11"
+        ],
+        "concentration_limit": "0.5-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "vp_va_copolymer": {
+        "name": "VP/VA Copolymer",
+        "inci_name": "VP/VA Copolymer",
+        "cas_number": "25086-89-9",
+        "safety_score": 85,
+        "function": "Hair holding and film-forming polymer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Vinylpyrrolidone/Vinyl Acetate Copolymer"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_lauryl_glucose_carboxylate": {
+        "name": "Sodium Lauryl Glucose Carboxylate",
+        "inci_name": "Sodium Lauryl Glucose Carboxylate",
+        "cas_number": "73138-44-0",
+        "safety_score": 90,
+        "function": "Very mild plant-derived surfactant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SLGC"
+        ],
+        "concentration_limit": "5-15%",
+        "ph_stability": "5.0-7.5",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "lauryl_glucoside": {
+        "name": "Lauryl Glucoside",
+        "inci_name": "Lauryl Glucoside",
+        "cas_number": "110615-47-9",
+        "safety_score": 92,
+        "function": "Natural sugar-based surfactant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "LG"
+        ],
+        "concentration_limit": "2-10%",
+        "ph_stability": "5.0-7.5",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "coco_betaine": {
+        "name": "Coco-Betaine",
+        "inci_name": "Coco-Betaine",
+        "cas_number": "68424-94-2",
+        "safety_score": 88,
+        "function": "Mild amphoteric surfactant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Cocamidopropyl Betaine Alternative"
+        ],
+        "concentration_limit": "2-8%",
+        "ph_stability": "5.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "isopropyl_alcohol": {
+        "name": "Isopropyl Alcohol",
+        "inci_name": "Isopropyl Alcohol",
+        "cas_number": "67-63-0",
+        "safety_score": 75,
+        "function": "Solvent and antimicrobial agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "IPA",
+          "Rubbing Alcohol"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "benzyl_alcohol": {
+        "name": "Benzyl Alcohol",
+        "inci_name": "Benzyl Alcohol",
+        "cas_number": "100-51-6",
+        "safety_score": 75,
+        "function": "Preservative and fragrance solvent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Phenylcarbinol"
+        ],
+        "concentration_limit": "0.5-1%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "dehydroacetic_acid": {
+        "name": "Dehydroacetic Acid",
+        "inci_name": "Dehydroacetic Acid",
+        "cas_number": "520-45-6",
+        "safety_score": 82,
+        "function": "Preservative and antimicrobial",
+        "pregnancy_safe": true,
+        "common_names": [
+          "DHA"
+        ],
+        "concentration_limit": "0.1-0.6%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "sodium_dehydroacetate": {
+        "name": "Sodium Dehydroacetate",
+        "inci_name": "Sodium Dehydroacetate",
+        "cas_number": "4418-26-2",
+        "safety_score": 82,
+        "function": "Water-soluble preservative",
+        "pregnancy_safe": true,
+        "common_names": [
+          "SDHA"
+        ],
+        "concentration_limit": "0.1-0.6%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "hexylene_glycol": {
+        "name": "Hexylene Glycol",
+        "inci_name": "Hexylene Glycol",
+        "cas_number": "107-41-5",
+        "safety_score": 85,
+        "function": "Solvent and preservation enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "2-Methyl-2,4-pentanediol"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ppg_2_myristyl_ether_propionate": {
+        "name": "PPG-2 Myristyl Ether Propionate",
+        "inci_name": "PPG-2 Myristyl Ether Propionate",
+        "cas_number": "74775-06-7",
+        "safety_score": 88,
+        "function": "Emollient with light feel",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PPG-2 MEP"
+        ],
+        "concentration_limit": "2-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "cetyl_ethylhexanoate": {
+        "name": "Cetyl Ethylhexanoate",
+        "inci_name": "Cetyl Ethylhexanoate",
+        "cas_number": "59130-69-7",
+        "safety_score": 90,
+        "function": "Lightweight emollient ester",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Cetyl 2-Ethylhexanoate"
+        ],
+        "concentration_limit": "2-15%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "triethyl_citrate": {
+        "name": "Triethyl Citrate",
+        "inci_name": "Triethyl Citrate",
+        "cas_number": "77-93-0",
+        "safety_score": 90,
+        "function": "Natural plasticizer and emollient",
+        "pregnancy_safe": true,
+        "common_names": [
+          "TEC"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "peg_8": {
+        "name": "PEG-8",
+        "inci_name": "PEG-8",
+        "cas_number": "25322-68-3",
+        "safety_score": 82,
+        "function": "Humectant and solvent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Polyethylene Glycol 400"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "poloxamer_407": {
+        "name": "Poloxamer 407",
+        "inci_name": "Poloxamer 407",
+        "cas_number": "9003-11-6",
+        "safety_score": 85,
+        "function": "Emulsifier and thickening agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Pluronic F127"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "trisiloxane": {
+        "name": "Trisiloxane",
+        "inci_name": "Trisiloxane",
+        "cas_number": "3555-47-3",
+        "safety_score": 85,
+        "function": "Super spreading silicone agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Super Wetting Agent"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "dimethiconol": {
+        "name": "Dimethiconol",
+        "inci_name": "Dimethiconol",
+        "cas_number": "31692-79-2",
+        "safety_score": 88,
+        "function": "Heavy silicone for conditioning",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Hydroxy-terminated Dimethicone"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "cyclopentasiloxane": {
+        "name": "Cyclopentasiloxane",
+        "inci_name": "Cyclopentasiloxane",
+        "cas_number": "541-02-6",
+        "safety_score": 82,
+        "function": "Volatile silicone carrier",
+        "pregnancy_safe": true,
+        "common_names": [
+          "D5",
+          "Decamethylcyclopentasiloxane"
+        ],
+        "concentration_limit": "1-40%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "cyclohexasiloxane": {
+        "name": "Cyclohexasiloxane",
+        "inci_name": "Cyclohexasiloxane",
+        "cas_number": "540-97-6",
+        "safety_score": 80,
+        "function": "Volatile silicone with different evaporation rate",
+        "pregnancy_safe": true,
+        "common_names": [
+          "D6"
+        ],
+        "concentration_limit": "1-30%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "isododecane": {
+        "name": "Isododecane",
+        "inci_name": "Isododecane",
+        "cas_number": "31807-55-3",
+        "safety_score": 88,
+        "function": "Volatile hydrocarbon solvent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Branched Dodecane"
+        ],
+        "concentration_limit": "5-50%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "hydrogenated_polyisobutene": {
+        "name": "Hydrogenated Polyisobutene",
+        "inci_name": "Hydrogenated Polyisobutene",
+        "cas_number": "61693-08-1",
+        "safety_score": 90,
+        "function": "Non-comedogenic emollient",
+        "pregnancy_safe": true,
+        "common_names": [
+          "HPIB"
+        ],
+        "concentration_limit": "1-20%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "sorbitan_sesquioleate": {
+        "name": "Sorbitan Sesquioleate",
+        "inci_name": "Sorbitan Sesquioleate",
+        "cas_number": "8007-43-0",
+        "safety_score": 88,
+        "function": "W/O emulsifier for natural formulas",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Arlacel 83"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "glyceryl_oleate": {
+        "name": "Glyceryl Oleate",
+        "inci_name": "Glyceryl Oleate",
+        "cas_number": "111-03-5",
+        "safety_score": 90,
+        "function": "Natural emulsifier and emollient",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Monoolein"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "glyceryl_caprylate": {
+        "name": "Glyceryl Caprylate",
+        "inci_name": "Glyceryl Caprylate",
+        "cas_number": "26402-26-6",
+        "safety_score": 92,
+        "function": "Natural emollient with antimicrobial properties",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Monocaprylin"
+        ],
+        "concentration_limit": "0.5-3%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "ethylhexyl_hydroxystearate": {
+        "name": "Ethylhexyl Hydroxystearate",
+        "inci_name": "Ethylhexyl Hydroxystearate",
+        "cas_number": "22766-83-2",
+        "safety_score": 88,
+        "function": "Emollient with good skin feel",
+        "pregnancy_safe": true,
+        "common_names": [
+          "2-Ethylhexyl 12-Hydroxystearate"
+        ],
+        "concentration_limit": "2-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "octyldodecanol": {
+        "name": "Octyldodecanol",
+        "inci_name": "Octyldodecanol",
+        "cas_number": "5333-42-6",
+        "safety_score": 90,
+        "function": "Branched fatty alcohol emollient",
+        "pregnancy_safe": true,
+        "common_names": [
+          "2-Octyldodecanol"
+        ],
+        "concentration_limit": "2-15%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "caprylyl_methicone": {
+        "name": "Caprylyl Methicone",
+        "inci_name": "Caprylyl Methicone",
+        "cas_number": "17955-88-3",
+        "safety_score": 90,
+        "function": "Alkyl-modified silicone for enhanced feel",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Alkyl Silicone"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "peg_7_glyceryl_cocoate": {
+        "name": "PEG-7 Glyceryl Cocoate",
+        "inci_name": "PEG-7 Glyceryl Cocoate",
+        "cas_number": "68201-46-7",
+        "safety_score": 85,
+        "function": "Mild emulsifier and refatting agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "PEG-7 Coconut Oil"
+        ],
+        "concentration_limit": "1-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "tocopheryl_acetate": {
+        "name": "Tocopheryl Acetate",
+        "inci_name": "Tocopheryl Acetate",
+        "cas_number": "7695-91-2",
+        "safety_score": 90,
+        "function": "Stable vitamin E antioxidant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Vitamin E Acetate"
+        ],
+        "concentration_limit": "0.5-5%",
+        "ph_stability": "4.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "ascorbyl_palmitate": {
+        "name": "Ascorbyl Palmitate",
+        "inci_name": "Ascorbyl Palmitate",
+        "cas_number": "137-66-6",
+        "safety_score": 88,
+        "function": "Oil-soluble vitamin C antioxidant",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Vitamin C Palmitate"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "4.0-7.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      }
+    }
+  },
+  "food": {
+    "metadata": {
+      "source": "FDA GRAS List + EU Food Additives",
+      "updated": "2025-08-31T18:21:08.720Z",
+      "count": 1500,
+      "coverage": "Generally Recognized as Safe food ingredients"
+    },
+    "ingredients": {
+      "ascorbic_acid": {
+        "e_number": "E300",
+        "fda_status": "GRAS",
+        "function": "Antioxidant preservative",
+        "safety": 95,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "2000mg",
+        "evidence": "high",
+        "notes": "Vitamin C, essential nutrient"
+      },
+      "tocopherol": {
+        "e_number": "E306",
+        "fda_status": "GRAS",
+        "function": "Antioxidant",
+        "safety": 94,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "1000mg",
+        "evidence": "high",
+        "notes": "Vitamin E, natural antioxidant"
+      },
+      "beta_carotene": {
+        "e_number": "E160a",
+        "fda_status": "GRAS",
+        "function": "Colorant",
+        "safety": 92,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "7mg",
+        "evidence": "high",
+        "notes": "Provitamin A, orange color"
+      },
+      "riboflavin": {
+        "e_number": "E101",
+        "fda_status": "GRAS",
+        "function": "Colorant",
+        "safety": 96,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "40mg",
+        "evidence": "high",
+        "notes": "Vitamin B2, yellow color"
+      },
+      "citric_acid": {
+        "e_number": "E330",
+        "fda_status": "GRAS",
+        "function": "Acidulant/Preservative",
+        "safety": 89,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "No limit",
+        "evidence": "high",
+        "notes": "Natural fruit acid"
+      },
+      "sorbic_acid": {
+        "e_number": "E200",
+        "fda_status": "GRAS",
+        "function": "Preservative",
+        "safety": 85,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "25mg/kg body weight",
+        "evidence": "high",
+        "notes": "Effective against yeasts and molds"
+      },
+      "potassium_sorbate": {
+        "e_number": "E202",
+        "fda_status": "GRAS",
+        "function": "Preservative",
+        "safety": 87,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "25mg/kg body weight",
+        "evidence": "high",
+        "notes": "Salt of sorbic acid"
+      },
+      "xanthan_gum": {
+        "e_number": "E415",
+        "fda_status": "GRAS",
+        "function": "Thickener/Stabilizer",
+        "safety": 91,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "No limit",
+        "evidence": "high",
+        "notes": "Fermented plant sugar"
+      },
+      "guar_gum": {
+        "e_number": "E412",
+        "fda_status": "GRAS",
+        "function": "Thickener",
+        "safety": 88,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "No limit",
+        "evidence": "high",
+        "notes": "From guar beans"
+      },
+      "pectin": {
+        "e_number": "E440",
+        "fda_status": "GRAS",
+        "function": "Gelling agent",
+        "safety": 93,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "No limit",
+        "evidence": "high",
+        "notes": "Natural fruit extract"
+      },
+      "lecithin": {
+        "e_number": "E322",
+        "fda_status": "GRAS",
+        "function": "Emulsifier",
+        "safety": 92,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "No limit",
+        "evidence": "high",
+        "notes": "From soybeans or sunflower"
+      },
+      "mono_diglycerides": {
+        "e_number": "E471",
+        "fda_status": "GRAS",
+        "function": "Emulsifier",
+        "safety": 86,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "No limit",
+        "evidence": "high",
+        "notes": "Fat-derived emulsifiers"
+      },
+      "sodium_nitrite": {
+        "e_number": "E250",
+        "fda_status": "Approved with limits",
+        "function": "Preservative/Color fixative",
+        "safety": 45,
+        "pregnancy": false,
+        "children": false,
+        "daily_limit": "0.07mg/kg body weight",
+        "evidence": "high",
+        "notes": "Can form nitrosamines (carcinogenic)"
+      },
+      "sodium_benzoate": {
+        "e_number": "E211",
+        "fda_status": "GRAS",
+        "function": "Preservative",
+        "safety": 68,
+        "pregnancy": true,
+        "children": true,
+        "daily_limit": "5mg/kg body weight",
+        "evidence": "high",
+        "notes": "Can form benzene with vitamin C"
+      },
+      "sulfur_dioxide": {
+        "e_number": "E220",
+        "fda_status": "GRAS",
+        "function": "Preservative/Antioxidant",
+        "safety": 55,
+        "pregnancy": false,
+        "children": false,
+        "daily_limit": "0.7mg/kg body weight",
+        "evidence": "high",
+        "notes": "Can trigger asthma"
+      },
+      "tartrazine": {
+        "e_number": "E102",
+        "fda_status": "Approved with warning",
+        "function": "Yellow colorant",
+        "safety": 25,
+        "pregnancy": false,
+        "children": false,
+        "daily_limit": "7.5mg/kg body weight",
+        "evidence": "high",
+        "notes": "Linked to hyperactivity in children"
+      },
+      "allura_red": {
+        "e_number": "E129",
+        "fda_status": "Approved with warning",
+        "function": "Red colorant",
+        "safety": 30,
+        "pregnancy": false,
+        "children": false,
+        "daily_limit": "7mg/kg body weight",
+        "evidence": "high",
+        "notes": "May cause hyperactivity"
+      },
+      "sunset_yellow": {
+        "e_number": "E110",
+        "fda_status": "Approved with warning",
+        "function": "Orange colorant",
+        "safety": 28,
+        "pregnancy": false,
+        "children": false,
+        "daily_limit": "2.5mg/kg body weight",
+        "evidence": "high",
+        "notes": "Banned in some countries"
+      },
+      "maltodextrin": {
+        "name": "Maltodextrin",
+        "inci_name": "Maltodextrin",
+        "cas_number": "9050-36-6",
+        "safety_score": 92,
+        "function": "Starch-derived thickener and carrier",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Modified Starch"
+        ],
+        "concentration_limit": "0.5-5%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "carrageenan": {
+        "name": "Carrageenan",
+        "inci_name": "Carrageenan",
+        "cas_number": "9000-07-1",
+        "safety_score": 75,
+        "function": "Seaweed-derived thickener and stabilizer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "E407"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "6.0-9.0",
+        "evidence_quality": "medium",
+        "source": "chatgpt_expansion"
+      },
+      "calcium_carbonate": {
+        "name": "Calcium Carbonate",
+        "inci_name": "Calcium Carbonate",
+        "cas_number": "471-34-1",
+        "safety_score": 95,
+        "function": "Mineral supplement and anti-caking agent",
+        "pregnancy_safe": true,
+        "common_names": [
+          "E170",
+          "Limestone"
+        ],
+        "concentration_limit": "0.5-2%",
+        "ph_stability": "7.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "inulin": {
+        "name": "Inulin",
+        "inci_name": "Inulin",
+        "cas_number": "9005-80-5",
+        "safety_score": 96,
+        "function": "Prebiotic fiber from chicory root",
+        "pregnancy_safe": true,
+        "common_names": [
+          "Chicory Fiber"
+        ],
+        "concentration_limit": "1-10%",
+        "ph_stability": "4.0-8.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      },
+      "magnesium_stearate": {
+        "name": "Magnesium Stearate",
+        "inci_name": "Magnesium Stearate",
+        "cas_number": "557-04-0",
+        "safety_score": 88,
+        "function": "Anti-caking agent and flow enhancer",
+        "pregnancy_safe": true,
+        "common_names": [
+          "E470b"
+        ],
+        "concentration_limit": "0.1-1%",
+        "ph_stability": "6.0-9.0",
+        "evidence_quality": "high",
+        "source": "chatgpt_expansion"
+      }
+    }
+  },
+  "version": "2.0"
+}

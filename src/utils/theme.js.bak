@@ -1,0 +1,127 @@
+// Centralized Light Green Theme for HealthyScan / Vee App
+// Clean, fresh green aesthetic with natural accents
+
+export const THEME = {
+  // Core backgrounds
+  background: '#F5F5F0',            // Main app background - warm off-white
+  backgroundLight: '#FFFFFF',        // Pure white (cards, headers)
+  surface: '#FFFFFF',                // Cards, inputs, elevated surfaces
+  surfaceLight: '#F8FAF5',           // Slightly tinted surface
+  surfaceDark: '#EDF5E1',            // Green-tinted surface variant
+
+  // Gradient backgrounds
+  gradientStart: '#B2DFBC',          // Top of screen gradient
+  gradientMid: '#C8E6C9',            // Mid gradient
+  gradientEnd: '#F5F5F0',            // Bottom of screen
+
+  // Borders & dividers
+  border: '#E0E0E0',                 // Standard borders
+  borderLight: '#EEEEEE',            // Lighter borders
+  borderSubtle: '#F0F0F0',           // Very subtle borders
+  borderGreen: '#C8E6C9',            // Green accent border
+  divider: '#EEEEEE',                // Divider lines
+
+  // Primary accent (Green)
+  primary: '#4CAF50',                // Main green accent
+  primaryDark: '#2E7D32',            // Darker green (buttons, headings)
+  primaryDeep: '#1B5E20',            // Deepest green (main buttons)
+  primaryLight: '#66BB6A',           // Lighter green
+  primaryMuted: 'rgba(76, 175, 80, 0.08)', // Muted green background
+  primaryGlow: 'rgba(46, 125, 50, 0.15)',  // Green glow effect
+
+  // Orange accent (Analyze Meal, warnings)
+  orange: '#FF9800',
+  orangeDark: '#EF6C00',
+  orangeLight: '#FFB74D',
+  orangeMuted: 'rgba(255, 152, 0, 0.08)',
+
+  // Text hierarchy
+  text: '#212121',                   // Primary text - near black
+  textSecondary: '#757575',          // Secondary text
+  textTertiary: '#9E9E9E',           // Tertiary/muted text
+  textGreen: '#1B5E20',              // Green heading text
+  textWhite: '#FFFFFF',              // White text on dark buttons
+
+  // Health score colors (semantic)
+  excellent: '#1B5E20',
+  good: '#4CAF50',
+  moderate: '#FF9800',
+  poor: '#F44336',
+  warning: '#FF9800',
+  error: '#F44336',
+
+  // Health score backgrounds
+  excellentBg: 'rgba(27, 94, 32, 0.1)',
+  goodBg: 'rgba(76, 175, 80, 0.1)',
+  moderateBg: 'rgba(255, 152, 0, 0.1)',
+  poorBg: 'rgba(244, 67, 54, 0.1)',
+  unknownBg: 'rgba(158, 158, 158, 0.08)',
+
+  // AI/Premium
+  aiPurple: '#7C4DFF',
+  aiPurpleBg: 'rgba(124, 77, 255, 0.08)',
+  premiumGreen: '#2E7D32',
+
+  // Utility
+  overlay: 'rgba(0, 0, 0, 0.45)',
+  overlayLight: 'rgba(0, 0, 0, 0.2)',
+  shadow: '#000000',
+  transparent: 'transparent',
+  white: '#FFFFFF',
+  black: '#000000',
+};
+
+// Shadow helpers
+export const GLOW = {
+  green: {
+    shadowColor: '#2E7D32',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  greenStrong: {
+    shadowColor: '#1B5E20',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  subtle: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+};
+
+// Common card style
+export const CARD = {
+  backgroundColor: THEME.surface,
+  borderRadius: 16,
+  borderWidth: 1,
+  borderColor: THEME.border,
+  ...GLOW.card,
+};
+
+// Common input style
+export const INPUT = {
+  backgroundColor: THEME.surface,
+  borderWidth: 1,
+  borderColor: THEME.border,
+  borderRadius: 12,
+  color: THEME.text,
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+};
+
+export default THEME;
+

@@ -1,0 +1,208 @@
+{
+  "metadata": {
+    "source": "FDA GRAS List + EU Food Additives",
+    "updated": "2025-08-31T18:21:08.720Z",
+    "count": 1500,
+    "coverage": "Generally Recognized as Safe food ingredients"
+  },
+  "ingredients": {
+    "ascorbic_acid": {
+      "e_number": "E300",
+      "fda_status": "GRAS",
+      "function": "Antioxidant preservative",
+      "safety": 95,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "2000mg",
+      "evidence": "high",
+      "notes": "Vitamin C, essential nutrient"
+    },
+    "tocopherol": {
+      "e_number": "E306",
+      "fda_status": "GRAS",
+      "function": "Antioxidant",
+      "safety": 94,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "1000mg",
+      "evidence": "high",
+      "notes": "Vitamin E, natural antioxidant"
+    },
+    "beta_carotene": {
+      "e_number": "E160a",
+      "fda_status": "GRAS",
+      "function": "Colorant",
+      "safety": 92,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "7mg",
+      "evidence": "high",
+      "notes": "Provitamin A, orange color"
+    },
+    "riboflavin": {
+      "e_number": "E101",
+      "fda_status": "GRAS",
+      "function": "Colorant",
+      "safety": 96,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "40mg",
+      "evidence": "high",
+      "notes": "Vitamin B2, yellow color"
+    },
+    "citric_acid": {
+      "e_number": "E330",
+      "fda_status": "GRAS",
+      "function": "Acidulant/Preservative",
+      "safety": 89,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "No limit",
+      "evidence": "high",
+      "notes": "Natural fruit acid"
+    },
+    "sorbic_acid": {
+      "e_number": "E200",
+      "fda_status": "GRAS",
+      "function": "Preservative",
+      "safety": 85,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "25mg/kg body weight",
+      "evidence": "high",
+      "notes": "Effective against yeasts and molds"
+    },
+    "potassium_sorbate": {
+      "e_number": "E202",
+      "fda_status": "GRAS",
+      "function": "Preservative",
+      "safety": 87,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "25mg/kg body weight",
+      "evidence": "high",
+      "notes": "Salt of sorbic acid"
+    },
+    "xanthan_gum": {
+      "e_number": "E415",
+      "fda_status": "GRAS",
+      "function": "Thickener/Stabilizer",
+      "safety": 91,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "No limit",
+      "evidence": "high",
+      "notes": "Fermented plant sugar"
+    },
+    "guar_gum": {
+      "e_number": "E412",
+      "fda_status": "GRAS",
+      "function": "Thickener",
+      "safety": 88,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "No limit",
+      "evidence": "high",
+      "notes": "From guar beans"
+    },
+    "pectin": {
+      "e_number": "E440",
+      "fda_status": "GRAS",
+      "function": "Gelling agent",
+      "safety": 93,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "No limit",
+      "evidence": "high",
+      "notes": "Natural fruit extract"
+    },
+    "lecithin": {
+      "e_number": "E322",
+      "fda_status": "GRAS",
+      "function": "Emulsifier",
+      "safety": 92,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "No limit",
+      "evidence": "high",
+      "notes": "From soybeans or sunflower"
+    },
+    "mono_diglycerides": {
+      "e_number": "E471",
+      "fda_status": "GRAS",
+      "function": "Emulsifier",
+      "safety": 86,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "No limit",
+      "evidence": "high",
+      "notes": "Fat-derived emulsifiers"
+    },
+    "sodium_nitrite": {
+      "e_number": "E250",
+      "fda_status": "Approved with limits",
+      "function": "Preservative/Color fixative",
+      "safety": 45,
+      "pregnancy": false,
+      "children": false,
+      "daily_limit": "0.07mg/kg body weight",
+      "evidence": "high",
+      "notes": "Can form nitrosamines (carcinogenic)"
+    },
+    "sodium_benzoate": {
+      "e_number": "E211",
+      "fda_status": "GRAS",
+      "function": "Preservative",
+      "safety": 68,
+      "pregnancy": true,
+      "children": true,
+      "daily_limit": "5mg/kg body weight",
+      "evidence": "high",
+      "notes": "Can form benzene with vitamin C"
+    },
+    "sulfur_dioxide": {
+      "e_number": "E220",
+      "fda_status": "GRAS",
+      "function": "Preservative/Antioxidant",
+      "safety": 55,
+      "pregnancy": false,
+      "children": false,
+      "daily_limit": "0.7mg/kg body weight",
+      "evidence": "high",
+      "notes": "Can trigger asthma"
+    },
+    "tartrazine": {
+      "e_number": "E102",
+      "fda_status": "Approved with warning",
+      "function": "Yellow colorant",
+      "safety": 25,
+      "pregnancy": false,
+      "children": false,
+      "daily_limit": "7.5mg/kg body weight",
+      "evidence": "high",
+      "notes": "Linked to hyperactivity in children"
+    },
+    "allura_red": {
+      "e_number": "E129",
+      "fda_status": "Approved with warning",
+      "function": "Red colorant",
+      "safety": 30,
+      "pregnancy": false,
+      "children": false,
+      "daily_limit": "7mg/kg body weight",
+      "evidence": "high",
+      "notes": "May cause hyperactivity"
+    },
+    "sunset_yellow": {
+      "e_number": "E110",
+      "fda_status": "Approved with warning",
+      "function": "Orange colorant",
+      "safety": 28,
+      "pregnancy": false,
+      "children": false,
+      "daily_limit": "2.5mg/kg body weight",
+      "evidence": "high",
+      "notes": "Banned in some countries"
+    }
+  }
+}

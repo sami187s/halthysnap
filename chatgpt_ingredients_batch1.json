@@ -1,0 +1,69 @@
+{
+  "ingredients": [
+    {
+      "name": "Water",
+      "inci_name": "Aqua/Water/Eau",
+      "cas_number": "7732-18-5",
+      "safety_score": 100,
+      "category": "moisturizer",
+      "function": "Solvent and hydration vehicle",
+      "pregnancy_safe": true,
+      "common_names": ["Aqua", "Eau"],
+      "concentration_limit": "—",
+      "ph_stability": "4.0-9.0",
+      "evidence_quality": "high"
+    },
+    {
+      "name": "Glycerin",
+      "inci_name": "Glycerin",
+      "cas_number": "56-81-5",
+      "safety_score": 95,
+      "category": "moisturizer",
+      "function": "Humectant that draws water into skin",
+      "pregnancy_safe": true,
+      "common_names": ["Glycerol"],
+      "concentration_limit": "1-10%",
+      "ph_stability": "4.0-9.0",
+      "evidence_quality": "high"
+    },
+    {
+      "name": "Niacinamide",
+      "inci_name": "Niacinamide",
+      "cas_number": "98-92-0",
+      "safety_score": 95,
+      "category": "active",
+      "function": "Brightening, barrier support, anti-inflammatory",
+      "pregnancy_safe": true,
+      "common_names": ["Vitamin B3"],
+      "concentration_limit": "2-10%",
+      "ph_stability": "5.0-7.0",
+      "evidence_quality": "high"
+    },
+    {
+      "name": "Sodium Hyaluronate",
+      "inci_name": "Sodium Hyaluronate",
+      "cas_number": "9067-32-7",
+      "safety_score": 95,
+      "category": "moisturizer",
+      "function": "Humectant; salt form of hyaluronic acid",
+      "pregnancy_safe": true,
+      "common_names": ["Hyaluronic Acid (salt)"],
+      "concentration_limit": "0.05-2%",
+      "ph_stability": "4.0-9.0",
+      "evidence_quality": "high"
+    },
+    {
+      "name": "Hyaluronic Acid",
+      "inci_name": "Hyaluronic Acid",
+      "cas_number": "9004-61-9",
+      "safety_score": 95,
+      "category": "moisturizer",
+      "function": "Humectant polymer that binds water",
+      "pregnancy_safe": true,
+      "common_names": ["HA", "Hyaluronan"],
+      "concentration_limit": "0.05-2%",
+      "ph_stability": "4.0-8.0",
+      "evidence_quality": "high"
+    }
+  ]
+}

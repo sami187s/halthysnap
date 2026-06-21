@@ -1,0 +1,41 @@
+const fs = require('fs');
+const path = require('path');
+
+let rewriteIncludeBuildLines;
+try {
+  ({ rewriteIncludeBuildLines } = require('../plugins/withAndroidSettingsGradleFix'));
+} catch (error) {
+  console.warn('⚠️  Unable to load shared Gradle fixer helper:', error.message);
+}
+
+function fixGradleSettings() {
+  const settingsPath = path.join(__dirname, '..', 'android', 'settings.gradle');
+
+  if (!fs.existsSync(settingsPath)) {
+    console.log('⚠️  settings.gradle not found, skipping fix');
+    return;
+  }
+
+  const content = fs.readFileSync(settingsPath, 'utf-8');
+
+  if (typeof rewriteIncludeBuildLines !== 'function') {
+    console.log('ℹ️  Helper unavailable, leaving settings.gradle unchanged');
+    return;
+  }
+
+  const { updated, modified } = rewriteIncludeBuildLines(content);
+
+  if (modified) {
+    fs.writeFileSync(settingsPath, updated);
+    console.log('✅ Normalized includeBuild lines via fix-gradle-settings.js');
+  } else {
+    console.log('ℹ️  settings.gradle includeBuild lines already normalized');
+  }
+}
+
+try {
+  fixGradleSettings();
+} catch (error) {
+  console.error('❌ Error:', error.message);
+  process.exit(0);
+}

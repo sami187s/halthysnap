@@ -1,0 +1,57 @@
+{
+  "expo": {
+    "name": "Vee: Product Check",
+    "slug": "healthyscan",
+    "version": "3.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/leaf-logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/leaf-logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#E8F5E8"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "ios": { "supportsTablet": true, "bundleIdentifier": "com.healthyscan.app", "buildNumber": "7", "config": { "usesNonExemptEncryption": false }, "appStoreUrl": "https://apps.apple.com/app/healthyscan/id123456789", "infoPlist": { "UIDeviceFamily": [1, 2], "NSCameraUsageDescription": "HealthyScan uses the camera to scan product barcodes for health analysis.", "NSPhotoLibraryUsageDescription": "HealthyScan needs access to your photo library to select product images for analysis.", "UIRequiredDeviceCapabilities": [ "arm64" ], "LSRequiresIPhoneOS": true, "CFBundleDevelopmentRegion": "en", "UIViewControllerBasedStatusBarAppearance": false, "UIStatusBarStyle": "UIStatusBarStyleLightContent", "UISupportedInterfaceOrientations": [ "UIInterfaceOrientationPortrait" ] } },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/leaf-logo.png",
+        "backgroundColor": "#E8F5E8"
+      },
+      "package": "com.healthyscan.app",
+      "versionCode": 2,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "allowBackup": false,
+      "softwareKeyboardLayoutMode": "pan"
+    },
+    "web": {
+      "favicon": "./assets/leaf-logo.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow HealthyScan to access camera to scan product barcodes.",
+          "microphonePermission": false
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "8880c36a-455c-4b8a-83fe-663883570a14"
+      }
+    }
+  }
+}

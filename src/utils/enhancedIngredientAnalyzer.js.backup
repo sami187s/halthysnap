@@ -1,0 +1,1463 @@
+// Ingredients database with fallback for compatibility
+let ingredientsDatabase = [];
+
+// Try to load the ingredients database
+try {
+  // In a React Native environment, you'd normally import this
+  // For now, we'll provide a minimal fallback database
+  ingredientsDatabase = [
+    {
+      "name": "sodium lauryl sulfate",
+      "aliases": ["sls", "sodium dodecyl sulfate"],
+      "riskLevel": "high",
+      "score": 15,
+      "description": "Harsh surfactant that can cause skin and eye irritation.",
+      "category": "surfactant"
+    },
+    {
+      "name": "parabens",
+      "aliases": ["methylparaben", "propylparaben", "butylparaben", "ethylparaben"],
+      "riskLevel": "medium",
+      "score": 35,
+      "description": "Preservatives that may disrupt hormone function.",
+      "category": "preservative"
+    },
+    {
+      "name": "water",
+      "aliases": ["aqua", "h2o"],
+      "riskLevel": "low",
+      "score": 90,
+      "description": "Essential ingredient, generally safe.",
+      "category": "solvent"
+    },
+    {
+      "name": "glycerin",
+      "aliases": ["glycerol"],
+      "riskLevel": "low", 
+      "score": 85,
+      "description": "Excellent moisturizer, skin-friendly.",
+      "category": "humectant"
+    }
+  ];
+} catch (error) {
+}
+
+export const analyzeIngredients = (productIngredients, productType = 'beauty', nutriments = {}, productData = null) => {
+  
+  try {
+    // Use different analysis for non-food products
+    if (productType !== 'food') {
+      return analyzeNonFoodProduct(productIngredients, productType);
+    }
+    
+    // Original food analysis continues below...
+    return analyzeFoodProduct(productIngredients, nutriments, productData);
+  } catch (error) {
+    // Return a safe fallback analysis
+    return {
+      score: 50,
+      analyzedIngredients: [],
+      goodIngredients: [],
+      badIngredients: [],
+      moderateIngredients: [],
+      unknownIngredients: [],
+      harmfulChemicals: [],
+      allergens: [],
+      additives: [],
+      productType: productType,
+      analysisType: 'error-fallback',
+      error: error.message
+    };
+  }
+};
+
+// NEW: Dedicated analysis for beauty/cosmetic/household products
+export const analyzeNonFoodProduct = (productIngredients, productType) => {
+  
+  if (!productIngredients || typeof productIngredients !== 'string') {
+    return {
+      score: 50,
+      analyzedIngredients: [],
+      goodIngredients: [],
+      badIngredients: [],
+      moderateIngredients: [],
+      unknownIngredients: [],
+      harmfulChemicals: [],
+      allergens: [],
+      additives: [],
+      productType: productType,
+      analysisType: 'chemical-safety'
+    };
+  }
+
+  // Enhanced ingredient cleaning - filter out manufacturer info, addresses, etc.
+  const ingredientsList = productIngredients
+    .toLowerCase()
+    .split(/[,;.]/)
+    .map(ingredient => ingredient.trim())
+    .filter(ingredient => {
+      // Filter out manufacturer details, addresses, websites, percentages
+      if (ingredient.length <= 2) return false;
+      if (ingredient.includes('www')) return false;
+      if (ingredient.includes('.com')) return false;
+      if (ingredient.includes('llc')) return false;
+      if (ingredient.includes('inc')) return false;
+      if (ingredient.includes('corp')) return false;
+      if (/\d{5}/.test(ingredient)) return false; // ZIP codes
+      if (ingredient.includes('pa ') && ingredient.includes('17331')) return false; // addresses
+      if (ingredient.includes('@')) return false; // social media
+      if (ingredient.match(/^\d+%/)) return false; // percentage values
+      if (ingredient.includes('free') && ingredient.includes('%')) return false; // nutrition facts
+      if (ingredient.includes('quality foods')) return false; // company names
+      return true;
+    });
+
+
+  const analyzedIngredients = [];
+  const goodIngredients = [];
+  const badIngredients = [];
+  const moderateIngredients = [];
+  const unknownIngredients = [];
+  const harmfulChemicals = [];
+  const allergens = [];
+  const additives = [];
+
+  let totalScore = 70; // Start neutral for non-food
+
+  // HARMFUL CHEMICALS DATABASE for cosmetics/household
+  const harmfulChemicalsDB = {
+    // Parabens
+    'methylparaben': { risk: 'high', type: 'Preservative', concern: 'Endocrine disruptor, potential carcinogen' },
+    'propylparaben': { risk: 'high', type: 'Preservative', concern: 'Endocrine disruptor, skin irritant' },
+    'butylparaben': { risk: 'high', type: 'Preservative', concern: 'Hormone disruptor, allergic reactions' },
+    'ethylparaben': { risk: 'moderate', type: 'Preservative', concern: 'Potential skin irritant' },
+    
+    // Sulfates
+    'sodium lauryl sulfate': { risk: 'high', type: 'Surfactant', concern: 'Skin/eye irritant, strips natural oils' },
+    'sodium laureth sulfate': { risk: 'moderate', type: 'Surfactant', concern: 'Potential skin dryness' },
+    'ammonium lauryl sulfate': { risk: 'high', type: 'Surfactant', concern: 'Harsh cleanser, skin irritant' },
+    
+    // Phthalates  
+    'dibutyl phthalate': { risk: 'high', type: 'Plasticizer', concern: 'Endocrine disruptor, reproductive toxin' },
+    'diethyl phthalate': { risk: 'high', type: 'Plasticizer', concern: 'Hormone disruptor' },
+    'benzyl butyl phthalate': { risk: 'high', type: 'Plasticizer', concern: 'Reproductive toxin' },
+    
+    // Formaldehyde & releasers
+    'formaldehyde': { risk: 'high', type: 'Preservative', concern: 'Carcinogen, severe skin/respiratory irritant' },
+    'quaternium-15': { risk: 'high', type: 'Preservative', concern: 'Formaldehyde releaser, allergen' },
+    'dmdm hydantoin': { risk: 'high', type: 'Preservative', concern: 'Formaldehyde releaser' },
+    
+    // Heavy metals & toxins
+    'lead acetate': { risk: 'high', type: 'Colorant', concern: 'Neurotoxin, developmental toxin' },
+    'mercury': { risk: 'high', type: 'Preservative', concern: 'Neurotoxin, kidney damage' },
+    'aluminum chloride': { risk: 'moderate', type: 'Antiperspirant', concern: 'Potential link to Alzheimer\'s' },
+    
+    // Petroleum derivatives
+    'petrolatum': { risk: 'moderate', type: 'Emollient', concern: 'May contain carcinogenic impurities' },
+    'mineral oil': { risk: 'moderate', type: 'Emollient', concern: 'Clogs pores, potential contamination' },
+    'paraffin': { risk: 'moderate', type: 'Emollient', concern: 'Comedogenic, blocks skin breathing' }
+  };
+
+  // ALLERGENS DATABASE
+  const allergensDB = {
+    'fragrance': { risk: 'moderate', concern: 'Contact allergies, respiratory issues' },
+    'parfum': { risk: 'moderate', concern: 'Contact allergies, hidden chemicals' },
+    'benzyl alcohol': { risk: 'moderate', concern: 'Skin sensitizer' },
+    'benzyl benzoate': { risk: 'moderate', concern: 'Skin allergen' },
+    'citral': { risk: 'moderate', concern: 'Fragrance allergen' },
+    'citronellol': { risk: 'moderate', concern: 'Fragrance allergen' },
+    'geraniol': { risk: 'moderate', concern: 'Fragrance allergen' },
+    'limonene': { risk: 'moderate', concern: 'Fragrance allergen, skin sensitizer' },
+    'linalool': { risk: 'moderate', concern: 'Fragrance allergen' },
+    'nickel': { risk: 'high', concern: 'Common metal allergen' },
+    'chromium': { risk: 'high', concern: 'Metal allergen, carcinogen' },
+    'latex': { risk: 'moderate', concern: 'Protein allergen' }
+  };
+
+  // SAFE INGREDIENTS for cosmetics
+  const safeIngredientsDB = {
+    'water': { benefit: 'Hydration base, essential solvent' },
+    'aqua': { benefit: 'Hydration base, essential solvent' },
+    'glycerin': { benefit: 'Excellent moisturizer, skin-friendly' },
+    'hyaluronic acid': { benefit: 'Superior hydration, anti-aging' },
+    'ceramides': { benefit: 'Skin barrier repair, moisturizing' },
+    'niacinamide': { benefit: 'Vitamin B3, reduces inflammation' },
+    'vitamin e': { benefit: 'Antioxidant, skin protection' },
+    'tocopherol': { benefit: 'Natural vitamin E, antioxidant' },
+    'aloe vera': { benefit: 'Soothing, anti-inflammatory' },
+    'chamomile': { benefit: 'Calming, reduces irritation' },
+    'green tea': { benefit: 'Antioxidant, anti-inflammatory' },
+    'shea butter': { benefit: 'Natural moisturizer, healing' },
+    'jojoba oil': { benefit: 'Natural oil, similar to skin sebum' },
+    'argan oil': { benefit: 'Nourishing, vitamin E rich' },
+    'coconut oil': { benefit: 'Moisturizing, antimicrobial' },
+    'rosehip oil': { benefit: 'Vitamin C, skin regeneration' }
+  };
+
+  // Analyze each ingredient for chemical safety
+  ingredientsList.forEach((ingredient, index) => {
+    const originalIngredient = ingredient;
+    ingredient = ingredient.trim().toLowerCase();
+    
+
+    let classified = false;
+
+    // Check for harmful chemicals
+    for (const [chemical, info] of Object.entries(harmfulChemicalsDB)) {
+      if (ingredient.includes(chemical) || chemical.includes(ingredient)) {
+        harmfulChemicals.push({
+          name: originalIngredient,
+          chemical: chemical,
+          risk: info.risk,
+          type: info.type,
+          concern: info.concern
+        });
+        
+        const penalty = info.risk === 'high' ? -15 : -8;
+        totalScore += penalty;
+        
+        badIngredients.push({
+          name: originalIngredient,
+          riskLevel: 'high',
+          category: 'Harmful Chemical',
+          concern: info.concern,
+          score: penalty
+        });
+        
+        classified = true;
+        break;
+      }
+    }
+
+    if (!classified) {
+      // Check for allergens
+      for (const [allergen, info] of Object.entries(allergensDB)) {
+        if (ingredient.includes(allergen) || allergen.includes(ingredient)) {
+          allergens.push({
+            name: originalIngredient,
+            allergen: allergen,
+            risk: info.risk,
+            concern: info.concern
+          });
+          
+          const penalty = info.risk === 'high' ? -10 : -5;
+          totalScore += penalty;
+          
+          moderateIngredients.push({
+            name: originalIngredient,
+            riskLevel: 'medium',
+            category: 'Allergen',
+            concern: info.concern,
+            score: penalty
+          });
+          
+          classified = true;
+          break;
+        }
+      }
+    }
+
+    if (!classified) {
+      // Check for safe ingredients
+      for (const [safe, info] of Object.entries(safeIngredientsDB)) {
+        if (ingredient.includes(safe) || safe.includes(ingredient)) {
+          const bonus = 3;
+          totalScore += bonus;
+          
+          goodIngredients.push({
+            name: originalIngredient,
+            riskLevel: 'low',
+            category: 'Safe Ingredient',
+            benefit: info.benefit,
+            score: bonus
+          });
+          
+          classified = true;
+          break;
+        }
+      }
+    }
+
+    // Check for additives (same as before but for non-food context)
+    const additiveInfo = checkForAdditive(ingredient);
+    if (additiveInfo) {
+      additives.push({
+        name: originalIngredient,
+        type: additiveInfo.type,
+        level: additiveInfo.level,
+        function: additiveInfo.function,
+        color: additiveInfo.color
+      });
+    }
+
+    // If not classified, mark as unknown
+    if (!classified) {
+      unknownIngredients.push({
+        name: originalIngredient,
+        riskLevel: 'unknown',
+        category: 'Unknown',
+        score: 0
+      });
+    }
+
+    analyzedIngredients.push({
+      name: originalIngredient,
+      classified: classified
+    });
+  });
+
+  // Final score adjustments for non-food products
+  totalScore = Math.max(0, Math.min(100, totalScore));
+
+
+  return {
+    overallScore: Math.round(totalScore),
+    score: Math.round(totalScore),
+    analyzedIngredients,
+    goodIngredients,
+    badIngredients,
+    moderateIngredients,
+    unknownIngredients,
+    harmfulChemicals,
+    allergens,
+    additives,
+    totalIngredients: ingredientsList.length,
+    productType: productType,
+    analysisType: 'chemical-safety',
+    
+    // Score breakdown for non-food
+    scoreBreakdown: {
+      chemicalSafety: Math.round(totalScore * 0.6),
+      allergenRisk: allergens.length > 0 ? 'High' : allergens.length > 2 ? 'Medium' : 'Low',
+      additiveCount: additives.length,
+      confidence: unknownIngredients.length / ingredientsList.length < 0.3 ? 'High' : 
+                 unknownIngredients.length / ingredientsList.length < 0.6 ? 'Medium' : 'Low',
+      harmfulChemicals: harmfulChemicals.length
+    }
+  };
+};
+
+// ORIGINAL food analysis function (renamed for clarity)
+export const analyzeFoodProduct = (productIngredients, nutriments = {}, product = null) => {
+  
+  if (!productIngredients || typeof productIngredients !== 'string') {
+    return {
+      score: 50,
+      analyzedIngredients: [],
+      goodIngredients: [],
+      badIngredients: [],
+      moderateIngredients: [],
+      unknownIngredients: [],
+      additives: [],
+      productType: 'food',
+      analysisType: 'nutritional',
+      nutritionalAnalysis: analyzeNutrition(nutriments, product)
+    };
+  }
+
+  // Enhanced ingredient cleaning for food products - filter out manufacturer info, addresses, etc.
+  const ingredientsList = productIngredients
+    .toLowerCase()
+    .split(/[,;.]/)
+    .map(ingredient => ingredient.trim())
+    .filter(ingredient => {
+      // Filter out manufacturer details, addresses, websites, percentages
+      if (ingredient.length <= 2) return false;
+      if (ingredient.includes('www')) return false;
+      if (ingredient.includes('.com')) return false;
+      if (ingredient.includes('llc')) return false;
+      if (ingredient.includes('inc')) return false;
+      if (ingredient.includes('corp')) return false;
+      if (/\d{5}/.test(ingredient)) return false; // ZIP codes
+      if (ingredient.includes('pa ') && ingredient.includes('17331')) return false; // addresses
+      if (ingredient.includes('@')) return false; // social media
+      if (ingredient.match(/^\d+%/)) return false; // percentage values
+      if (ingredient.includes('free') && ingredient.includes('%')) return false; // nutrition facts
+      if (ingredient.includes('quality foods')) return false; // company names
+      if (ingredient.includes('utzsnacks')) return false; // brand names
+      return true;
+    });
+
+
+  const analyzedIngredients = [];
+  const goodIngredients = [];
+  const badIngredients = [];
+  const moderateIngredients = [];
+  const unknownIngredients = [];
+  const additives = [];
+
+  let totalScore = 0;
+  let matchedIngredients = 0;
+
+  // GOOD FOOD INGREDIENTS DATABASE
+  const goodFoodIngredientsDB = {
+    // Whole foods
+    'potatoes': { score: 80, riskLevel: 'low', category: 'Whole Food', benefit: 'Natural, nutritious whole food' },
+    'potato': { score: 80, riskLevel: 'low', category: 'Whole Food', benefit: 'Natural, nutritious whole food' },
+    'tomatoes': { score: 85, riskLevel: 'low', category: 'Whole Food', benefit: 'Rich in lycopene and vitamins' },
+    'onions': { score: 75, riskLevel: 'low', category: 'Whole Food', benefit: 'Natural antioxidants and flavor' },
+    'garlic': { score: 85, riskLevel: 'low', category: 'Whole Food', benefit: 'Natural antimicrobial properties' },
+    
+    // Healthy oils
+    'vegetable oil': { score: 65, riskLevel: 'low', category: 'Natural Fat', benefit: 'Natural cooking oil' },
+    'olive oil': { score: 90, riskLevel: 'low', category: 'Natural Fat', benefit: 'Heart-healthy monounsaturated fats' },
+    'sunflower oil': { score: 70, riskLevel: 'low', category: 'Natural Fat', benefit: 'Natural source of vitamin E' },
+    'corn oil': { score: 65, riskLevel: 'low', category: 'Natural Fat', benefit: 'Natural cooking oil' },
+    'coconut oil': { score: 75, riskLevel: 'low', category: 'Natural Fat', benefit: 'Natural saturated fat' },
+    
+    // Basic seasonings
+    'salt': { score: 60, riskLevel: 'low', category: 'Natural Seasoning', benefit: 'Natural mineral, essential in moderation' },
+    'sea salt': { score: 70, riskLevel: 'low', category: 'Natural Seasoning', benefit: 'Natural minerals from sea water' },
+    'sugar': { score: 40, riskLevel: 'medium', category: 'Natural Sweetener', benefit: 'Natural sweetener, use in moderation' },
+    
+    // Grains and starches  
+    'wheat': { score: 75, riskLevel: 'low', category: 'Whole Grain', benefit: 'Natural grain, source of fiber' },
+    'rice': { score: 75, riskLevel: 'low', category: 'Whole Grain', benefit: 'Natural grain, energy source' },
+    'oats': { score: 85, riskLevel: 'low', category: 'Whole Grain', benefit: 'High fiber, heart healthy' },
+    'corn': { score: 70, riskLevel: 'low', category: 'Whole Grain', benefit: 'Natural grain, source of energy' },
+    
+    // Vitamins and nutrients
+    'vitamin c': { score: 95, riskLevel: 'low', category: 'Vitamin', benefit: 'Essential antioxidant vitamin' },
+    'vitamin e': { score: 95, riskLevel: 'low', category: 'Vitamin', benefit: 'Important antioxidant vitamin' },
+    'ascorbic acid': { score: 90, riskLevel: 'low', category: 'Vitamin', benefit: 'Natural form of vitamin C' },
+    'citric acid': { score: 75, riskLevel: 'low', category: 'Natural Acid', benefit: 'Natural preservative from citrus' },
+    
+    // Proteins
+    'protein': { score: 85, riskLevel: 'low', category: 'Protein', benefit: 'Essential macronutrient' },
+    'whey protein': { score: 80, riskLevel: 'low', category: 'Protein', benefit: 'High-quality complete protein' },
+    
+    // Natural extracts
+    'natural flavor': { score: 60, riskLevel: 'low', category: 'Natural Flavoring', benefit: 'Derived from natural sources' },
+    'natural flavoring': { score: 60, riskLevel: 'low', category: 'Natural Flavoring', benefit: 'Derived from natural sources' },
+    
+    // Water
+    'water': { score: 100, riskLevel: 'low', category: 'Essential', benefit: 'Essential for life, pure hydration' }
+  };
+
+  ingredientsList.forEach((ingredient, index) => {
+    try {
+      const originalIngredient = ingredient;
+      ingredient = ingredient.trim().toLowerCase();
+      
+      
+      // First check our good food ingredients database
+      let foundIngredient = null;
+      for (const [goodIngredient, info] of Object.entries(goodFoodIngredientsDB)) {
+        if (ingredient.includes(goodIngredient) || goodIngredient.includes(ingredient)) {
+          foundIngredient = {
+            ...info,
+            name: originalIngredient
+          };
+          break;
+        }
+      }
+      
+      // If not found, try the database
+      if (!foundIngredient) {
+        foundIngredient = findIngredientInDatabase(ingredient, 'food');
+      }
+      
+      // Enhanced additive detection with detailed logging
+      const additiveInfo = checkForAdditive(ingredient);
+      
+      if (additiveInfo) { // checkForAdditive returns null if not additive, object if it is
+        const additiveEntry = {
+          name: originalIngredient, // Keep original formatting
+          type: additiveInfo.type,
+          risk: additiveInfo.riskLevel || 'moderate', // Fix: Use 'riskLevel' from function
+          level: additiveInfo.riskLevel || 'moderate', // Also add 'level' for compatibility
+          eNumber: additiveInfo.eNumber || additiveInfo.code || null,
+          function: additiveInfo.function,
+          description: additiveInfo.description,
+          concerns: additiveInfo.concerns || [],
+          color: additiveInfo.color,
+          isAdditive: true // Add this flag for clarity
+        };
+        additives.push(additiveEntry);
+      } else {
+      }
+    
+    if (foundIngredient) {
+      matchedIngredients++;
+      totalScore += foundIngredient.score;
+      
+      const analyzedIngredient = {
+        name: ingredient,
+        ...foundIngredient
+      };
+
+      analyzedIngredients.push(analyzedIngredient);
+
+      if (foundIngredient.riskLevel === 'low') {
+        goodIngredients.push(analyzedIngredient);
+      } else if (foundIngredient.riskLevel === 'medium') {
+        moderateIngredients.push(analyzedIngredient);
+      } else {
+        badIngredients.push(analyzedIngredient);
+      }
+    } else {
+      // For unknown ingredients, use smart defaults based on product type
+      const unknownIngredient = analyzeUnknownIngredient(ingredient, 'food');
+      unknownIngredients.push(unknownIngredient);
+    }
+    } catch (error) {
+      // Add as unknown ingredient if processing fails
+      const fallbackIngredient = {
+        name: ingredient,
+        riskLevel: 'medium',
+        description: 'Analysis failed - treating as moderate risk',
+        category: 'unknown'
+      };
+      unknownIngredients.push(fallbackIngredient);
+    }
+  });
+
+  // Calculate final score with nutrition component - FIXED ERROR HANDLING
+  const ingredientScore = matchedIngredients > 0 ? totalScore / matchedIngredients : 50;
+  
+  // Safe nutrition analysis with error handling
+  let nutritionAnalysis;
+  try {
+    nutritionAnalysis = analyzeNutrition(nutriments, product);
+  } catch (error) {
+    nutritionAnalysis = { score: 50 }; // Fallback
+  }
+  
+  // Extract nutrition score safely
+  const nutritionScore = (nutritionAnalysis && typeof nutritionAnalysis.score === 'number') 
+    ? nutritionAnalysis.score 
+    : 50;
+  
+  
+  // Food products: 60% ingredients, 40% nutrition
+  const finalScore = Math.round((ingredientScore * 0.6) + (nutritionScore * 0.4));
+
+  // Calculate confidence
+  const unknownPercentage = unknownIngredients.length / ingredientsList.length;
+  let confidence = 'High';
+  if (unknownPercentage > 0.6) confidence = 'Low';
+  else if (unknownPercentage > 0.3) confidence = 'Medium';
+
+  return {
+    overallScore: finalScore,
+    score: finalScore,
+    analyzedIngredients,
+    goodIngredients,
+    badIngredients,
+    moderateIngredients,
+    unknownIngredients,
+    additives,
+    totalIngredients: ingredientsList.length,
+    matchedIngredients,
+    productType: 'food',
+    analysisType: 'nutritional',
+    nutritionalAnalysis: nutritionAnalysis || { score: 50 }, // Use safe analysis
+    scoreBreakdown: {
+      ingredientScore: Math.round(ingredientScore),
+      nutritionScore: Math.round(nutritionScore),
+      confidence: confidence,
+      knownIngredients: matchedIngredients,
+      unknownIngredients: unknownIngredients.length,
+      dataQuality: unknownPercentage < 0.3 ? 'High' : unknownPercentage < 0.6 ? 'Medium' : 'Low'
+    }
+  };
+}; // End of analyzeFoodProduct
+
+// Helper function moved outside
+const findIngredientInDatabase = (ingredient, productType) => {
+  return ingredientsDatabase.find(dbIngredient => {
+    // Check if ingredient is applicable to this product type
+    if (dbIngredient.categories && !dbIngredient.categories.includes(productType) && !dbIngredient.categories.includes('both')) {
+      return false;
+    }
+
+    // Check main name
+    if (dbIngredient.name.includes(ingredient) || ingredient.includes(dbIngredient.name)) {
+      return true;
+    }
+    
+    // Check aliases
+    return dbIngredient.aliases && dbIngredient.aliases.some(alias => 
+      alias.includes(ingredient) || ingredient.includes(alias)
+    );
+  });
+};
+
+const analyzeUnknownIngredient = (ingredient, productType) => {
+  // Smart analysis for unknown ingredients based on common patterns
+  const concerningPatterns = [
+    'sulfate', 'paraben', 'phthalate', 'formaldehyde', 'triclosan', 
+    'petroleum', 'mineral oil', 'artificial color', 'artificial flavor',
+    'sodium lauryl', 'sodium laureth', 'dea', 'mea', 'tea',
+    'high fructose corn syrup', 'trans fat', 'hydrogenated oil',
+    'sodium nitrite', 'msg', 'bha', 'bht', 'tbhq'
+  ];
+
+  const beneficialPatterns = [
+    'vitamin', 'organic', 'natural', 'extract', 'oil', 'butter',
+    'hyaluronic', 'ceramide', 'peptide', 'antioxidant', 'botanical',
+    'amino acid', 'omega', 'fiber', 'protein', 'whole grain'
+  ];
+
+  let score = 50; // Neutral score for unknown
+  let riskLevel = 'unknown';
+
+  // Check for concerning patterns
+  for (const pattern of concerningPatterns) {
+    if (ingredient.includes(pattern)) {
+      score = 20;
+      riskLevel = 'high';
+      break;
+    }
+  }
+
+  // Check for beneficial patterns
+  if (riskLevel === 'unknown') {
+    for (const pattern of beneficialPatterns) {
+      if (ingredient.includes(pattern)) {
+        score = 75;
+        riskLevel = 'low';
+        break;
+      }
+    }
+  }
+
+  return {
+    name: ingredient,
+    riskLevel: riskLevel,
+    score: score,
+    description: `Unknown ingredient - analysis based on name patterns`,
+    category: 'unknown'
+  };
+};
+
+const calculateFinalScore = (totalScore, matchedIngredients, badIngredients, goodIngredients, moderateIngredients, unknownIngredients, productType, nutriments) => {
+  const ingredientCounts = {
+    matchedIngredients,
+    goodCount: goodIngredients.length,
+    badCount: badIngredients.length,
+    moderateCount: moderateIngredients.length,
+    unknownCount: unknownIngredients.length
+  };
+
+  // NEW SCORING SYSTEM - Start neutral at 50, not biased at 80
+  let ingredientScore = 0;
+  let totalIngredientWeight = 0;
+  let lowConfidenceCount = 0;
+  
+  const totalIngredients = goodIngredients.length + badIngredients.length + moderateIngredients.length + unknownIngredients.length;
+  
+  if (totalIngredients > 0) {
+    // NEW INGREDIENT RISK TIERS
+    const scoreMap = {
+      'very_good': 95,  // Natural vitamins, whole ingredients
+      'good': 80,       // Generally beneficial
+      'neutral': 60,    // No significant impact
+      'moderate': 40,   // Some concerns
+      'bad': 20,        // Harmful
+      'very_bad': 5     // Endocrine disruptors, carcinogens
+    };
+
+    // Process GOOD ingredients (map to very_good/good based on quality)
+    goodIngredients.forEach(ingredient => {
+      const isVeryGood = ingredient.name.toLowerCase().includes('vitamin') || 
+                        ingredient.name.toLowerCase().includes('organic') ||
+                        ingredient.name.toLowerCase().includes('natural oil');
+      const score = isVeryGood ? scoreMap.very_good : scoreMap.good;
+      const weight = getIngredientImportance(ingredient.name);
+      
+      ingredientScore += score * weight;
+      totalIngredientWeight += weight;
+    });
+    
+    // Process MODERATE ingredients 
+    moderateIngredients.forEach(ingredient => {
+      const weight = getIngredientImportance(ingredient.name);
+      ingredientScore += scoreMap.moderate * weight;
+      totalIngredientWeight += weight;
+    });
+    
+    // Process BAD ingredients (check for very bad ones)
+    badIngredients.forEach(ingredient => {
+      const isVeryBad = ingredient.name.toLowerCase().includes('formaldehyde') ||
+                       ingredient.name.toLowerCase().includes('lead') ||
+                       ingredient.name.toLowerCase().includes('mercury');
+      const score = isVeryBad ? scoreMap.very_bad : scoreMap.bad;
+      const weight = getIngredientImportance(ingredient.name);
+      
+      ingredientScore += score * weight;
+      totalIngredientWeight += weight;
+    });
+    
+    // Process UNKNOWN ingredients with confidence scoring
+    unknownIngredients.forEach(ingredient => {
+      const { score, confidence } = analyzeUnknownIngredientAdvanced(ingredient.name);
+      const weight = getIngredientImportance(ingredient.name);
+      
+      if (confidence < 0.7) lowConfidenceCount++;
+      
+      ingredientScore += score * weight;
+      totalIngredientWeight += weight;
+    });
+    
+    // Calculate weighted average
+    const ingredientComponent = totalIngredientWeight > 0 ? ingredientScore / totalIngredientWeight : 50;
+    
+    // NUTRITION COMPONENT (30-40% for food products)
+    let nutritionComponent = 50; // Default neutral
+    let nutritionWeight = productType === 'food' ? 0.35 : 0.1; // 35% for food, 10% for beauty
+    
+    if (productType === 'food' && nutriments && Object.keys(nutriments).length > 0) {
+      nutritionComponent = calculateAdvancedNutritionScore(nutriments);
+    }
+    
+    // COMBINE COMPONENTS
+    const ingredientWeight = 1 - nutritionWeight;
+    let finalScore = (ingredientComponent * ingredientWeight) + (nutritionComponent * nutritionWeight);
+    
+    const scoreBreakdown = {
+      ingredientComponent: ingredientComponent.toFixed(1),
+      nutritionComponent: nutritionComponent.toFixed(1),
+      ingredientWeight: ingredientWeight.toFixed(2),
+      nutritionWeight: nutritionWeight.toFixed(2),
+      combinedScore: finalScore.toFixed(1)
+    };
+    
+    // APPLY PENALTIES & BONUSES (bounded -25 to +15)
+    let bonusPenalty = 0;
+    
+    // Penalties for bad ingredients
+    const badPercentage = badIngredients.length / totalIngredients;
+    if (badPercentage >= 0.4) {
+      bonusPenalty -= 18; // 40%+ bad ingredients
+    } else if (badPercentage >= 0.2) {
+      bonusPenalty -= 10; // 20-40% bad ingredients
+    }
+    
+    // Bonuses for good ingredients
+    const goodPercentage = goodIngredients.length / totalIngredients;
+    if (goodPercentage >= 0.7) {
+      bonusPenalty += 10; // 70%+ good ingredients
+    } else if (goodPercentage >= 0.5) {
+      bonusPenalty += 5; // 50-70% good ingredients
+    }
+    
+    // Cap bonuses/penalties
+    bonusPenalty = Math.max(-25, Math.min(15, bonusPenalty));
+    
+    finalScore += bonusPenalty;
+    
+    // CONFIDENCE-BASED CAPPING
+    const lowConfidencePercentage = lowConfidenceCount / totalIngredients;
+    if (lowConfidencePercentage > 0.4) {
+      finalScore = Math.min(finalScore, 70); // Cap at 70 if too many unknowns
+    }
+    
+    const finalBreakdown = {
+      badPercentage: (badPercentage * 100).toFixed(1) + '%',
+      goodPercentage: (goodPercentage * 100).toFixed(1) + '%',
+      bonusPenalty,
+      lowConfidencePercentage: (lowConfidencePercentage * 100).toFixed(1) + '%'
+    };
+    
+    return finalScore;
+};
+
+// NEW HELPER FUNCTIONS FOR ADVANCED SCORING
+
+const getIngredientImportance = (ingredientName) => {
+  const name = ingredientName.toLowerCase();
+  
+  // High importance ingredients get more weight
+  if (name.includes('preservative') || 
+      name.includes('fragrance') || 
+      name.includes('allergen') ||
+      name.includes('active') ||
+      name.includes('benzoate') ||
+      name.includes('sulfate') ||
+      name.includes('paraben')) {
+    return 1.5; // Active/preservative/fragrance/allergen
+  }
+  
+  // Trace ingredients get less weight
+  if (name.includes('trace') || 
+      name.includes('less than') ||
+      name.includes('<') ||
+      name.includes('minor')) {
+    return 0.7; // Trace amounts
+  }
+  
+  return 1.0; // Normal importance
+};
+
+const analyzeUnknownIngredientAdvanced = (ingredientName) => {
+  const name = ingredientName.toLowerCase();
+  let baseScore = 55; // Neutral unknown base
+  let confidence = 0.5; // Low confidence by default
+  
+  // Boost for natural-sounding ingredients
+  if (name.includes('natural') || 
+      name.includes('organic') || 
+      name.includes('extract') ||
+      name.includes('oil') ||
+      name.includes('butter')) {
+    baseScore = 75;
+    confidence = 0.8; // Higher confidence
+  }
+  // Penalize artificial-sounding ingredients
+  else if (name.includes('artificial') || 
+           name.includes('synthetic') ||
+           name.includes('chemical') ||
+           name.includes('compound')) {
+    baseScore = 40;
+    confidence = 0.9; // High confidence it's not great
+  }
+  // Try to fuzzy match against database
+  else {
+    // Simple fuzzy matching could be added here
+    confidence = 0.5; // Low confidence for truly unknown
+  }
+  
+  // Apply confidence factor
+  const finalScore = baseScore * (0.5 + confidence * 0.5); // Scale by confidence
+  
+  return {
+    score: finalScore,
+    confidence: confidence
+  };
+};
+
+const calculateAdvancedNutritionScore = (nutriments) => {
+  // Improved nutrition scoring based on established methods
+  let score = 70; // Start neutral
+  
+  
+  if (!nutriments || Object.keys(nutriments).length === 0) {
+    return 70;
+  }
+  
+  // Check all possible field name variations
+  const getSafeValue = (mainKey, altKeys = []) => {
+    if (nutriments[mainKey] !== undefined) return parseFloat(nutriments[mainKey]);
+    for (const alt of altKeys) {
+      if (nutriments[alt] !== undefined) return parseFloat(nutriments[alt]);
+    }
+    return null;
+  };
+  
+  // NEGATIVE POINTS (penalties)
+  
+  // Sugar content (major factor)
+  const sugars = getSafeValue('sugars_100g', ['sugars', 'sugar_100g', 'sugar']);
+  if (sugars !== null) {
+  }
+  
+  // Sodium content
+  const sodium = getSafeValue('sodium_100g', ['sodium', 'salt_100g', 'salt']);
+  if (sodium !== null) {
+    // Convert salt to sodium if needed (1g salt ≈ 0.4g sodium)
+    const sodiumVal = sodium > 3 ? sodium * 0.4 : sodium; // Assume it's salt if > 3g
+  }
+  
+  // Saturated fat
+  const satFat = getSafeValue('saturated_fat_100g', ['saturated-fat_100g', 'saturated_fat', 'saturated-fat']);
+  if (satFat !== null) {
+  }
+  
+  // Calories (if very high)
+  const energy = getSafeValue('energy_kcal_100g', ['energy-kcal_100g', 'energy_100g', 'energy', 'energy-kj_100g']);
+  if (energy !== null) {
+    // Convert kJ to kcal if needed (1 kcal ≈ 4.184 kJ)
+    const kcal = energy > 1000 ? energy / 4.184 : energy;
+  }
+  
+  // POSITIVE POINTS (bonuses)
+  
+  // Fiber content
+  const fiber = getSafeValue('fiber_100g', ['fiber', 'fibre_100g', 'fibre']);
+  if (fiber !== null) {
+  }
+  
+  // Protein content
+  const protein = getSafeValue('proteins_100g', ['proteins', 'protein_100g', 'protein']);
+  if (protein !== null) {
+  }
+  
+  // Vitamins and minerals (simplified)
+  const vitaminKeys = Object.keys(nutriments).filter(key => 
+    key.includes('vitamin') || key.includes('calcium') || key.includes('iron')
+  );
+  if (vitaminKeys.length > 3) score += 8; // Rich in vitamins/minerals
+  else if (vitaminKeys.length > 1) score += 4; // Some vitamins/minerals
+  
+  // Clamp score
+  score = Math.max(0, Math.min(100, score));
+  
+  return score;
+};
+
+const calculateNutritionScore = (nutriments) => {
+  let score = 70; // Start with a good base score
+  
+  
+  // Check for high sugar content (penalties)
+  if (nutriments.sugars_100g > 25) score -= 15;
+  else if (nutriments.sugars_100g > 15) score -= 10;
+  else if (nutriments.sugars_100g > 8) score -= 5;
+  
+  // Check for high salt content (penalties)
+  if (nutriments.salt_100g > 3) score -= 15;
+  else if (nutriments.salt_100g > 1.5) score -= 10;
+  else if (nutriments.salt_100g > 0.8) score -= 5;
+  
+  // Check for high saturated fat (penalties)
+  if (nutriments['saturated-fat_100g'] > 15) score -= 12;
+  else if (nutriments['saturated-fat_100g'] > 8) score -= 8;
+  else if (nutriments['saturated-fat_100g'] > 4) score -= 4;
+  
+  // Check for fiber content (bonuses)
+  if (nutriments.fiber_100g > 8) score += 10;
+  else if (nutriments.fiber_100g > 5) score += 8;
+  else if (nutriments.fiber_100g > 3) score += 5;
+  
+  // Check for protein content (bonuses)
+  if (nutriments.proteins_100g > 20) score += 8;
+  else if (nutriments.proteins_100g > 12) score += 5;
+  else if (nutriments.proteins_100g > 8) score += 3;
+  
+  // Ensure reasonable bounds
+  score = Math.max(20, Math.min(100, score));
+  
+  return score;
+}; // End of calculateAdvancedNutritionScore
+
+const analyzeNutrition = (nutriments, product = null) => {
+  if (!nutriments || Object.keys(nutriments).length === 0) {
+    
+    // Apply special scoring for known product types when no nutrition data
+    let defaultScore = 50;
+    if (product) {
+      const productName = product.name ? product.name.toLowerCase() : '';
+      const categories = product.categories ? product.categories.toLowerCase() : '';
+      const searchText = `${productName} ${categories}`.toLowerCase();
+      
+      // Sugary drinks and sodas get lower scores
+      if (searchText.includes('cola') || searchText.includes('soda') || searchText.includes('soft drink') ||
+          searchText.includes('energy drink') || searchText.includes('sport drink')) {
+        defaultScore = 15; // Very low for sugary drinks
+      }
+      // Candy and sweets
+      else if (searchText.includes('candy') || searchText.includes('chocolate') || searchText.includes('sweet')) {
+        defaultScore = 20; // Low for sweets
+      }
+      // Processed snacks
+      else if (searchText.includes('chips') || searchText.includes('snack') || searchText.includes('crisp')) {
+        defaultScore = 25; // Low for processed snacks
+      }
+    }
+    
+    return {
+      score: defaultScore,
+      energy: 0,
+      sugars: 0,
+      salt: 0,
+      saturatedFat: 0,
+      fiber: 0,
+      proteins: 0,
+      recommendations: ['ℹ️ No nutrition data available for analysis']
+    };
+  }
+
+
+  // Helper to get values with fallback field names
+  const getSafeValue = (mainKey, altKeys = []) => {
+    if (nutriments[mainKey] !== undefined) return parseFloat(nutriments[mainKey]) || 0;
+    for (const alt of altKeys) {
+      if (nutriments[alt] !== undefined) return parseFloat(nutriments[alt]) || 0;
+    }
+    return 0;
+  };
+
+  const analysis = {
+    energy: getSafeValue('energy_kcal_100g', ['energy-kcal_100g', 'energy_100g', 'energy']),
+    sugars: getSafeValue('sugars_100g', ['sugars', 'sugar_100g', 'sugar']),
+    salt: getSafeValue('salt_100g', ['salt', 'sodium_100g', 'sodium']),
+    saturatedFat: getSafeValue('saturated_fat_100g', ['saturated-fat_100g', 'saturated_fat', 'saturated-fat']),
+    fiber: getSafeValue('fiber_100g', ['fiber', 'fibre_100g', 'fibre']),
+    proteins: getSafeValue('proteins_100g', ['proteins', 'protein_100g', 'protein']),
+    recommendations: []
+  };
+
+
+  // Generate accurate recommendations based on actual values
+  if (analysis.sugars > 15) {
+    analysis.recommendations.push(`⚠️ High sugar content (${analysis.sugars.toFixed(1)}g/100g) - consume in moderation`);
+  } else if (analysis.sugars > 5) {
+    analysis.recommendations.push(`ℹ️ Moderate sugar content (${analysis.sugars.toFixed(1)}g/100g)`);
+  }
+  
+  if (analysis.salt > 1.5) {
+    analysis.recommendations.push(`⚠️ High salt content (${analysis.salt.toFixed(1)}g/100g) - may affect blood pressure`);
+  } else if (analysis.salt > 0.8) {
+    analysis.recommendations.push(`ℹ️ Moderate salt content (${analysis.salt.toFixed(1)}g/100g)`);
+  }
+  
+  if (analysis.saturatedFat > 8) {
+    analysis.recommendations.push(`⚠️ High saturated fat (${analysis.saturatedFat.toFixed(1)}g/100g) - limit consumption`);
+  } else if (analysis.saturatedFat > 3) {
+    analysis.recommendations.push(`ℹ️ Moderate saturated fat (${analysis.saturatedFat.toFixed(1)}g/100g)`);
+  }
+  
+  if (analysis.fiber > 5) {
+    analysis.recommendations.push(`✅ Good source of fiber (${analysis.fiber.toFixed(1)}g/100g) - beneficial for digestion`);
+  }
+  
+  if (analysis.proteins > 10) {
+    analysis.recommendations.push(`✅ Good protein content (${analysis.proteins.toFixed(1)}g/100g) - helps muscle maintenance`);
+  }
+
+  // Add energy information
+  if (analysis.energy > 0) {
+    if (analysis.energy > 400) {
+      analysis.recommendations.push(`⚠️ High calorie content (${analysis.energy.toFixed(0)} kcal/100g)`);
+    } else if (analysis.energy < 100) {
+      analysis.recommendations.push(`✅ Low calorie content (${analysis.energy.toFixed(0)} kcal/100g)`);
+    }
+  }
+
+  
+  // Calculate nutrition score (0-100) based on nutritional profile
+  let nutritionScore = 50; // Start neutral
+  
+  // If no nutrition data available, give a lower default score for fairness
+  const hasNutritionData = analysis.energy > 0 || analysis.sugars > 0 || analysis.salt > 0 || 
+                          analysis.fiber > 0 || analysis.proteins > 0 || analysis.saturatedFat > 0;
+  
+  if (!hasNutritionData) {
+    
+    // Special handling for known unhealthy products
+    const productName = product.name ? product.name.toLowerCase() : '';
+    const categories = product.categories ? product.categories.toLowerCase() : '';
+    const searchText = `${productName} ${categories}`.toLowerCase();
+    
+    // Sugary drinks and sodas get lower scores
+    if (searchText.includes('cola') || searchText.includes('soda') || searchText.includes('soft drink') ||
+        searchText.includes('energy drink') || searchText.includes('sport drink')) {
+      nutritionScore = 15; // Very low for sugary drinks
+    }
+    // Candy and sweets
+    else if (searchText.includes('candy') || searchText.includes('chocolate') || searchText.includes('sweet')) {
+      nutritionScore = 20; // Low for sweets
+    }
+    // Processed snacks
+    else if (searchText.includes('chips') || searchText.includes('snack') || searchText.includes('crisp')) {
+      nutritionScore = 25; // Low for processed snacks
+    }
+    else {
+      nutritionScore = 30; // Conservative default for unknown products
+    }
+  } else {
+    // Sugar scoring
+    if (analysis.sugars <= 2) nutritionScore += 15;
+    else if (analysis.sugars <= 5) nutritionScore += 10;
+    else if (analysis.sugars <= 10) nutritionScore += 5;
+    else if (analysis.sugars <= 15) nutritionScore -= 5;
+    else nutritionScore -= Math.min(20, analysis.sugars);
+    
+    // Salt scoring  
+    if (analysis.salt <= 0.3) nutritionScore += 10;
+    else if (analysis.salt <= 0.6) nutritionScore += 5;
+    else if (analysis.salt <= 1.0) nutritionScore -= 0;
+    else if (analysis.salt <= 1.5) nutritionScore -= 5;
+    else nutritionScore -= Math.min(15, analysis.salt * 5);
+    
+    // Fiber bonus
+    if (analysis.fiber > 3) nutritionScore += Math.min(10, analysis.fiber * 2);
+    
+    // Protein bonus
+    if (analysis.proteins > 5) nutritionScore += Math.min(8, analysis.proteins);
+    
+    // Saturated fat penalty
+    if (analysis.saturatedFat > 3) nutritionScore -= Math.min(12, analysis.saturatedFat);
+    
+    // Calorie consideration for very high calorie foods
+    if (analysis.energy > 500) nutritionScore -= Math.min(8, (analysis.energy - 500) / 100);
+  }
+  
+  // Ensure score is within bounds
+  nutritionScore = Math.max(0, Math.min(100, Math.round(nutritionScore)));
+  
+  // Add score to analysis
+  analysis.score = nutritionScore;
+  
+  return analysis;
+}; // End of analyzeNutrition function
+
+export const getScoreColor = (score) => {
+  if (score >= 90) return '#1B5E20';      // Very Dark Green - Excellent
+  if (score >= 70) return '#4CAF50';      // Green - Good (was Medium)
+  if (score >= 50) return '#FF9800';      // Orange - Average (was Good)
+  if (score >= 25) return '#FF5722';      // Red-orange - Poor
+  return '#F44336';                       // Red - Very Poor
+};
+
+export const getScoreGrade = (score) => {
+  if (score >= 90) return 'A';            // Excellent
+  if (score >= 70) return 'B';            // Good (was Mediocre)
+  if (score >= 50) return 'C';            // Average (was Good)
+  if (score >= 25) return 'D';            // Poor
+  return 'F';                             // Very Poor
+};
+
+export const getRecommendation = (score, productType = 'beauty') => {
+  const typeText = productType === 'food' ? 'food product' : 'cosmetic product';
+  
+  if (score >= 90) {
+    return `Excellent choice! This ${typeText} contains mostly beneficial ingredients and is safe for regular use.`;
+  } else if (score >= 70) {
+    return `Good ${typeText} with mostly safe ingredients. Suitable for regular use with minimal concerns.`;
+  } else if (score >= 50) {
+    return `Average quality ${typeText}. Consider alternatives if you have sensitivities or health concerns.`;
+  } else if (score >= 25) {
+    return `Poor quality ${typeText}. Contains concerning ingredients that may be harmful.`;
+  } else {
+    return `Avoid this ${typeText} - contains many concerning ingredients that may be harmful.`;
+  }
+};
+
+export const getProductTypeFromCategories = (categories, productName = '', source = '') => {
+  
+  // If from Open Beauty Facts, it's definitely beauty/cosmetic
+  if (source && source.includes('Beauty')) {
+    return 'beauty';
+  }
+  
+  // If from Open Food Facts, it's definitely food
+  if (source && source.includes('Food')) {
+    return 'food';
+  }
+  
+  if (!categories && !productName) {
+    return 'beauty';
+  }
+  
+  const textToCheck = `${categories || ''} ${productName || ''}`.toLowerCase();
+  
+  // FOOD categories - extensive list
+  const foodKeywords = [
+    // Basic food types
+    'food', 'beverage', 'drink', 'snack', 'meal', 'edible',
+    // Specific foods
+    'bread', 'dairy', 'meat', 'fish', 'vegetable', 'fruit', 'cereal', 
+    'pasta', 'rice', 'sauce', 'oil', 'vinegar', 'spice', 'herb',
+    // Sweets & desserts
+    'sweet', 'chocolate', 'cookie', 'biscuit', 'cake', 'candy', 'dessert',
+    'ice cream', 'yogurt', 'cheese', 'milk', 'butter',
+    // Drinks
+    'juice', 'soda', 'coffee', 'tea', 'beer', 'wine', 'water',
+    // Categories
+    'organic-food', 'baby-food', 'pet-food', 'frozen-food',
+    // Cooking ingredients
+    'flour', 'sugar', 'salt', 'pepper', 'condiment', 'seasoning'
+  ];
+  
+  // BEAUTY/COSMETIC categories - extensive list
+  const beautyKeywords = [
+    // Basic beauty
+    'beauty', 'cosmetic', 'makeup', 'skincare', 'skin-care', 'face-care',
+    // Specific products
+    'shampoo', 'conditioner', 'soap', 'lotion', 'cream', 'serum',
+    'foundation', 'lipstick', 'mascara', 'eyeshadow', 'blush',
+    'perfume', 'cologne', 'deodorant', 'antiperspirant',
+    // Care products
+    'moisturizer', 'cleanser', 'toner', 'sunscreen', 'body-wash',
+    'hand-cream', 'foot-cream', 'nail-polish', 'lip-balm',
+    // Hair care
+    'hair-care', 'styling', 'gel', 'mousse', 'spray',
+    // Personal care
+    'personal-care', 'hygiene', 'oral-care', 'toothpaste', 'mouthwash'
+  ];
+  
+  // HOUSEHOLD/CLEANING categories
+  const householdKeywords = [
+    'cleaning', 'detergent', 'bleach', 'disinfectant', 'soap',
+    'household', 'laundry', 'dish', 'surface', 'toilet', 'bathroom',
+    'kitchen', 'floor', 'glass', 'multi-purpose'
+  ];
+  
+  // Check for food keywords first
+  for (const keyword of foodKeywords) {
+    if (textToCheck.includes(keyword)) {
+      return 'food';
+    }
+  }
+  
+  // Check for beauty keywords
+  for (const keyword of beautyKeywords) {
+    if (textToCheck.includes(keyword)) {
+      return 'beauty';
+    }
+  }
+  
+  // Check for household keywords
+  for (const keyword of householdKeywords) {
+    if (textToCheck.includes(keyword)) {
+      return 'beauty'; // Treat household as beauty for ingredient analysis
+    }
+  }
+  
+  return 'beauty'; // Default to beauty/cosmetics
+};
+
+// Enhanced Additive Detection Functions
+const checkForAdditive = (ingredient) => {
+  const cleanIngredient = ingredient.toLowerCase().trim();
+  
+  // Check E-numbers first with improved regex
+  const eNumberMatch = cleanIngredient.match(/^e(\d{3,4}[a-z]?)$/i);
+  if (eNumberMatch) {
+    const eNumber = eNumberMatch[0].toUpperCase();
+    const additiveData = COMPREHENSIVE_ADDITIVE_DATABASE[eNumber];
+    
+    if (additiveData) {
+      return {
+        name: ingredient,
+        eNumber: eNumber,
+        type: additiveData.type,
+        riskLevel: additiveData.riskLevel,
+        concerns: additiveData.concerns,
+        description: `${additiveData.name} - ${additiveData.type}`,
+        function: getAdditiveFunctionByType(additiveData.type)
+      };
+    } else {
+      // Generic E-number handling
+      return {
+        name: ingredient,
+        eNumber: eNumber,
+        type: getAdditiveTypeByENumber(eNumber),
+        riskLevel: 'moderate', // Default for unknown E-numbers
+        concerns: ['Unknown E-number additive'],
+        description: `E-number additive: ${getAdditiveTypeByENumber(eNumber)}`,
+        function: getAdditiveFunctionByENumber(eNumber)
+      };
+    }
+  }
+  
+  // Check chemical additives database
+  for (const [additiveName, data] of Object.entries(CHEMICAL_ADDITIVES_DATABASE)) {
+    if (cleanIngredient.includes(additiveName) || 
+        cleanIngredient === additiveName ||
+        cleanIngredient.includes(additiveName.replace(/\s+/g, ''))) {
+      return {
+        name: ingredient,
+        type: data.type,
+        riskLevel: data.riskLevel,
+        concerns: data.concerns,
+        description: `${additiveName} - ${data.type}`,
+        function: getAdditiveFunctionByType(data.type)
+      };
+    }
+  }
+  
+  // Check for partial matches and common variations
+  const partialMatches = {
+    'sulfate': { type: 'Surfactant', riskLevel: 'moderate', concerns: ['Skin irritation'] },
+    'paraben': { type: 'Preservative', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+    'silicone': { type: 'Conditioning agent', riskLevel: 'low', concerns: ['Build-up on hair/skin'] },
+    'phthalate': { type: 'Plasticizer', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+    'mineral oil': { type: 'Emollient', riskLevel: 'moderate', concerns: ['Pore clogging'] },
+    'petrolatum': { type: 'Occlusive', riskLevel: 'moderate', concerns: ['Pore clogging'] },
+    'fragrance': { type: 'Fragrance', riskLevel: 'moderate', concerns: ['Allergic reactions', 'Unknown chemicals'] },
+    'parfum': { type: 'Fragrance', riskLevel: 'moderate', concerns: ['Allergic reactions', 'Unknown chemicals'] }
+  };
+  
+  for (const [pattern, data] of Object.entries(partialMatches)) {
+    if (cleanIngredient.includes(pattern)) {
+      return {
+        name: ingredient,
+        type: data.type,
+        riskLevel: data.riskLevel,
+        concerns: data.concerns,
+        description: `Contains ${pattern} - ${data.type}`,
+        function: getAdditiveFunctionByType(data.type)
+      };
+    }
+  }
+  
+  return null;
+};
+// Helper functions for the enhanced system
+const getAdditiveTypeByENumber = (eNumber) => {
+  const num = parseInt(eNumber.substring(1));
+  if (num >= 100 && num <= 199) return 'Food Coloring';
+  if (num >= 200 && num <= 299) return 'Preservative';
+  if (num >= 300 && num <= 399) return 'Antioxidant';
+  if (num >= 400 && num <= 499) return 'Thickener/Stabilizer';
+  if (num >= 500 && num <= 599) return 'Acidity Regulator';
+  if (num >= 600 && num <= 699) return 'Flavor Enhancer';
+  if (num >= 900 && num <= 999) return 'Glazing Agent';
+  return 'Food Additive';
+};
+
+const getAdditiveFunctionByENumber = (eNumber) => {
+  const type = getAdditiveTypeByENumber(eNumber);
+  return getAdditiveFunctionByType(type);
+};
+
+const getAdditiveFunctionByType = (type) => {
+  const functions = {
+    'Food Coloring': 'Provides color to products',
+    'Preservative': 'Prevents spoilage and extends shelf life',
+    'Antioxidant': 'Prevents oxidation and rancidity',
+    'Thickener/Stabilizer': 'Improves texture and consistency',
+    'Thickener': 'Improves texture and consistency',
+    'Acidity Regulator': 'Controls pH levels',
+    'Flavor Enhancer': 'Enhances taste and flavor',
+    'Glazing Agent': 'Provides glossy appearance',
+    'Surfactant': 'Cleansing and foaming agent',
+    'Emulsifier': 'Helps mix oil and water',
+    'Conditioning agent': 'Softens and smooths',
+    'Plasticizer': 'Increases flexibility',
+    'Emollient': 'Moisturizes and softens',
+    'Occlusive': 'Prevents moisture loss',
+    'Fragrance': 'Provides scent',
+    'Antimicrobial': 'Kills bacteria and microbes',
+    'Skin lightener': 'Lightens skin pigmentation',
+    'Sweetener': 'Provides sweet taste',
+    'Solvent': 'Dissolves other ingredients',
+    'Colorant': 'Provides color'
+  };
+  return functions[type] || 'Processing aid';
+};
+
+// Comprehensive E-number and additive database
+const COMPREHENSIVE_ADDITIVE_DATABASE = {
+  // Food colorings (E100-E199) - many potentially concerning
+  'E102': { name: 'Tartrazine', type: 'Food Coloring', riskLevel: 'high', concerns: ['Hyperactivity', 'Allergic reactions'] },
+  'E110': { name: 'Sunset Yellow FCF', type: 'Food Coloring', riskLevel: 'high', concerns: ['Hyperactivity', 'Allergic reactions'] },
+  'E122': { name: 'Azorubine', type: 'Food Coloring', riskLevel: 'high', concerns: ['Hyperactivity', 'Allergic reactions'] },
+  'E124': { name: 'Ponceau 4R', type: 'Food Coloring', riskLevel: 'high', concerns: ['Hyperactivity', 'Allergic reactions'] },
+  'E129': { name: 'Allura Red AC', type: 'Food Coloring', riskLevel: 'high', concerns: ['Hyperactivity', 'Allergic reactions'] },
+  'E131': { name: 'Patent Blue V', type: 'Food Coloring', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  'E132': { name: 'Indigotine', type: 'Food Coloring', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  'E133': { name: 'Brilliant Blue FCF', type: 'Food Coloring', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  'E142': { name: 'Green S', type: 'Food Coloring', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  'E151': { name: 'Brilliant Black BN', type: 'Food Coloring', riskLevel: 'high', concerns: ['Hyperactivity'] },
+  'E154': { name: 'Brown FK', type: 'Food Coloring', riskLevel: 'high', concerns: ['Banned in many countries'] },
+  'E155': { name: 'Brown HT', type: 'Food Coloring', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  
+  // Preservatives (E200-E299) - many concerning
+  'E200': { name: 'Sorbic acid', type: 'Preservative', riskLevel: 'low', concerns: [] },
+  'E202': { name: 'Potassium sorbate', type: 'Preservative', riskLevel: 'low', concerns: [] },
+  'E210': { name: 'Benzoic acid', type: 'Preservative', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  'E211': { name: 'Sodium benzoate', type: 'Preservative', riskLevel: 'moderate', concerns: ['Allergic reactions'] },
+  'E220': { name: 'Sulphur dioxide', type: 'Preservative', riskLevel: 'high', concerns: ['Asthma', 'Allergic reactions'] },
+  'E221': { name: 'Sodium sulphite', type: 'Preservative', riskLevel: 'high', concerns: ['Asthma', 'Allergic reactions'] },
+  'E222': { name: 'Sodium hydrogen sulphite', type: 'Preservative', riskLevel: 'high', concerns: ['Asthma'] },
+  'E223': { name: 'Sodium metabisulphite', type: 'Preservative', riskLevel: 'high', concerns: ['Asthma'] },
+  'E224': { name: 'Potassium metabisulphite', type: 'Preservative', riskLevel: 'high', concerns: ['Asthma'] },
+  'E249': { name: 'Potassium nitrite', type: 'Preservative', riskLevel: 'high', concerns: ['Cancer risk', 'Nitrosamine formation'] },
+  'E250': { name: 'Sodium nitrite', type: 'Preservative', riskLevel: 'high', concerns: ['Cancer risk', 'Nitrosamine formation'] },
+  'E251': { name: 'Sodium nitrate', type: 'Preservative', riskLevel: 'high', concerns: ['Cancer risk'] },
+  'E252': { name: 'Potassium nitrate', type: 'Preservative', riskLevel: 'high', concerns: ['Cancer risk'] },
+  
+  // Antioxidants (E300-E399)
+  'E300': { name: 'Ascorbic acid (Vitamin C)', type: 'Antioxidant', riskLevel: 'low', concerns: [] },
+  'E301': { name: 'Sodium ascorbate', type: 'Antioxidant', riskLevel: 'low', concerns: [] },
+  'E320': { name: 'Butylated hydroxyanisole (BHA)', type: 'Antioxidant', riskLevel: 'high', concerns: ['Cancer risk', 'Endocrine disruption'] },
+  'E321': { name: 'Butylated hydroxytoluene (BHT)', type: 'Antioxidant', riskLevel: 'high', concerns: ['Cancer risk', 'Endocrine disruption'] },
+  
+  // Emulsifiers, stabilizers, thickeners (E400-E499)
+  'E407': { name: 'Carrageenan', type: 'Thickener', riskLevel: 'moderate', concerns: ['Digestive issues'] },
+  'E433': { name: 'Polysorbate 80', type: 'Emulsifier', riskLevel: 'moderate', concerns: ['Gut health concerns'] },
+  'E466': { name: 'Carboxymethyl cellulose', type: 'Thickener', riskLevel: 'moderate', concerns: ['Digestive issues'] },
+  
+  // pH regulators, anti-caking agents (E500-E599)
+  'E551': { name: 'Silicon dioxide', type: 'Anti-caking agent', riskLevel: 'low', concerns: [] },
+  'E621': { name: 'Monosodium glutamate (MSG)', type: 'Flavor enhancer', riskLevel: 'moderate', concerns: ['MSG sensitivity'] },
+  
+  // Sweeteners (E950-E999)
+  'E950': { name: 'Acesulfame potassium', type: 'Sweetener', riskLevel: 'moderate', concerns: ['Artificial sweetener'] },
+  'E951': { name: 'Aspartame', type: 'Sweetener', riskLevel: 'high', concerns: ['Headaches', 'Neurological concerns'] },
+  'E952': { name: 'Cyclamic acid', type: 'Sweetener', riskLevel: 'moderate', concerns: ['Banned in some countries'] },
+  'E954': { name: 'Saccharin', type: 'Sweetener', riskLevel: 'moderate', concerns: ['Artificial sweetener'] },
+  'E955': { name: 'Sucralose', type: 'Sweetener', riskLevel: 'moderate', concerns: ['Gut microbiome effects'] }
+};
+
+// Chemical additives and preservatives database
+const CHEMICAL_ADDITIVES_DATABASE = {
+  // Sulfates
+  'sodium lauryl sulfate': { type: 'Surfactant', riskLevel: 'high', concerns: ['Skin irritation', 'Eye irritation'] },
+  'sodium laureth sulfate': { type: 'Surfactant', riskLevel: 'moderate', concerns: ['Skin irritation'] },
+  'ammonium lauryl sulfate': { type: 'Surfactant', riskLevel: 'high', concerns: ['Skin irritation'] },
+  
+  // Parabens
+  'methylparaben': { type: 'Preservative', riskLevel: 'high', concerns: ['Endocrine disruption', 'Allergic reactions'] },
+  'ethylparaben': { type: 'Preservative', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+  'propylparaben': { type: 'Preservative', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+  'butylparaben': { type: 'Preservative', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+  'parabens': { type: 'Preservative', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+  
+  // Formaldehyde releasers
+  'formaldehyde': { type: 'Preservative', riskLevel: 'high', concerns: ['Cancer risk', 'Allergic reactions'] },
+  'quaternium-15': { type: 'Preservative', riskLevel: 'high', concerns: ['Formaldehyde release'] },
+  'dmdm hydantoin': { type: 'Preservative', riskLevel: 'high', concerns: ['Formaldehyde release'] },
+  'imidazolidinyl urea': { type: 'Preservative', riskLevel: 'moderate', concerns: ['Formaldehyde release'] },
+  
+  // Other concerning chemicals
+  'triclosan': { type: 'Antimicrobial', riskLevel: 'high', concerns: ['Endocrine disruption', 'Antibiotic resistance'] },
+  'triclocarban': { type: 'Antimicrobial', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+  'phthalates': { type: 'Plasticizer', riskLevel: 'high', concerns: ['Endocrine disruption'] },
+  'bha': { type: 'Antioxidant', riskLevel: 'high', concerns: ['Cancer risk'] },
+  'bht': { type: 'Antioxidant', riskLevel: 'high', concerns: ['Cancer risk'] },
+  'toluene': { type: 'Solvent', riskLevel: 'high', concerns: ['Neurological effects'] },
+  'coal tar': { type: 'Colorant', riskLevel: 'high', concerns: ['Cancer risk'] },
+  'lead acetate': { type: 'Colorant', riskLevel: 'high', concerns: ['Heavy metal toxicity'] },
+  'hydroquinone': { type: 'Skin lightener', riskLevel: 'high', concerns: ['Cancer risk', 'Skin damage'] }
+};
+
+const getAdditiveSafetyLevel = (eNumber) => {
+  const additiveData = COMPREHENSIVE_ADDITIVE_DATABASE[eNumber.toUpperCase()];
+  if (additiveData) {
+    // Map new risk levels to old safety levels for compatibility
+    switch (additiveData.riskLevel) {
+      case 'low': return 'safe';
+      case 'moderate': return 'moderate';
+      case 'high': return 'concerning';
+      default: return 'moderate';
+    }
+  }
+  return 'safe'; // Default for unknown E-numbers
+};
+
+const getColorByLevel = (level) => {
+  switch (level) {
+    case 'safe': return '#4CAF50';
+    case 'moderate': return '#4CAF50';     // Changed to green (was orange)
+    case 'concerning': return '#F44336';
+    default: return '#9E9E9E';
+  }
+};
+
+const getAdditiveSafetyColor = (eNumber) => {
+  return getColorByLevel(getAdditiveSafetyLevel(eNumber));
+};
+
+const isAdditive = (ingredient) => {
+  return checkForAdditive(ingredient) !== null;
+};
+
+const getAdditiveType = (ingredient) => {
+  const additiveInfo = checkForAdditive(ingredient);
+  return additiveInfo ? additiveInfo.type : 'Unknown Additive';
+};
+
+export const getENumber = (ingredient) => {
+  const cleanIngredient = ingredient.toLowerCase();
+  const eNumberMatch = cleanIngredient.match(/^e(\d{3,4}[a-z]?)$/);
+  return eNumberMatch ? eNumberMatch[0].toUpperCase() : null;
+};
+
+// End of enhanced ingredient analyzer
+// Adding final closing brace to balance the count
+}

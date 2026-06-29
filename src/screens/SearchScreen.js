@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -96,9 +96,11 @@ const SearchScreen = ({ navigation }) => {
 
     // Check connectivity before making any network calls — on iOS this
     // gives a clear error instead of a confusing timeout/connection failure.
+    // Note: isConnected can be null or false even when connected on iOS/Android,
+    // so only block if BOTH isConnected and isInternetReachable are definitively false.
     try {
       const net = await NetInfo.fetch();
-      if (!net.isConnected) {
+      if (net.isConnected === false && net.isInternetReachable === false) {
         Alert.alert(
           'No Internet',
           'Your device is not connected to the internet. Please check your Wi-Fi or mobile data and try again.'
@@ -195,7 +197,7 @@ const SearchScreen = ({ navigation }) => {
         {/* Product image */}
         <View style={st.productImgWrap}>
           <ProductImg uri={item.image} typeIcon={typeIcon} theme={theme} />
-          <View style={[st.typeDot, { backgroundColor: isFood ? '#2E7D32' : '#6B3FA0', borderColor: theme.bgCard }]}>
+          <View style={[st.typeDot, { backgroundColor: isFood ? '#067A4F' : '#6B3FA0', borderColor: theme.bgCard }]}>
             <Ionicons name={typeIcon} size={8} color="#fff" />
           </View>
         </View>
@@ -207,8 +209,8 @@ const SearchScreen = ({ navigation }) => {
             <Text style={[st.productBrand, { color: theme.textMuted }]} numberOfLines={1}>{item.brand}</Text>
           ) : null}
           <View style={[st.typeChip, { backgroundColor: isFood ? 'rgba(46,125,50,0.15)' : 'rgba(107,63,160,0.15)' }]}>
-            <Ionicons name={typeIcon} size={11} color={isFood ? '#4CAF50' : '#9C6ADE'} />
-            <Text style={[st.typeChipText, { color: isFood ? '#4CAF50' : '#9C6ADE' }]}>{typeLabel}</Text>
+            <Ionicons name={typeIcon} size={11} color={isFood ? '#067A4F' : '#9C6ADE'} />
+            <Text style={[st.typeChipText, { color: isFood ? '#067A4F' : '#9C6ADE' }]}>{typeLabel}</Text>
           </View>
         </View>
 

@@ -35,6 +35,10 @@ const cleanupOldHistory = (history) => {
  */
 export const checkPremiumStatus = async () => {
   try {
+    // Developer / free-premium override
+    const freePremium = await AsyncStorage.getItem('freePremiumGranted');
+    if (freePremium === 'true') return true;
+
     const subscriptionType = await AsyncStorage.getItem(STORAGE_KEYS.SUBSCRIPTION_TYPE);
     const expiresAt = await AsyncStorage.getItem(STORAGE_KEYS.SUBSCRIPTION_EXPIRES_AT);
 
@@ -64,24 +68,19 @@ export const checkPremiumStatus = async () => {
  */
 export const saveToHistory = async (product) => {
   try {
-    // Premium check
-    const isPremium = await checkPremiumStatus();
-    if (!isPremium) {
-      console.log('ℹ️ History save skipped - Premium feature only');
-      return { success: false, reason: 'not_premium' };
-    }
-
-    // Validate required fields
+    // Validate required fields first
     if (!product.barcode || !product.productName) {
       console.warn('⚠️ Invalid product data - missing barcode or name');
       return { success: false, reason: 'invalid_data' };
     }
 
+    const isPremium = await checkPremiumStatus();
+
     // Get existing history
     const historyJson = await AsyncStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
     let history = historyJson ? JSON.parse(historyJson) : [];
 
-    // Clean up old scans (older than 7 days) — premium users keep full history
+    // Clean up old scans (older than 7 days) for non-premium users
     if (!isPremium) {
       history = cleanupOldHistory(history);
     }
@@ -112,10 +111,11 @@ export const saveToHistory = async (product) => {
       console.log('💾 Added new scan to history');
     }
 
-    // Enforce limit (keep newest 100)
-    if (history.length > MAX_HISTORY_ITEMS) {
-      history = history.slice(0, MAX_HISTORY_ITEMS);
-      console.log(`✂️ Trimmed history to ${MAX_HISTORY_ITEMS} items`);
+    // Enforce limit — premium gets 1000, free gets 20
+    const limit = isPremium ? MAX_HISTORY_ITEMS : 20;
+    if (history.length > limit) {
+      history = history.slice(0, limit);
+      console.log(`✂️ Trimmed history to ${limit} items`);
     }
 
     // Save updated history
@@ -135,26 +135,8 @@ export const saveToHistory = async (product) => {
  */
 export const getHistory = async () => {
   try {
-    // Premium check
-    const isPremium = await checkPremiumStatus();
-    if (!isPremium) {
-      return { success: false, reason: 'not_premium', data: [] };
-    }
-
     const historyJson = await AsyncStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
-    let history = historyJson ? JSON.parse(historyJson) : [];
-
-    // Clean up old scans automatically — premium users keep full history
-    const originalLength = history.length;
-    if (!isPremium) {
-      history = cleanupOldHistory(history);
-    }
-    
-    // Save cleaned history if items were removed
-    if (history.length < originalLength) {
-      await AsyncStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify(history));
-    }
-
+    const history = historyJson ? JSON.parse(historyJson) : [];
     console.log(`📖 Retrieved ${history.length} history items`);
     return { success: true, data: history };
   } catch (error) {
@@ -169,11 +151,6 @@ export const getHistory = async () => {
  */
 export const deleteHistoryItem = async (itemId) => {
   try {
-    const isPremium = await checkPremiumStatus();
-    if (!isPremium) {
-      return { success: false, reason: 'not_premium' };
-    }
-
     const historyJson = await AsyncStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
     let history = historyJson ? JSON.parse(historyJson) : [];
 
@@ -199,11 +176,6 @@ export const deleteHistoryItem = async (itemId) => {
  */
 export const clearHistory = async () => {
   try {
-    const isPremium = await checkPremiumStatus();
-    if (!isPremium) {
-      return { success: false, reason: 'not_premium' };
-    }
-
     await AsyncStorage.removeItem(STORAGE_KEYS.SCAN_HISTORY);
     console.log('🗑️ History cleared');
 
@@ -220,11 +192,6 @@ export const clearHistory = async () => {
  */
 export const searchHistory = async (query) => {
   try {
-    const isPremium = await checkPremiumStatus();
-    if (!isPremium) {
-      return { success: false, reason: 'not_premium', data: [] };
-    }
-
     const historyJson = await AsyncStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
     const history = historyJson ? JSON.parse(historyJson) : [];
 
@@ -251,11 +218,6 @@ export const searchHistory = async (query) => {
  */
 export const getHistoryStats = async () => {
   try {
-    const isPremium = await checkPremiumStatus();
-    if (!isPremium) {
-      return { success: false, reason: 'not_premium' };
-    }
-
     const historyJson = await AsyncStorage.getItem(STORAGE_KEYS.SCAN_HISTORY);
     const history = historyJson ? JSON.parse(historyJson) : [];
 

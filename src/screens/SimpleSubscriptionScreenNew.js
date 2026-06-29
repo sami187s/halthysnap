@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Dimensions, Platform, ActivityIndicator, Linking, ScrollView, StatusBar } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
@@ -109,36 +109,6 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
   };
 
   const handlePurchase = async () => {
-    if (loading) return;
-    setLoading(true);
-
-    try {
-      // Grant free premium permanently
-      await AsyncStorage.setItem('freePremiumGranted', 'true');
-      await AsyncStorage.multiSet([
-        ['subscriptionType', 'Premium'],
-        ['subscriptionExpiresAt', (Date.now() + 10 * 365 * 24 * 60 * 60 * 1000).toString()],
-        ['lastSubscriptionCheck', Date.now().toString()],
-        ['premiumTrialActivated', 'false'],
-        ['premiumTrialUsedToday', '0'],
-      ]);
-      setCurrentTier('premium');
-      setLoading(false);
-
-      if (fromOnboarding) {
-        // Complete the onboarding flow and go to the main app
-        await AsyncStorage.setItem('hasCompletedPaywall', 'true');
-        navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-      } else {
-        Alert.alert('Premium Active', 'You now have unlimited scans and full premium access.');
-      }
-    } catch (error) {
-      setLoading(false);
-      console.error('Free premium grant error:', error);
-    }
-  };
-
-  const _handlePurchase_IAP_DISABLED = async () => {
     if (loading || initializingIAP) {
       console.log('⏳ Purchase blocked: loading=' + loading + ', initializing=' + initializingIAP);
       return;
@@ -193,20 +163,22 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
             ['lastSubscriptionCheck', Date.now().toString()]
           ]);
           
-          Alert.alert(
-            'Premium Active! 🎉', 
-            'All features unlocked!\nUnlimited AI analysis available',
-            [{ 
-              text: 'Start Scanning!', 
-              onPress: () => {
-                // Navigate and trigger full refresh
-                navigation.reset({
+          if (fromOnboarding) {
+            await AsyncStorage.multiSet([['hasCompletedPaywall', 'true'], ['chatbotAccess', 'enabled']]);
+            navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+          } else {
+            Alert.alert(
+              'Premium Active! 🎉',
+              'All features unlocked! Unlimited AI analysis available.',
+              [{
+                text: 'Start Scanning!',
+                onPress: () => navigation.reset({
                   index: 0,
                   routes: [{ name: 'Home', params: { premiumActivated: true } }],
-                });
-              }
-            }]
-          );
+                }),
+              }]
+            );
+          }
         },
         onPurchaseFailure: (error) => {
           setLoading(false);
@@ -316,60 +288,112 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
     }
   };
 
-  // If already premium
-  if (currentTier === 'premium') {
+  // ── Single unified render — pricing table always shown ──────────────────────
+  // isPremium only changes the CTA button; IAP logic is never touched here.
+  if (false) {  // disabled — merged into main render below
+    const PREMIUM_FEATURES = [
+      { icon: 'barcode-outline',        text: 'Unlimited Barcode Scans' },
+      { icon: 'hardware-chip-outline',  text: 'AI Nutrition Assistant', comingSoon: true },
+      { icon: 'flask-outline',          text: 'Advanced Ingredient Analysis' },
+      { icon: 'ban-outline',            text: 'Ad-free Experience' },
+    ];
+
     return (
-      <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
-        <View style={styles.header}>
+      <View style={{ flex: 1, backgroundColor: '#f8faf8' }}>
+        <StatusBar barStyle="dark-content" backgroundColor="#f8faf8" />
+
+        {/* Header */}
+        <View style={lStyles.header}>
           {fromOnboarding ? (
-            <View style={{ width: 22 }} />
+            <View style={{ width: 36 }} />
           ) : (
             <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <Ionicons name="arrow-back" size={22} color="#a0a0a0" />
+              <Ionicons name="arrow-back" size={22} color="#067A4F" />
             </TouchableOpacity>
           )}
-          <Text style={styles.headerTitle}>Premium</Text>
-          <View style={{ width: 22 }} />
+          <Text style={lStyles.headerTitle}>Premium Upgrade</Text>
+          <Ionicons name="ellipsis-vertical" size={20} color="#067A4F" />
         </View>
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={true}>
 
-          <View style={styles.featuresCard}>
-            <Text style={styles.cardTitle}>Your Premium Benefits</Text>
-            {[
-              { icon: 'infinite',            text: 'Unlimited scans (always active)' },
-              { icon: 'sparkles',            text: 'AI ingredient analysis' },
-              { icon: 'shield-checkmark',    text: 'Detect hidden dangers' },
-              { icon: 'bulb',                text: 'Cleaner alternatives recommendations' },
-              { icon: 'chatbubble-ellipses', text: 'Unlimited AI Nutritionist messages' },
-              { icon: 'time',                text: 'Save results + full history access' },
-              { icon: 'rocket',              text: 'New features coming soon' },
-            ].map((item, i) => (
-              <View key={i} style={styles.featureRow}>
-                <View style={styles.featureIconWrap}>
-                  <Ionicons name={item.icon} size={18} color="#4CAF50" />
-                </View>
-                <Text style={styles.featureRowText}>{item.text}</Text>
-                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
-              </View>
-            ))}
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={lStyles.scroll} showsVerticalScrollIndicator={false} bounces>
+
+          {/* Hero */}
+          <View style={lStyles.hero}>
+            <Text style={lStyles.heroHeadline}>Elevate Your Wellness Journey</Text>
+            <Text style={lStyles.heroSub}>
+              Unlock the full potential of HealthySnap with professional-grade analysis and personal AI guidance.
+            </Text>
           </View>
 
-          <TouchableOpacity style={styles.primaryBtn} onPress={async () => {
-            if (fromOnboarding) {
-              await AsyncStorage.setItem('hasCompletedPaywall', 'true');
-              navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
-            } else {
-              navigation.navigate('Home');
-            }
-          }} activeOpacity={0.85}>
-            <Text style={styles.primaryBtnText}>Start Scanning Products</Text>
-            <View style={styles.btnIconWrap}><Ionicons name="camera" size={22} color="rgba(255,255,255,0.9)" /></View>
-          </TouchableOpacity>
+          {/* Premium Active Card */}
+          <View style={lStyles.card}>
+            <View style={lStyles.cardAccent} />
+            <View style={lStyles.cardBody}>
 
+              {/* Title row */}
+              <View style={lStyles.cardTitleRow}>
+                <View>
+                  <Text style={lStyles.mostPopular}>MOST POPULAR</Text>
+                  <Text style={lStyles.planName}>HealthySnap Premium</Text>
+                </View>
+                <View style={lStyles.diamondBox}>
+                  <Ionicons name="diamond" size={20} color="#fff" />
+                </View>
+              </View>
+
+              {/* Price */}
+              <View style={lStyles.priceBlock}>
+                <View style={lStyles.priceRow}>
+                  <Text style={lStyles.priceAmount}>$2.99</Text>
+                  <Text style={lStyles.pricePer}> / week</Text>
+                </View>
+                <Text style={lStyles.priceNote}>Billed weekly. Cancel anytime.</Text>
+              </View>
+
+              {/* Features */}
+              <View style={lStyles.featureList}>
+                {PREMIUM_FEATURES.map((f, i) => (
+                  <View key={i} style={lStyles.featureRow}>
+                    <View style={lStyles.featureIcon}>
+                      <Ionicons name={f.icon} size={13} color="#067A4F" />
+                    </View>
+                    <Text style={lStyles.featureText}>{f.text}</Text>
+                    {f.comingSoon ? (
+                      <View style={lStyles.comingSoonPill}>
+                        <Text style={lStyles.comingSoonText}>COMING SOON</Text>
+                      </View>
+                    ) : (
+                      <Ionicons name="checkmark-circle" size={18} color="#067A4F" />
+                    )}
+                  </View>
+                ))}
+              </View>
+
+              {/* Start scanning CTA */}
+              <TouchableOpacity
+                style={lStyles.upgradeBtn}
+                activeOpacity={0.88}
+                onPress={async () => {
+                  if (fromOnboarding) {
+                    await AsyncStorage.multiSet([['hasCompletedPaywall', 'true'], ['chatbotAccess', 'enabled']]);
+                    navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+                  } else {
+                    if (navigation.canGoBack()) navigation.goBack();
+                    else navigation.navigate('MainTabs');
+                  }
+                }}
+              >
+                <Text style={lStyles.upgradeBtnText}>Start Scanning Products</Text>
+              </TouchableOpacity>
+
+              <Text style={lStyles.secureNote}>Secure payment via App Store / Play Store</Text>
+            </View>
+          </View>
+
+          {/* Manage subscription */}
           <TouchableOpacity
-            style={styles.outlineBtn}
-            activeOpacity={0.85}
+            style={lStyles.freeBtn}
+            activeOpacity={0.7}
             onPress={() => {
               Alert.alert('Manage Subscription', 'Choose an option:', [
                 { text: 'Apple Subscriptions', onPress: () => Linking.openURL('https://apps.apple.com/account/subscriptions') },
@@ -383,95 +407,171 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
                         onPress: async () => {
                           const result = await iapManager.cancelSubscription();
                           if (result.success) {
-                            await AsyncStorage.multiRemove(['subscriptionType','subscriptionExpiresAt','lastSubscriptionCheck']);
-                            Alert.alert('Subscription Cancelled','You have been returned to the free tier.',[{ text:'OK', onPress: () => navigation.reset({ index:0, routes:[{ name:'Home' }] }) }]);
+                            await AsyncStorage.multiRemove(['subscriptionType', 'subscriptionExpiresAt', 'lastSubscriptionCheck']);
+                            Alert.alert('Subscription Cancelled', 'You have been returned to the free tier.', [{ text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) }]);
                             setCurrentTier('free');
                             await checkExistingSubscription();
                           }
-                        }
-                      }
+                        },
+                      },
                     ]);
-                  }
+                  },
                 },
-                { text: 'Cancel', style: 'cancel' }
+                { text: 'Cancel', style: 'cancel' },
               ]);
             }}
           >
-            <Ionicons name="settings-outline" size={18} color="#a0a0a0" />
-            <Text style={styles.outlineBtnText}>Manage Subscription</Text>
+            <Ionicons name="settings-outline" size={15} color="#707a6d" />
+            <Text style={lStyles.freeBtnText}>Manage Subscription</Text>
           </TouchableOpacity>
-
-          <View style={styles.infoPill}>
-            <Ionicons name="information-circle" size={18} color="#4CAF50" />
-            <Text style={styles.infoPillText}>Your subscription is active. Enjoy unlimited features!</Text>
-          </View>
 
         </ScrollView>
       </View>
     );
   }
 
-  // Free tier view
+  // Unified pricing table — shown for both free and premium users
+  const FEATURES = [
+    { icon: 'barcode-outline',        text: 'Unlimited Barcode Scans' },
+    { icon: 'hardware-chip-outline',  text: 'AI Nutrition Assistant',  comingSoon: true },
+    { icon: 'flask-outline',          text: 'Advanced Ingredient Analysis' },
+    { icon: 'ban-outline',            text: 'Ad-free Experience' },
+  ];
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
-      <View style={styles.header}>
+    <View style={{ flex: 1, backgroundColor: '#f8faf8' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#f8faf8" />
+
+      {/* Header — no back button during onboarding (forced paywall); back allowed from in-app upgrade */}
+      <View style={lStyles.header}>
         {fromOnboarding ? (
-          <View style={{ width: 22 }} />
+          <View style={{ width: 36 }} />
         ) : (
           <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={22} color="#a0a0a0" />
+            <Ionicons name="arrow-back" size={22} color="#067A4F" />
           </TouchableOpacity>
         )}
-        <Text style={styles.headerTitle}>Premium</Text>
-        <View style={{ width: 22 }} />
+        <Text style={lStyles.headerTitle}>Premium Upgrade</Text>
+        <View style={{ width: 36 }} />
       </View>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} bounces={true}>
 
-        <View style={styles.priceCard}>
-          <Text style={styles.planTitle}>HealthyScan Premium</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>{productPrice}</Text>
-          </View>
-          <Text style={styles.priceNote}>Promotional access - no payment required</Text>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={lStyles.scroll} showsVerticalScrollIndicator={false} bounces>
+
+        {/* Hero */}
+        <View style={lStyles.hero}>
+          <Text style={lStyles.heroHeadline}>Elevate Your Wellness Journey</Text>
+          <Text style={lStyles.heroSub}>
+            Unlock the full potential of HealthySnap with professional-grade analysis and personal AI guidance.
+          </Text>
         </View>
 
-        <View style={styles.featuresCard}>
-          <Text style={styles.cardTitle}>What's included:</Text>
-          {[
-            { icon: 'sparkles',            text: 'AI ingredient analysis' },
-            { icon: 'shield-checkmark',    text: 'Detect hidden dangers' },
-            { icon: 'infinite',            text: 'Unlimited scans' },
-            { icon: 'bulb',                text: 'Smart recommendations' },
-            { icon: 'chatbubble-ellipses', text: 'AI chatbot assistant' },
-            { icon: 'time',                text: 'History & saved products' },
-            { icon: 'rocket',              text: 'New features coming soon' },
-          ].map((item, i) => (
-            <View key={i} style={styles.featureRow}>
-              <View style={styles.featureIconWrap}>
-                <Ionicons name={item.icon} size={18} color="#4CAF50" />
+        {/* Pricing Card */}
+        <View style={lStyles.card}>
+          {/* Green top accent */}
+          <View style={lStyles.cardAccent} />
+
+          <View style={lStyles.cardBody}>
+            {/* Title row */}
+            <View style={lStyles.cardTitleRow}>
+              <View>
+                <Text style={lStyles.mostPopular}>MOST POPULAR</Text>
+                <Text style={lStyles.planName}>HealthySnap Premium</Text>
               </View>
-              <Text style={styles.featureRowText}>{item.text}</Text>
-              <Ionicons name="checkmark" size={18} color="#4CAF50" />
+              <View style={lStyles.diamondBox}>
+                <Ionicons name="diamond" size={20} color="#fff" />
+              </View>
             </View>
-          ))}
+
+            {/* Price */}
+            <View style={lStyles.priceBlock}>
+              <View style={lStyles.priceRow}>
+                <Text style={lStyles.priceAmount}>$2.99</Text>
+                <Text style={lStyles.pricePer}> / week</Text>
+              </View>
+              <Text style={lStyles.priceNote}>Billed weekly. Cancel anytime.</Text>
+            </View>
+
+            {/* Features */}
+            <View style={lStyles.featureList}>
+              {FEATURES.map((f, i) => (
+                <View key={i} style={lStyles.featureRow}>
+                  <View style={lStyles.featureIcon}>
+                    <Ionicons name={f.icon} size={13} color="#067A4F" />
+                  </View>
+                  <Text style={lStyles.featureText}>{f.text}</Text>
+                  {f.comingSoon && (
+                    <View style={lStyles.comingSoonPill}>
+                      <Text style={lStyles.comingSoonText}>COMING SOON</Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+            </View>
+
+            {/* CTA Button — triggers IAP if free, goes back if already premium */}
+            <TouchableOpacity
+              style={[lStyles.upgradeBtn, loading && { opacity: 0.6 }]}
+              onPress={currentTier === 'premium' ? async () => {
+                if (fromOnboarding) {
+                  await AsyncStorage.multiSet([['hasCompletedPaywall', 'true'], ['chatbotAccess', 'enabled']]);
+                  navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
+                } else {
+                  if (navigation.canGoBack()) navigation.goBack();
+                  else navigation.navigate('MainTabs');
+                }
+              } : handlePurchase}
+              disabled={loading}
+              activeOpacity={0.88}
+            >
+              {loading ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={lStyles.upgradeBtnText}>
+                  {currentTier === 'premium' ? 'Start Scanning Products' : 'Upgrade Now'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <Text style={lStyles.secureNote}>Secure payment via App Store / Play Store</Text>
+          </View>
         </View>
 
-        <TouchableOpacity
-          style={[styles.primaryBtn, loading && styles.btnDisabled]}
-          onPress={handlePurchase}
-          disabled={loading}
-          activeOpacity={0.85}
-        >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Text style={styles.primaryBtnText}>Continue To Premium</Text>
-              <View style={styles.btnIconWrap}><Ionicons name="diamond" size={22} color="rgba(255,255,255,0.9)" /></View>
-            </>
-          )}
-        </TouchableOpacity>
+        {/* Bottom action — only shown when already premium */}
+        {currentTier === 'premium' && (
+          <TouchableOpacity
+            style={lStyles.freeBtn}
+            activeOpacity={0.7}
+            onPress={() => {
+              Alert.alert('Manage Subscription', 'Choose an option:', [
+                { text: 'Apple Subscriptions', onPress: () => Linking.openURL('https://apps.apple.com/account/subscriptions') },
+                {
+                  text: 'Cancel & Return to Free', style: 'destructive',
+                  onPress: async () => {
+                    Alert.alert('Cancel Subscription', 'Are you sure you want to cancel?', [
+                      { text: 'No, Keep Premium', style: 'cancel' },
+                      {
+                        text: 'Yes, Cancel', style: 'destructive',
+                        onPress: async () => {
+                          const result = await iapManager.cancelSubscription();
+                          if (result.success) {
+                            await AsyncStorage.multiRemove(['subscriptionType', 'subscriptionExpiresAt', 'lastSubscriptionCheck']);
+                            Alert.alert('Subscription Cancelled', 'You have been returned to the free tier.', [{ text: 'OK', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'Home' }] }) }]);
+                            setCurrentTier('free');
+                            await checkExistingSubscription();
+                          }
+                        },
+                      },
+                    ]);
+                  },
+                },
+                { text: 'Cancel', style: 'cancel' },
+              ]);
+            }}
+          >
+            <Ionicons name="settings-outline" size={15} color="#707a6d" />
+            <Text style={lStyles.freeBtnText}>Manage Subscription</Text>
+          </TouchableOpacity>
+        )}
 
       </ScrollView>
     </View>
@@ -698,9 +798,23 @@ const styles = StyleSheet.create({
   infoPillText: {
     flex: 1,
     fontSize: 13,
-    color: '#4CAF50',
+    color: '#067A4F',
     fontWeight: '500',
     lineHeight: 19,
+  },
+
+  /* Free button */
+  freeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 6,
+  },
+  freeBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#555555',
   },
 
   /* Legal */
@@ -720,6 +834,203 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#333333',
     marginHorizontal: 5,
+  },
+});
+
+// ── Light-theme styles for the redesigned free-tier view ──────────────────────
+const lStyles = StyleSheet.create({
+  header: {
+    height: Platform.OS === 'ios' ? 90 : 72,
+    paddingTop: Platform.OS === 'ios' ? 48 : 28,
+    paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8faf8',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#067A4F',
+    letterSpacing: -0.2,
+  },
+
+  scroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 60,
+  },
+
+  hero: {
+    paddingTop: 20,
+    paddingBottom: 24,
+    alignItems: 'center',
+  },
+  heroHeadline: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#191c1b',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+    lineHeight: 34,
+    marginBottom: 12,
+  },
+  heroSub: {
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#40493e',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#bfc9bb',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 20,
+    elevation: 3,
+    marginBottom: 16,
+  },
+  cardAccent: {
+    height: 8,
+    backgroundColor: '#067A4F',
+  },
+  cardBody: {
+    padding: 24,
+  },
+  cardTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 20,
+  },
+  mostPopular: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#067A4F',
+    letterSpacing: 1.5,
+    marginBottom: 4,
+  },
+  planName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#191c1b',
+    letterSpacing: -0.3,
+  },
+  diamondBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: '#067A4F',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  priceBlock: {
+    marginBottom: 24,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  priceAmount: {
+    fontSize: 36,
+    fontWeight: '800',
+    color: '#191c1b',
+    letterSpacing: -1,
+  },
+  pricePer: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#40493e',
+  },
+  priceNote: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#707a6d',
+    marginTop: 4,
+    letterSpacing: 0.3,
+  },
+
+  featureList: {
+    gap: 14,
+    marginBottom: 28,
+  },
+  featureRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  featureIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#d9e6da',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#40493e',
+  },
+  comingSoonPill: {
+    backgroundColor: '#e6e9e7',
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  comingSoonText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#40493e',
+    letterSpacing: 0.8,
+  },
+
+  upgradeBtn: {
+    backgroundColor: '#067A4F',
+    borderRadius: 9999,
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+    shadowColor: '#067A4F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  upgradeBtnText: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.2,
+  },
+
+  secureNote: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#707a6d',
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+
+  freeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    gap: 6,
+  },
+  freeBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#707a6d',
   },
 });
 

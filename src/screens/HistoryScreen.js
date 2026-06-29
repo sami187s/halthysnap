@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+﻿import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,28 @@ import {
   checkPremiumStatus,
 } from '../utils/historyManager';
 
+const HistoryImage = ({ item, theme }) => {
+  const [failed, setFailed] = React.useState(false);
+  const icon = item.productType === 'food' ? 'nutrition-outline' : 'sparkles-outline';
+  if (!item.productImage || failed) {
+    return (
+      <View style={[s.imgWrap, { backgroundColor: theme.bgIcon }]}>
+        <Ionicons name={icon} size={22} color={theme.textMuted} />
+      </View>
+    );
+  }
+  return (
+    <View style={[s.imgWrap, { backgroundColor: theme.bgIcon }]}>
+      <Image
+        source={{ uri: item.productImage }}
+        style={s.img}
+        resizeMode="cover"
+        onError={() => setFailed(true)}
+      />
+    </View>
+  );
+};
+
 const HistoryScreen = () => {
   const navigation = useNavigation();
   const { theme, isDark } = useTheme();
@@ -50,8 +72,6 @@ const HistoryScreen = () => {
       setLoading(true);
       const premium = await checkPremiumStatus();
       setIsPremium(premium);
-
-      if (!premium) { setLoading(false); return; }
 
       const result = await getHistory();
       if (result.success) {
@@ -108,26 +128,32 @@ const HistoryScreen = () => {
   };
 
   const handleItemPress = (item) => {
+    const preloadedData = {
+      product_name: item.productName,
+      brands: item.brand || '',
+      image_url: item.productImage || null,
+      ingredients_text: item.ingredients || '',
+      nutriments: item.nutriments || {},
+      curatedScore: item.score || 0,
+    };
+
     if (item.productType === 'cosmetic') {
       navigation.navigate('CosmeticResults', {
         barcode: item.barcode,
-        productName: item.productName,
-        productImage: item.productImage,
-        ingredients: item.ingredients,
         fromHistory: true,
+        preloadedData,
       });
     } else {
       navigation.navigate('Results', {
         barcode: item.barcode,
-        productName: item.productName,
-        productImage: item.productImage,
         fromHistory: true,
+        preloadedData,
       });
     }
   };
 
   const getScoreColor = (score) => {
-    if (score >= 70) return '#4CAF50';
+    if (score >= 70) return '#067A4F';
     if (score >= 40) return '#FF9800';
     return '#F44336';
   };
@@ -154,50 +180,15 @@ const HistoryScreen = () => {
     return (
       <View style={[s.root, { backgroundColor: theme.bg }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={[s.header, { height: HEADER_H, paddingTop: HEADER_PT, backgroundColor: isDark ? 'rgba(10,10,10,0.95)' : 'rgba(245,245,245,0.97)', borderBottomColor: theme.headerBorder }]}>
-          <Text style={[s.headerTitle, { color: theme.text }]}>SCAN HISTORY</Text>
+        <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(250,250,245,0.95)', borderBottomColor: theme.headerBorder }]}>
+          <View style={s.headerLeft}>
+            <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
+            <Text style={s.headerTitle}>HealthySnap</Text>
+          </View>
+          <Ionicons name="notifications-outline" size={22} color="#067A4F" />
         </View>
         <View style={s.center}>
-          <ActivityIndicator size="large" color="#4CAF50" />
-        </View>
-      </View>
-    );
-  }
-
-  // ── Premium Gate ───────────────────────────────────────
-  if (!isPremium) {
-    return (
-      <View style={[s.root, { backgroundColor: theme.bg }]}>
-        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={[s.header, { height: HEADER_H, paddingTop: HEADER_PT, backgroundColor: isDark ? 'rgba(10,10,10,0.95)' : 'rgba(245,245,245,0.97)', borderBottomColor: theme.headerBorder }]}>
-          <Text style={[s.headerTitle, { color: theme.text }]}>SCAN HISTORY</Text>
-        </View>
-        <View style={[s.gateWrap, { paddingTop: HEADER_H }]}>
-          <View style={[s.gateIconWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-            <Ionicons name="lock-closed" size={36} color="#4CAF50" />
-          </View>
-          <Text style={[s.gateTitle, { color: theme.text }]}>Premium Only</Text>
-          <Text style={[s.gateDesc, { color: theme.textMuted }]}>
-            Keep track of every product you scan — full history, health stats, and search.
-          </Text>
-
-          <View style={[s.featureBox, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-            {['Up to 1000 saved scans', 'Search your history', 'Health score stats', 'Unlimited AI analysis'].map(f => (
-              <View key={f} style={s.featureRow}>
-                <Ionicons name="checkmark" size={15} color="#4CAF50" />
-                <Text style={[s.featureText, { color: theme.text }]}>{f}</Text>
-              </View>
-            ))}
-          </View>
-
-          <TouchableOpacity
-            style={s.upgradeBtn}
-            onPress={() => navigation.navigate('Subscription')}
-            activeOpacity={0.85}
-          >
-            <Text style={s.upgradeBtnText}>UPGRADE TO PREMIUM</Text>
-            <Ionicons name="arrow-forward" size={14} color="#000" />
-          </TouchableOpacity>
+          <ActivityIndicator size="large" color="#067A4F" />
         </View>
       </View>
     );
@@ -213,13 +204,7 @@ const HistoryScreen = () => {
         activeOpacity={0.75}
       >
         {/* Image */}
-        <View style={[s.imgWrap, { backgroundColor: theme.bgIcon }]}>
-          {item.productImage ? (
-            <Image source={{ uri: item.productImage }} style={s.img} resizeMode="cover" />
-          ) : (
-            <Ionicons name={item.productType === 'food' ? 'nutrition-outline' : 'sparkles-outline'} size={22} color={theme.textMuted} />
-          )}
-        </View>
+        <HistoryImage item={item} theme={theme} />
 
         {/* Info */}
         <View style={s.rowInfo}>
@@ -228,14 +213,14 @@ const HistoryScreen = () => {
             <Text style={[s.rowType, { color: theme.textMuted }]}>
               {item.productType === 'food' ? 'FOOD' : 'COSMETIC'}
             </Text>
-            <Text style={[s.rowDot, { color: theme.textDim }]}>·</Text>
+            <View style={s.rowDot} />
             <Text style={[s.rowDate, { color: theme.textMuted }]}>{formatDate(item.scannedAt)}</Text>
           </View>
         </View>
 
         {/* Score + delete */}
         <View style={s.rowRight}>
-          <View style={[s.scorePill, { backgroundColor: getScoreColor(item.score) + '22' }]}>
+          <View style={[s.scorePill, { borderColor: getScoreColor(item.score), backgroundColor: getScoreColor(item.score) + '0D' }]}>
             <Text style={[s.scoreNum, { color: getScoreColor(item.score) }]}>{Math.round(item.score)}</Text>
           </View>
           <TouchableOpacity
@@ -256,7 +241,7 @@ const HistoryScreen = () => {
       <View style={[s.statsRow, { borderBottomColor: theme.border }]}>
         {[
           { value: stats.totalScans, label: 'SCANS', color: theme.text },
-          { value: stats.healthyCount, label: 'HEALTHY', color: '#4CAF50' },
+          { value: stats.healthyCount, label: 'HEALTHY', color: '#067A4F' },
           { value: stats.moderateCount, label: 'MODERATE', color: '#FF9800' },
           { value: stats.riskyCount, label: 'RISKY', color: '#F44336' },
         ].map(({ value, label, color }) => (
@@ -290,29 +275,21 @@ const HistoryScreen = () => {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { height: HEADER_H, paddingTop: HEADER_PT, backgroundColor: isDark ? 'rgba(10,10,10,0.95)' : 'rgba(245,245,245,0.97)', borderBottomColor: theme.headerBorder }]}>
-        {canGoBack ? (
-          <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="arrow-back" size={22} color={theme.textMuted} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 22 }} />
-        )}
-        <Text style={[s.headerTitle, { color: theme.text }]}>SCAN HISTORY</Text>
-        {history.length > 0 ? (
-          <TouchableOpacity onPress={handleClearAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="trash-outline" size={20} color={theme.textMuted} />
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 22 }} />
-        )}
+      <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(250,250,245,0.95)', borderBottomColor: theme.headerBorder }]}>
+        <View style={s.headerLeft}>
+          <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
+          <Text style={s.headerTitle}>HealthySnap</Text>
+        </View>
+        <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="notifications-outline" size={22} color="#067A4F" />
+        </TouchableOpacity>
       </View>
 
       <FlatList
         data={filteredHistory}
         renderItem={renderItem}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={[s.list, { paddingTop: HEADER_H + 16, paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[s.list, { paddingTop: insets.top + 96, paddingBottom: insets.bottom + 100 }]}
         ListEmptyComponent={renderEmpty}
         ListHeaderComponent={
           <>
@@ -336,14 +313,21 @@ const HistoryScreen = () => {
             {renderStats()}
             {/* Count label */}
             {filteredHistory.length > 0 && (
-              <Text style={[s.countLabel, { color: theme.textMuted }]}>
-                {filteredHistory.length} {filteredHistory.length === 1 ? 'PRODUCT' : 'PRODUCTS'}
-              </Text>
+              <View style={s.countRow}>
+                <Text style={[s.countLabel, { color: theme.textMuted }]}>
+                  {filteredHistory.length} {filteredHistory.length === 1 ? 'PRODUCT' : 'PRODUCTS'}
+                </Text>
+                {history.length > 0 && (
+                  <TouchableOpacity onPress={handleClearAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name="trash-outline" size={20} color={theme.textMuted} />
+                  </TouchableOpacity>
+                )}
+              </View>
             )}
           </>
         }
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#4CAF50" />
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor="#067A4F" />
         }
         showsVerticalScrollIndicator={false}
       />
@@ -360,17 +344,36 @@ const s = StyleSheet.create({
     position: 'absolute',
     top: 0, left: 0, right: 0,
     zIndex: 50,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
+    paddingBottom: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5F2EC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(13,99,27,0.12)',
+  },
   headerTitle: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#067A4F',
+    letterSpacing: -0.3,
+  },
+  bellBtn: {
+    padding: 4,
   },
 
   // ── Search ──────────────────────────────────────────
@@ -380,13 +383,20 @@ const s = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     paddingHorizontal: 14,
-    paddingVertical: 12,
-    marginBottom: 12,
+    paddingVertical: 11,
+    marginBottom: 20,
     gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '400',
   },
 
@@ -394,20 +404,25 @@ const s = StyleSheet.create({
   statsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 16,
-    marginBottom: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingVertical: 20,
+    marginBottom: 4,
   },
   statCell: { alignItems: 'center', flex: 1 },
   statNum: { fontSize: 26, fontWeight: '700', letterSpacing: -0.5 },
-  statLabel: { fontSize: 9, fontWeight: '600', letterSpacing: 2, marginTop: 2 },
+  statLabel: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5, marginTop: 3 },
 
-  // ── Count label ──────────────────────────────────────
+  // ── Count row ────────────────────────────────────────
+  countRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+    marginTop: 8,
+  },
   countLabel: {
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: '700',
     letterSpacing: 2,
-    marginBottom: 12,
   },
 
   // ── List ────────────────────────────────────────────
@@ -419,31 +434,40 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 16,
     borderWidth: 1,
-    padding: 12,
-    marginBottom: 10,
-    gap: 12,
+    borderColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: '#FFFFFF',
+    padding: 14,
+    marginBottom: 12,
+    gap: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 1,
   },
   imgWrap: {
-    width: 56,
-    height: 56,
+    width: 64,
+    height: 64,
     borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
     flexShrink: 0,
+    backgroundColor: '#EEEEE9',
   },
-  img: { width: 56, height: 56 },
+  img: { width: 64, height: 64 },
   rowInfo: { flex: 1, gap: 4 },
-  rowName: { fontSize: 14, fontWeight: '600', lineHeight: 19 },
-  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  rowType: { fontSize: 9, fontWeight: '700', letterSpacing: 1.5 },
-  rowDot: { fontSize: 10 },
-  rowDate: { fontSize: 11, fontWeight: '400' },
+  rowName: { fontSize: 14, fontWeight: '600', lineHeight: 19, color: '#1a1c19' },
+  rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  rowType: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: '#707a6c' },
+  rowDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#bfcaba' },
+  rowDate: { fontSize: 11, fontWeight: '400', color: '#707a6c' },
   rowRight: { alignItems: 'center', gap: 8, flexShrink: 0 },
   scorePill: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },

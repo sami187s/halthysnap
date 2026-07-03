@@ -502,7 +502,7 @@ function App() {
         <StatusBar style="light" backgroundColor="transparent" translucent={true} />
         <Image
           source={require('./assets/logo.png')}
-          style={{ width: SW * 0.5, height: SW * 0.5, resizeMode: 'contain' }}
+          style={{ width: SW * 0.72, height: SW * 0.72, resizeMode: 'contain' }}
         />
       </View>
     );
@@ -533,7 +533,7 @@ function App() {
                   <View style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH, backgroundColor: '#067A4F', justifyContent: 'center', alignItems: 'center' }}>
                     <Image
                       source={require('./assets/logo.png')}
-                      style={{ width: SW * 0.5, height: SW * 0.5, resizeMode: 'contain' }}
+                      style={{ width: SW * 0.72, height: SW * 0.72, resizeMode: 'contain' }}
                     />
                   </View>
                 );

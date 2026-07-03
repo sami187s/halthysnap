@@ -1,9 +1,9 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar, setStatusBarTranslucent, setStatusBarBackgroundColor } from 'expo-status-bar';
-import { Platform, View, Text, Alert, StyleSheet, TouchableOpacity as RNTouchableOpacity, Image } from 'react-native';
+import { Platform, View, Text, Alert, StyleSheet, TouchableOpacity as RNTouchableOpacity, Image, Dimensions } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/native';
@@ -20,7 +20,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
       /* All scrollable containers */
       [data-testid="scroll-view"], [class*="ScrollView"], [class*="r-overflow"] {
         scrollbar-width: auto !important;
-        scrollbar-color: #4CAF50 #E8E8E8 !important;
+        scrollbar-color: #067A4F #E8E8E8 !important;
       }
       ::-webkit-scrollbar {
         width: 10px !important;
@@ -31,12 +31,12 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
         border-radius: 8px !important;
       }
       ::-webkit-scrollbar-thumb {
-        background: #4CAF50 !important;
+        background: #067A4F !important;
         border-radius: 8px !important;
         border: 2px solid #E8E8E8 !important;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #388E3C !important;
+        background: #067A4F !important;
       }
       /* Ensure overflow scroll on scrollable views */
       [class*="r-overflow-hidden"] {
@@ -146,12 +146,12 @@ function MainTabs() {
             iconName = focused ? 'leaf' : 'leaf-outline';
           } else if (route.name === 'Search') {
             iconName = focused ? 'search' : 'search-outline';
-          } else if (route.name === 'History') {
-            iconName = focused ? 'time' : 'time-outline';
           } else if (route.name === 'AIChat') {
             iconName = focused ? 'nutrition' : 'nutrition-outline';
           } else if (route.name === 'VeeList') {
-            iconName = focused ? 'list' : 'list-outline';
+            iconName = focused ? 'trophy' : 'trophy-outline';
+          } else if (route.name === 'Profile') {
+            iconName = focused ? 'person' : 'person-outline';
           }
 
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -197,20 +197,20 @@ function MainTabs() {
         options={{ tabBarLabel: 'Search' }}
       />
       <Tab.Screen
-        name="History"
-        component={HistoryScreen}
-        options={{ tabBarLabel: 'History' }}
-      />
-      <Tab.Screen
         name="AIChat"
         component={AINutritionistScreen}
         options={{ tabBarLabel: 'AI Chat' }}
       />
       
-      <Tab.Screen 
-        name="VeeList" 
+      <Tab.Screen
+        name="VeeList"
         component={VeeListScreen}
-        options={{ tabBarLabel: 'Vee List' }}
+        options={{ tabBarLabel: 'Best' }}
+      />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        options={{ tabBarLabel: 'Profile' }}
       />
     </Tab.Navigator>
 
@@ -286,7 +286,7 @@ class ErrorBoundary extends React.Component {
           <View style={{ flexDirection: 'row', gap: 10 }}>
             <View 
               style={{ 
-                backgroundColor: '#4CAF50', 
+                backgroundColor: '#067A4F', 
                 paddingHorizontal: 30, 
                 paddingVertical: 15, 
                 borderRadius: 25,
@@ -313,24 +313,24 @@ class ErrorBoundary extends React.Component {
 function App() {
   const { theme, isDark } = useTheme();
   const [isReady, setIsReady] = React.useState(false);
-  const [showOnboarding, setShowOnboarding] = React.useState(false);
+  const [showOnboarding, setShowOnboarding] = React.useState(null); // null = not yet checked
   const [isFirstLaunch, setIsFirstLaunch] = useState(null);
   const [showPremiumOnLaunch, setShowPremiumOnLaunch] = React.useState(false);
   
   // Check if user has seen onboarding
   const checkOnboarding = async () => {
     try {
+      // Always check AsyncStorage first — respects one-time onboarding on all devices
       const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
       const hasCompletedPaywall = await AsyncStorage.getItem('hasCompletedPaywall');
       const needsOnboarding = hasSeenOnboarding === null;
       setShowOnboarding(needsOnboarding);
       setIsFirstLaunch(needsOnboarding);
-      // If paywall was completed, launch straight to PremiumFeatures screen
       setShowPremiumOnLaunch(!needsOnboarding && hasCompletedPaywall === 'true');
     } catch (error) {
       console.error('Error checking onboarding:', error);
-      setShowOnboarding(false);
-      setIsFirstLaunch(false);
+      setShowOnboarding(true);
+      setIsFirstLaunch(true);
       setShowPremiumOnLaunch(false);
     }
   };
@@ -360,16 +360,30 @@ function App() {
         // Check if user has seen onboarding
         await checkOnboarding();
 
+        // One-time migration: grant chatbot access only to new users
+        // Old users (already had app) see "Coming Soon" to protect API costs
+        const chatbotAccessChecked = await AsyncStorage.getItem('chatbotAccessChecked');
+        if (!chatbotAccessChecked) {
+          const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
+          const chatbotAccess = hasSeenOnboarding ? 'coming_soon' : 'enabled';
+          await AsyncStorage.multiSet([
+            ['chatbotAccess', chatbotAccess],
+            ['chatbotAccessChecked', 'true'],
+          ]);
+          console.log('✅ Chatbot access set:', chatbotAccess);
+        }
+
         // 🖼️ Prefetch Vee List images so they're ready instantly
         const VEE_IMAGE_URLS = [
-          'https://media.sobeys.com/original/061314000056_VOILA_7beca970b0ad2512141beb2e92bd8f3cd5343355.JPG',
-          'https://digital.loblaws.ca/PCX/21560949_EA/en/1/21560949_en_front_800.png',
-          'https://m.media-amazon.com/images/I/51eKuOrpExL.jpg',
-          'https://m.media-amazon.com/images/I/81DQ8tL64oL._AC_UF1000,1000_QL80_.jpg',
-          'https://www.britsuperstore.com/media/catalog/product/cache/7/image/225x225/602f0fa2c1f0d1ba5e241f914e856ff9/m/e/meridian_organic_smooth_almond_butter_170g-1762849553.jpg',
-          'https://images.hollandandbarrettimages.co.uk/productimages/HB/724/094373_D.jpg',
-          'https://www.laroche-posay.ca/dw/image/v2/AATL_PRD/on/demandware.static/-/Sites-larocheposay-master-catalog/default/dw9ff4849c/2022/3337875578486/lrp_toleriane-sensitive-40ml-3337875578486-00.jpg',
-          'https://boots.scene7.com/is/image/Boots/10290141?fmt=jpeg&wid=400',
+          'https://images.openfoodfacts.org/images/products/327/408/000/5003/front_en.797.400.jpg',
+          'https://images.openfoodfacts.org/images/products/322/982/001/9307/front_fr.300.400.jpg',
+          'https://images.openfoodfacts.org/images/products/322/885/700/0166/front_fr.1862.400.jpg',
+          'https://images.openfoodfacts.org/images/products/000/002/072/4696/front_en.384.400.jpg',
+          'https://images.openfoodfacts.org/images/products/730/040/048/1588/front_en.269.400.jpg',
+          'https://images.openfoodfacts.org/images/products/322/982/012/9488/front_fr.238.400.jpg',
+          'https://images.openfoodfacts.org/images/products/501/002/900/0023/front_en.121.400.jpg',
+          'https://images.openfoodfacts.org/images/products/303/349/000/4521/front_fr.111.400.jpg',
+          'https://images.openfoodfacts.org/images/products/405/648/949/1217/front_en.3.400.jpg',
         ];
         VEE_IMAGE_URLS.forEach(url => Image.prefetch(url).catch(() => {}));
 
@@ -472,17 +486,24 @@ function App() {
     },
   };
 
-  // Simplified loading screen
-  if (!isReady) {
+  // Simplified loading screen — fills the entire screen on all platforms
+  if (!isReady || showOnboarding === null) {
+    const { width: SW, height: SH } = Dimensions.get('screen');
     return (
-      <View style={{ flex: 1, backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center' }}>
+      <View style={{
+        position: 'absolute',
+        top: 0, left: 0,
+        width: SW,
+        height: SH,
+        backgroundColor: '#067A4F',
+        justifyContent: 'center',
+        alignItems: 'center',
+      }}>
         <StatusBar style="light" backgroundColor="transparent" translucent={true} />
-        <Text style={{ fontSize: 24, color: '#4CAF50', fontWeight: 'bold', marginBottom: 10 }}>
-          Vee: Product Check
-        </Text>
-        <Text style={{ fontSize: 16, color: '#666' }}>
-          Loading...
-        </Text>
+        <Image
+          source={require('./assets/logo.png')}
+          style={{ width: SW * 0.5, height: SW * 0.5, resizeMode: 'contain' }}
+        />
       </View>
     );
   }
@@ -506,14 +527,17 @@ function App() {
           <NavigationContainer 
             linking={linking}
             fallback={
-              <View style={{ flex: 1, backgroundColor: '#f8f9fa', justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 24, color: '#4CAF50', fontWeight: 'bold', marginBottom: 20 }}>
-                  Vee: Product Check
-                </Text>
-                <Text style={{ fontSize: 16, color: '#666' }}>
-                  Initializing...
-                </Text>
-              </View>
+              (() => {
+                const { width: SW, height: SH } = Dimensions.get('screen');
+                return (
+                  <View style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH, backgroundColor: '#067A4F', justifyContent: 'center', alignItems: 'center' }}>
+                    <Image
+                      source={require('./assets/logo.png')}
+                      style={{ width: SW * 0.5, height: SW * 0.5, resizeMode: 'contain' }}
+                    />
+                  </View>
+                );
+              })()
             }
             onStateChange={(state) => {
               if (__DEV__) {
@@ -540,7 +564,7 @@ function App() {
             }}
           >
             <Stack.Navigator 
-              initialRouteName={showOnboarding ? "Onboarding" : "MainTabs"}
+              initialRouteName={showOnboarding === true ? "Onboarding" : "MainTabs"}
               screenOptions={{
                 headerShown: false,
                 gestureEnabled: true,

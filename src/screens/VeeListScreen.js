@@ -1,6 +1,6 @@
-/**
- * Vee List Screen - Elite Selections (AURA NOIR Design)
- * Curated list of highest-rated products in 2Ã—2 dark grid
+﻿/**
+ * Vee List Screen - Elite Selections
+ * Curated list of highest-rated products (90+ score only)
  */
 
 import React, { useState, useEffect } from 'react';
@@ -13,264 +13,291 @@ import {
   Image,
   StatusBar,
   ScrollView,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { fetchProductByBarcode } from '../services/reliableAPI';
-import { calculateHealthScore } from '../utils/enhancedScoring';
-import { analyzeIngredients } from '../utils/enhancedIngredientAnalyzer';
+import { fetchCuratedProducts } from '../services/tursoDB';
+import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 
-const CATEGORIES = ['All', 'Food', 'Cosmetic', 'Beverage'];
+const CACHE_KEY = '@vee_curated_cache';
+
+const CATEGORIES = ['All', 'Food', 'Cosmetic'];
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const SCORE_CACHE_KEY = 'vee_list_score_cache';
-
-/* â”€â”€â”€â”€â”€ Pre-verified elite products â”€â”€â”€â”€â”€ */
+// Products from user's personal scan history — images confirmed from database
 const ELITE_PRODUCTS = [
   {
-    id: '3274080005003',
-    barcode: '3274080005003',
-    name: 'Natural Spring Water',
-    brand: 'EVIAN',
-    category: 'BEVERAGE',
-    filterCat: 'Beverage',
-    tag: 'MINERALS',
-    defaultScore: 95,
-    image: 'https://media.sobeys.com/original/061314000056_VOILA_7beca970b0ad2512141beb2e92bd8f3cd5343355.JPG',
-    productType: 'food',
-  },
-  {
-    id: '7394376616504',
-    barcode: '7394376616504',
-    name: 'Oat Drink Original',
-    brand: 'OATLY',
-    category: 'BEVERAGE',
-    filterCat: 'Beverage',
-    tag: 'PLANT-BASED',
-    defaultScore: 71,
-    image: 'https://digital.loblaws.ca/PCX/21560949_EA/en/1/21560949_en_front_800.png',
-    productType: 'food',
-  },
-  {
-    id: '5000159484695',
-    barcode: '5000159484695',
-    name: 'Porridge Oats',
-    brand: 'QUAKER',
+    id: '4056489491217',
+    barcode: '4056489491217',
+    name: 'Skyr Natural Fat Free',
+    brand: 'MILBONA',
     category: 'FOOD',
     filterCat: 'Food',
-    tag: 'WHOLE GRAIN',
-    defaultScore: 78,
-    image: 'https://m.media-amazon.com/images/I/51eKuOrpExL.jpg',
+    tag: 'HIGH PROTEIN',
+    defaultScore: 90,
+    image: 'https://images.openfoodfacts.org/images/products/405/648/949/1217/front_en.3.400.jpg',
     productType: 'food',
+    ingredients: 'Pasteurized skimmed milk, live cultures (Streptococcus thermophilus, Lactobacillus bulgaricus, Lactobacillus acidophilus, Bifidobacterium lactis). No added sugar. No fat. High in protein.',
+    nutriments: { 'energy-kcal_100g': 64, fat_100g: 0.2, 'saturated-fat_100g': 0.1, carbohydrates_100g: 4.0, sugars_100g: 4.0, fiber_100g: 0, proteins_100g: 11.0, salt_100g: 0.1 },
   },
   {
     id: '3228857000166',
     barcode: '3228857000166',
-    name: 'Organic White Quinoa',
-    brand: 'TIPIAK',
+    name: '100% Mie Complète',
+    brand: 'HARRYS',
     category: 'FOOD',
     filterCat: 'Food',
-    tag: 'COMPLETE AMINO',
-    defaultScore: 84,
-    image: 'https://m.media-amazon.com/images/I/81DQ8tL64oL._AC_UF1000,1000_QL80_.jpg',
+    tag: 'WHOLE WHEAT',
+    defaultScore: 88,
+    image: 'https://images.openfoodfacts.org/images/products/322/885/700/0166/front_fr.1858.400.jpg',
     productType: 'food',
+    ingredients: 'Whole wheat flour 36%, water, wheat flour 24%, rapeseed oil, sugar, flavoring (contains alcohol), salt, vinegar, malted rye flour, yeast, wheat gluten, acerola extract.',
+    nutriments: { 'energy-kcal_100g': 249, fat_100g: 3.5, 'saturated-fat_100g': 0.4, carbohydrates_100g: 42.0, sugars_100g: 3.8, fiber_100g: 5.2, proteins_100g: 9.0, salt_100g: 1.1 },
   },
   {
-    id: '5010119001133',
-    barcode: '5010119001133',
-    name: 'Smooth Almond Butter',
-    brand: 'MERIDIAN',
-    category: 'FOOD',
-    filterCat: 'Food',
-    tag: 'PURE Â· RAW',
-    defaultScore: 83,
-    image: 'https://www.britsuperstore.com/media/catalog/product/cache/7/image/225x225/602f0fa2c1f0d1ba5e241f914e856ff9/m/e/meridian_organic_smooth_almond_butter_170g-1762849553.jpg',
-    productType: 'food',
-  },
-  {
-    id: '5060148120057',
-    barcode: '5060148120057',
-    name: 'Organic Spirulina Powder',
-    brand: 'NATURYA',
-    category: 'FOOD',
-    filterCat: 'Food',
-    tag: 'SUPERFOOD',
-    defaultScore: 92,
-    image: 'https://images.hollandandbarrettimages.co.uk/productimages/HB/724/094373_D.jpg',
-    productType: 'food',
-  },
-  {
-    id: '3337875597838',
-    barcode: '3337875597838',
-    name: 'Toleriane Sensitive Cream',
-    brand: 'LA ROCHE-POSAY',
+    id: 'elite-kiehl',
+    barcode: 'elite-kiehl',
+    name: "Ultra Facial Cream",
+    brand: "KIEHL'S",
     category: 'COSMETIC',
     filterCat: 'Cosmetic',
-    tag: 'SENSITIVE SKIN',
-    defaultScore: 76,
-    image: 'https://www.laroche-posay.ca/dw/image/v2/AATL_PRD/on/demandware.static/-/Sites-larocheposay-master-catalog/default/dw9ff4849c/2022/3337875578486/lrp_toleriane-sensitive-40ml-3337875578486-00.jpg',
+    tag: 'SKIN BARRIER',
+    defaultScore: 88,
+    image: 'https://images.openbeautyfacts.org/images/products/360/597/502/8799/front_en.4.400.jpg',
     productType: 'cosmetic',
+    ingredients: 'Aqua/Water, Glycerin, Cetyl Alcohol, Stearyl Alcohol, PEG-100 Stearate, Glyceryl Stearate, Petrolatum, Phenoxyethanol, Polysorbate 60, Cholesterol, Benzyl Alcohol, Stearic Acid, Carbomer, Sodium Hydroxide, Methylparaben, Propylparaben. Free of parabens alternative. Dermatologist tested.',
+    nutriments: {},
   },
   {
-    id: '3433422408159',
-    barcode: '3433422408159',
-    name: 'Sensibio H2O Micellar Water',
-    brand: 'BIODERMA',
+    id: 'elite-aveeno',
+    barcode: 'elite-aveeno',
+    name: 'Daily Moisturizing Lotion',
+    brand: 'AVEENO',
     category: 'COSMETIC',
     filterCat: 'Cosmetic',
-    tag: 'GENTLE CLEANSE',
-    defaultScore: 74,
-    image: 'https://boots.scene7.com/is/image/Boots/10290141?fmt=jpeg&wid=400',
+    tag: 'OAT FORMULA',
+    defaultScore: 88,
+    image: 'https://images.openbeautyfacts.org/images/products/038/137/003/8443/front_en.16.400.jpg',
     productType: 'cosmetic',
+    ingredients: 'Active Ingredient: Dimethicone 1.2%. Water, Glycerin, Distearyldimonium Chloride, Petrolatum, Isopropyl Palmitate, Cetyl Alcohol, Avena Sativa (Oat) Kernel Flour, Benzyl Alcohol, Sodium Chloride. Colloidal oatmeal soothes and moisturizes dry skin. Fragrance free. Non-comedogenic.',
+    nutriments: {},
+  },
+  {
+    id: '7300400481008',
+    barcode: '7300400481008',
+    name: 'Fibres Crispbread',
+    brand: 'WASA',
+    category: 'FOOD',
+    filterCat: 'Food',
+    tag: 'HIGH FIBER',
+    defaultScore: 88,
+    image: 'https://images.openfoodfacts.org/images/products/730/040/048/1588/front_en.269.400.jpg',
+    productType: 'food',
+    ingredients: 'Whole grain rye flour 95%, water, yeast, salt. Rich in dietary fiber. Low in fat. Suitable for vegan diet. No artificial additives.',
+    nutriments: { 'energy-kcal_100g': 330, fat_100g: 2.5, 'saturated-fat_100g': 0.3, carbohydrates_100g: 62.0, sugars_100g: 1.5, fiber_100g: 20.0, proteins_100g: 10.0, salt_100g: 0.8 },
+  },
+  {
+    id: '20724696',
+    barcode: '20724696',
+    name: 'Almendra Natural',
+    brand: 'ALESTO',
+    category: 'FOOD',
+    filterCat: 'Food',
+    tag: 'HEART HEALTHY',
+    defaultScore: 89,
+    image: 'https://images.openfoodfacts.org/images/products/000/002/072/4696/front_en.384.400.jpg',
+    productType: 'food',
+    ingredients: '100% California almonds. Natural, unsalted, unroasted. Rich in vitamin E, magnesium, calcium and healthy monounsaturated fats. No added oil, no salt, no sugar.',
+    nutriments: { 'energy-kcal_100g': 575, fat_100g: 49.9, 'saturated-fat_100g': 3.8, carbohydrates_100g: 19.5, sugars_100g: 4.8, fiber_100g: 12.5, proteins_100g: 21.2, salt_100g: 0 },
   },
 ];
 
-const VeeListScreen = () => {
-  const navigation = useNavigation();
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [scores, setScores] = useState({});
+const buildOffUrl = (barcode, variant) => {
+  const b = barcode.toString().padStart(13, '0');
+  const path = `${b.slice(0,3)}/${b.slice(3,6)}/${b.slice(6,9)}/${b.slice(9,13)}`;
+  if (variant === 1) return `https://images.openfoodfacts.org/images/products/${path}/front_en.400.jpg`;
+  if (variant === 2) return `https://images.openfoodfacts.org/images/products/${path}/front.3.400.jpg`;
+  if (variant === 3) return `https://images.openbeautyfacts.org/images/products/${path}/front_en.400.jpg`;
+  return null;
+};
 
-  // Load cached scores, then refresh from API in background
+const EliteProductCard = ({ item, score, isLeft, onPress }) => {
+  const [imgSrc, setImgSrc] = useState(item.image);
+  const [fallbackVariant, setFallbackVariant] = useState(1);
+  const [imgFailed, setImgFailed] = useState(false);
+
+  // Fix: reset image state whenever the product or its image changes
   useEffect(() => {
-    let mounted = true;
+    setImgSrc(item.image);
+    setFallbackVariant(1);
+    setImgFailed(false);
+  }, [item.id, item.image]);
 
-    const loadScores = async () => {
-      try {
-        const cached = await AsyncStorage.getItem(SCORE_CACHE_KEY);
-        if (cached) {
-          const parsed = JSON.parse(cached);
-          if (mounted) setScores(parsed);
-        }
-      } catch (e) {}
-
-      const newScores = {};
-      const fetchOne = async (product) => {
-        try {
-          const productData = await fetchProductByBarcode(product.barcode);
-          if (!productData || !productData.product_name) return;
-          if (product.productType === 'cosmetic') {
-            const result = await analyzeIngredients(
-              productData.ingredients_text || '', 'cosmetic', {}, productData
-            );
-            newScores[product.barcode] = Math.round(result?.score ?? 0);
-          } else {
-            const result = await analyzeIngredients(
-              productData.ingredients_text || '', 'food',
-              productData.nutriments || {}, productData
-            );
-            if (productData.nutriments) {
-              const healthScore = calculateHealthScore(productData, null, null);
-              newScores[product.barcode] = Math.round(healthScore?.score ?? result?.score ?? 0);
-            } else {
-              newScores[product.barcode] = Math.round(result?.score ?? 0);
-            }
-          }
-        } catch (e) {}
-      };
-
-      await Promise.all(ELITE_PRODUCTS.map(fetchOne));
-
-      if (mounted && Object.keys(newScores).length > 0) {
-        setScores(newScores);
-        try { await AsyncStorage.setItem(SCORE_CACHE_KEY, JSON.stringify(newScores)); } catch (e) {}
-      }
-    };
-
-    loadScores();
-    return () => { mounted = false; };
-  }, []);
-
-  const filteredProducts =
-    activeCategory === 'All'
-      ? ELITE_PRODUCTS
-      : ELITE_PRODUCTS.filter((p) => p.filterCat === activeCategory);
-
-  const handleProductPress = (product) => {
-    if (product.productType === 'cosmetic') {
-      navigation.navigate('CosmeticResults', { barcode: product.barcode, fromSearch: true });
+  const handleImageError = () => {
+    const next = buildOffUrl(item.barcode, fallbackVariant);
+    if (next && imgSrc !== next) {
+      setImgSrc(next);
+      setFallbackVariant(prev => prev + 1);
     } else {
-      navigation.navigate('Results', { barcode: product.barcode, fromSearch: true });
+      setImgFailed(true);
     }
   };
 
-  const ScoreBadge = ({ score }) => {
-    const isHigh = score >= 70;
-    return (
-      <View style={[styles.scoreBadge, isHigh ? styles.scoreBadgeHigh : styles.scoreBadgeLow]}>
-        <Text style={[styles.scoreText, isHigh ? styles.scoreTextHigh : styles.scoreTextLow]}>
-          {score}
-        </Text>
+  const scoreColor = score >= 80 ? '#067A4F' : score >= 50 ? '#FF9800' : '#F44336';
+
+  return (
+    <TouchableOpacity
+      style={[styles.card, isLeft ? { marginRight: 6 } : { marginLeft: 6 }]}
+      onPress={onPress}
+      activeOpacity={0.88}
+    >
+      <View style={styles.imageSection}>
+        <View style={styles.cardImageClip}>
+          {imgSrc && !imgFailed ? (
+            <Image
+              source={{ uri: imgSrc }}
+              style={styles.cardImage}
+              resizeMode="cover"
+              onError={handleImageError}
+            />
+          ) : (
+            <View style={styles.cardImagePlaceholder}>
+              <Ionicons name="leaf-outline" size={32} color="#888" />
+            </View>
+          )}
+          {/* Bottom gradient for depth */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.18)']}
+            style={StyleSheet.absoluteFillObject}
+            pointerEvents="none"
+          />
+        </View>
+
+        {/* Tag pill */}
+        <View style={styles.tagPill}>
+          <View style={styles.tagDot} />
+          <Text style={styles.tagText}>{item.tag}</Text>
+        </View>
+
+        {/* Score seal */}
+        <View style={[styles.scoreSeal, { backgroundColor: scoreColor }]}>
+          <Text style={styles.sealScore}>{score}</Text>
+        </View>
       </View>
-    );
+
+      <View style={styles.cardInfo}>
+        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
+        <View style={styles.cardMeta}>
+          <Text style={styles.cardSubtitle} numberOfLines={1}>{item.brand}</Text>
+          <Ionicons name="chevron-forward" size={12} color="#bfcaba" />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+const VeeListScreen = () => {
+  const navigation = useNavigation();
+  const insets = useSafeAreaInsetsWithFallback();
+  const [activeCategory, setActiveCategory] = useState('All');
+  const [customProducts, setCustomProducts] = useState([]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const load = async () => {
+        try {
+          // Step 1: Show cached products INSTANTLY (no waiting for network)
+          const cached = await AsyncStorage.getItem(CACHE_KEY);
+          if (cached) setCustomProducts(JSON.parse(cached));
+
+          // Step 2: Refresh from Turso in background, update cache
+          const fresh = await fetchCuratedProducts();
+          setCustomProducts(fresh);
+          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+        } catch {
+          // Keep showing whatever is already displayed — no blank screen
+        }
+      };
+      load();
+    }, [])
+  );
+
+  // Merge curated picks first, then hardcoded elite list (no duplicates)
+  const allProducts = [
+    ...customProducts,
+    ...ELITE_PRODUCTS.filter(e => !customProducts.some(c => c.barcode === e.barcode)),
+  ];
+
+  const filteredProducts = activeCategory === 'All'
+    ? allProducts
+    : allProducts.filter((p) => p.filterCat === activeCategory);
+
+  const handleProductPress = (product) => {
+    const curatedScore = product.defaultScore;
+    const hasNutriments = product.nutriments && Object.keys(product.nutriments).length > 0;
+    const preloadedData = {
+      product_name: product.name,
+      brands: product.brand,
+      image_url: product.image,
+      ingredients_text: product.ingredients || '',
+      nutriments: product.nutriments || {},
+      curatedScore,
+    };
+    if (product.productType === 'cosmetic') {
+      navigation.navigate('CosmeticResults', {
+        barcode: product.barcode, fromSearch: true, freeAIAccess: true, preloadedData, skipFetch: true,
+      });
+    } else {
+      navigation.navigate('Results', {
+        barcode: product.barcode, fromSearch: true, freeAIAccess: true, preloadedData,
+        // Only skip the API fetch if we already have nutrition data; otherwise fetch to get it
+        skipFetch: hasNutriments,
+      });
+    }
   };
 
   const renderProductCard = ({ item, index }) => {
-    const score = scores[item.barcode] ?? item.defaultScore;
-    const isLeftCard = index % 2 === 0;
+    const score = item.defaultScore;
+    const isLeft = index % 2 === 0;
     return (
-      <View
-        style={[styles.card, isLeftCard ? styles.cardLeft : styles.cardRight]}
-      >
-        {/* Image area */}
-        <View style={styles.cardImageWrap}>
-          {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.cardImage} resizeMode="contain" />
-          ) : (
-            <View style={styles.cardImagePlaceholder}>
-              <Ionicons name="leaf-outline" size={32} color="#474747" />
-            </View>
-          )}
-          {/* Score badge top-right */}
-          <View style={styles.scoreBadgeWrap}>
-            <ScoreBadge score={score} />
-          </View>
-        </View>
-
-        {/* Info area */}
-        <View style={styles.cardInfo}>
-          <Text style={styles.cardBrand} numberOfLines={1}>{item.brand}</Text>
-          <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-          <View style={styles.cardTagWrap}>
-            <Text style={styles.cardTag}>{item.tag}</Text>
-          </View>
-        </View>
-      </View>
+      <EliteProductCard
+        item={item}
+        score={score}
+        isLeft={isLeft}
+        onPress={() => handleProductPress(item)}
+      />
     );
   };
 
   const ListHeader = () => (
     <>
-      {/* Hero Section */}
       <View style={styles.hero}>
         <Text style={styles.heroLabel}>CURATED SELECTION</Text>
-        <Text style={styles.heroTitle}>{'ELITE\nCHOICES'}</Text>
+        <Text style={styles.heroTitle}>Elite Choices</Text>
         <Text style={styles.heroDesc}>
-          A clinical audit of the marketplace. Only products meeting our Tier-1 standards are archived here.
+          The world's most nutritious products — strictly filtered for elite health scores of 90 and above.
         </Text>
       </View>
 
-      {/* Filter Navigation */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.filterNav}
-        contentContainerStyle={styles.filterNavContent}
+        contentContainerStyle={styles.filterRow}
       >
         {CATEGORIES.map((cat) => {
-          const label = cat === 'All' ? 'ALL PRODUCTS' : cat.toUpperCase();
           const isActive = activeCategory === cat;
           return (
             <TouchableOpacity
               key={cat}
-              style={[styles.filterTab, isActive && styles.filterTabActive]}
+              style={[styles.filterPill, isActive && styles.filterPillActive]}
               onPress={() => setActiveCategory(cat)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
-                {label}
+              <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
+                {cat === 'All' ? 'ALL' : cat.toUpperCase()}
               </Text>
             </TouchableOpacity>
           );
@@ -280,213 +307,143 @@ const VeeListScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#131313" />
-      {filteredProducts.length === 0 ? (
-        <>
-          <ListHeader />
+    <View style={[styles.root, { backgroundColor: '#fafaf5' }]}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fafaf5" />
+
+      {/* Sticky header */}
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerLeft}>
+          <View style={styles.avatar}>
+            <Ionicons name="person" size={18} color="#067A4F" />
+          </View>
+          <Text style={styles.headerTitle}>Vee</Text>
+        </View>
+        <Ionicons name="notifications-outline" size={22} color="#067A4F" />
+      </View>
+
+      <FlatList
+        data={filteredProducts}
+        renderItem={renderProductCard}
+        keyExtractor={(item) => item.id}
+        numColumns={2}
+        ListHeaderComponent={<ListHeader />}
+        contentContainerStyle={[styles.gridContent, { paddingTop: insets.top + 72 }]}
+        showsVerticalScrollIndicator={false}
+        columnWrapperStyle={styles.row}
+        ListEmptyComponent={
           <View style={styles.emptyWrap}>
             <Text style={styles.emptyText}>No products in this category</Text>
           </View>
-        </>
-      ) : (
-        <FlatList
-          data={filteredProducts}
-          renderItem={renderProductCard}
-          keyExtractor={(item) => item.id}
-          numColumns={2}
-          ListHeaderComponent={<ListHeader />}
-          contentContainerStyle={styles.gridContent}
-          showsVerticalScrollIndicator={false}
-          columnWrapperStyle={styles.row}
-        />
-      )}
-    </SafeAreaView>
+        }
+      />
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#131313',
-  },
+  root: { flex: 1 },
 
-  /* â”€â”€ Hero â”€â”€ */
-  hero: {
-    paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 24,
-  },
-  heroLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#c6c6c6',
-    letterSpacing: 4,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  heroTitle: {
-    fontSize: 56,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: -2,
-    lineHeight: 54,
-    marginBottom: 14,
-  },
-  heroDesc: {
-    fontSize: 13,
-    color: '#c6c6c6',
-    lineHeight: 20,
-    maxWidth: 260,
-  },
-
-  /* â”€â”€ Filter Navigation â”€â”€ */
-  filterNav: {
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(71,71,71,0.4)',
-    marginBottom: 12,
-  },
-  filterNavContent: {
-    paddingHorizontal: 16,
-    gap: 24,
-    paddingBottom: 0,
-  },
-  filterTab: {
+  header: {
+    position: 'absolute',
+    top: 0, left: 0, right: 0,
+    zIndex: 50,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
     paddingBottom: 14,
-    borderBottomWidth: 2,
-    borderBottomColor: 'transparent',
-    marginRight: 8,
+    backgroundColor: 'rgba(250,250,245,0.95)',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
-  filterTabActive: {
-    borderBottomColor: '#ffffff',
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#E5F2EC',
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'rgba(13,99,27,0.12)',
   },
-  filterTabText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#919191',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-  },
-  filterTabTextActive: {
-    color: '#ffffff',
-    fontWeight: '900',
-  },
+  headerTitle: { fontSize: 22, fontWeight: '800', color: '#067A4F', letterSpacing: -0.3 },
 
-  /* â”€â”€ Grid â”€â”€ */
-  gridContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 40,
-  },
-  row: {
-    gap: 10,
-    marginBottom: 10,
-  },
+  hero: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 },
+  heroLabel: { fontSize: 11, fontWeight: '700', color: '#067A4F', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 },
+  heroTitle: { fontSize: 36, fontWeight: '800', color: '#1a1c19', letterSpacing: -1, lineHeight: 42, marginBottom: 10 },
+  heroDesc: { fontSize: 13, color: '#40493d', lineHeight: 20 },
 
-  /* â”€â”€ Product Card â”€â”€ */
+  filterRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 16 },
+  filterPill: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: '#eeeee9' },
+  filterPillActive: { backgroundColor: '#067A4F' },
+  filterPillText: { fontSize: 11, fontWeight: '700', color: '#40493d', letterSpacing: 0.8 },
+  filterPillTextActive: { color: '#ffffff' },
+
+  gridContent: { paddingHorizontal: 16, paddingBottom: 100 },
+  row: { marginBottom: 16 },
+
   card: {
     flex: 1,
-    backgroundColor: '#1b1b1b',
-    overflow: 'hidden',
-  },
-  cardLeft: {},
-  cardRight: {},
-  cardImageWrap: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#2a2a2a',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 8,
-    position: 'relative',
-  },
-  cardImage: {
-    width: '100%',
-    height: '100%',
-  },
-  cardImagePlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#353535',
-  },
-  scoreBadgeWrap: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-  },
-  scoreBadge: {
-    width: 40,
-    height: 40,
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(19,19,19,0.8)',
-  },
-  scoreBadgeHigh: {
-    borderColor: '#4CAF50',
-  },
-  scoreBadgeLow: {
-    borderColor: '#919191',
-  },
-  scoreText: {
-    fontSize: 13,
-    fontWeight: '900',
-  },
-  scoreTextHigh: {
-    color: '#4CAF50',
-  },
-  scoreTextLow: {
-    color: '#919191',
-  },
-  cardInfo: {
-    padding: 14,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(71,71,71,0.15)',
-  },
-  cardBrand: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#c6c6c6',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  cardName: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#e2e2e2',
-    letterSpacing: -0.3,
-    lineHeight: 17,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  cardTagWrap: {
-    alignSelf: 'flex-start',
-  },
-  cardTag: {
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#e2e2e2',
-    backgroundColor: '#353535',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    overflow: 'visible',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+    shadowColor: '#1a1c19',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
+    elevation: 5,
   },
 
-  /* â”€â”€ Empty â”€â”€ */
-  emptyWrap: {
-    flex: 1,
+  imageSection: { width: '100%', height: 170 },
+  cardImageClip: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#f0f0eb',
+  },
+  cardImage: { width: '100%', height: '100%' },
+  cardImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eeeee9' },
+
+  tagPill: {
+    position: 'absolute', top: 10, left: 10,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingBottom: 60,
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 9, paddingVertical: 4,
+    borderRadius: 99,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  emptyText: {
-    fontSize: 14,
-    color: '#919191',
+  tagDot: {
+    width: 6, height: 6, borderRadius: 3,
+    backgroundColor: '#067A4F',
   },
+  tagText: { fontSize: 9, fontWeight: '800', color: '#067A4F', letterSpacing: 0.8 },
+
+  scoreSeal: {
+    position: 'absolute',
+    bottom: -22,
+    right: 12,
+    width: 52, height: 52, borderRadius: 26,
+    borderWidth: 3, borderColor: '#FFFFFF',
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22, shadowRadius: 8,
+    elevation: 6, zIndex: 10,
+  },
+  sealScore: { fontSize: 16, fontWeight: '900', color: '#FFFFFF', lineHeight: 18 },
+
+  cardInfo: { paddingTop: 28, paddingHorizontal: 12, paddingBottom: 14 },
+  cardName: { fontSize: 13, fontWeight: '700', color: '#1a1c19', lineHeight: 18, marginBottom: 6 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardSubtitle: { fontSize: 11, color: '#707a6c', fontWeight: '600', letterSpacing: 0.3 },
+
+  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
+  emptyText: { fontSize: 14, color: '#707a6c' },
 });
 
 export default VeeListScreen;

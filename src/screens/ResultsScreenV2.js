@@ -2,14 +2,14 @@
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
   StyleSheet, Animated, Dimensions, StatusBar,
-  Image, ActivityIndicator, Share,
+  Image, ActivityIndicator, Share, Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { fetchProductByBarcode } from '../services/reliableAPI';
-import { fetchAlternativesByCategory, updateProductImageInTurso } from '../services/tursoDB';
+import { fetchAlternativesByCategory, updateProductImageInTurso, saveCuratedProduct } from '../services/tursoDB';
 import { analyzeIngredients, getProductTypeFromCategories } from '../utils/enhancedIngredientAnalyzer';
 import { calculateHealthScore } from '../utils/enhancedScoring';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
@@ -82,11 +82,21 @@ const HeroImage = React.memo(({ imageUrl, barcode, imgStyle }) => {
   return <Image source={{ uri }} style={imgStyle} resizeMode="cover" onError={handleError} />;
 });
 
-// Alt-card image — images are pre-fetched in fetchRealAlternatives.
-// This component just renders whatever URL it receives, or a placeholder.
-const AltImg = React.memo(({ uri, imgStyle, placeholderStyle }) => {
-  const [err, setErr] = React.useState(false);
-  if (!uri || err) {
+// Constructs the OFF CDN split-path URL from a barcode — no API call needed.
+function buildCdnUrl(barcode) {
+  if (!barcode) return null;
+  const b = String(barcode).replace(/\D/g, '');
+  if (b.length === 13)
+    return `https://images.openfoodfacts.org/images/products/${b.slice(0,3)}/${b.slice(3,6)}/${b.slice(6,9)}/${b.slice(9)}/front_en.400.jpg`;
+  return `https://images.openfoodfacts.org/images/products/${b}/front_en.400.jpg`;
+}
+
+// Alt-card image with automatic CDN fallback from barcode.
+const AltImg = React.memo(({ uri, barcode, imgStyle, placeholderStyle }) => {
+  const cdnUrl = buildCdnUrl(barcode);
+  const [src, setSrc] = React.useState(uri || cdnUrl);
+
+  if (!src) {
     return (
       <View style={[imgStyle, placeholderStyle]}>
         <Ionicons name="leaf-outline" size={28} color={OUTLINE} />
@@ -94,7 +104,16 @@ const AltImg = React.memo(({ uri, imgStyle, placeholderStyle }) => {
     );
   }
   return (
-    <Image source={{ uri }} style={imgStyle} resizeMode="cover" onError={() => setErr(true)} />
+    <Image
+      source={{ uri: src }}
+      style={imgStyle}
+      resizeMode="cover"
+      onError={() => {
+        // If stored URL failed, try CDN; if CDN also fails, show placeholder
+        if (cdnUrl && src !== cdnUrl) setSrc(cdnUrl);
+        else setSrc(null);
+      }}
+    />
   );
 });
 
@@ -216,6 +235,47 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   const [additiveLoading, setAdditiveLoading]       = useState(false);
   const [realAlternatives, setRealAlternatives]       = useState([]);
   const [altsLoading, setAltsLoading]                 = useState(false);
+  const [isInBest, setIsInBest]                       = useState(false);
+
+  const BEST_KEY = '@vee_curated_products';
+
+  // Check + save to Best
+  useEffect(() => {
+    if (!barcode) return;
+    AsyncStorage.getItem(BEST_KEY).then(raw => {
+      const list = raw ? JSON.parse(raw) : [];
+      setIsInBest(list.some(p => p.barcode === String(barcode)));
+    }).catch(() => {});
+  }, [barcode]);
+
+  const handleAddToBest = async () => {
+    if (!product) return;
+    try {
+      const entry = {
+        barcode: String(barcode),
+        name: product.product_name || product.name || 'Unknown Product',
+        brand: product.brands || product.brand || 'Unknown Brand',
+        score,
+        image: product.image_url || product.image || null,
+        productType: 'food',
+        ingredients: product.ingredients_text || '',
+      };
+      // Save to Turso DB — visible to ALL users instantly
+      await saveCuratedProduct(entry);
+      // Also save locally so the button stays green on this device
+      const raw = await AsyncStorage.getItem(BEST_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      if (!list.some(p => p.barcode === entry.barcode)) {
+        await AsyncStorage.setItem(BEST_KEY, JSON.stringify([entry, ...list]));
+      }
+      setIsInBest(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert(
+        '✅ Saved to History!',
+        `"${product.product_name || 'This product'}" is now visible in the Best section for every user of the app.`
+      );
+    } catch (e) { console.log('AddToBest error', e.message); }
+  };
 
   const safeAreaInsets = useSafeAreaInsetsWithFallback();
   const fadeAnim   = useRef(new Animated.Value(0)).current;
@@ -330,70 +390,40 @@ const ResultsScreenV2 = ({ route, navigation }) => {
         (productData.product_name || '').split(' ')[0].toLowerCase() || 'food',
       ];
       const primaryKeyword = keywords[0];
-      let candidates = await fetchAlternativesByCategory(primaryKeyword, barcode, 40);
-      if (candidates.length < 5 && keywords[1]) {
-        const more = await fetchAlternativesByCategory(keywords[1], barcode, 30);
-        for (const c of more) {
-          if (!candidates.find((x) => x.barcode === c.barcode)) candidates.push(c);
-        }
+
+      // Fetch both keyword queries in parallel instead of sequential
+      const [primary, secondary] = await Promise.all([
+        fetchAlternativesByCategory(primaryKeyword, barcode, 20),
+        keywords[1] ? fetchAlternativesByCategory(keywords[1], barcode, 20) : Promise.resolve([]),
+      ]);
+      const seen = new Set();
+      const candidates = [];
+      for (const p of [...primary, ...secondary]) {
+        if (p.barcode && !seen.has(p.barcode)) { seen.add(p.barcode); candidates.push(p); }
       }
       if (candidates.length === 0) return;
 
-      // Score and take top 5 only
+      // Score with calculateHealthScore (same method used in detail view) and take top 5 healthy only
       const top5 = candidates
         .filter((p) => p.product_name && p.barcode)
         .map((p) => {
-          const ingResult = p.ingredients_text
-            ? analyzeIngredients(p.ingredients_text, 'food')
-            : null;
+          const score = calculateHealthScore(p, null, null)?.score ?? 60;
           return {
             name:    p.product_name,
             brand:   p.brands || '',
             image:   p.image_url || null,
             barcode: p.barcode,
-            score:   ingResult?.score ?? 60,
+            score,
           };
         })
+        .filter((p) => p.score >= 80)
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);
 
       if (top5.length === 0) return;
 
-      // Show cards immediately (may have some null images)
+      // Show cards — AltImg builds CDN image URLs from barcodes instantly, no API calls needed
       setRealAlternatives(top5);
-
-      // Pre-fetch images for any card missing one — all in parallel
-      const needImage = top5.filter(a => !a.image && a.barcode);
-      if (needImage.length === 0) return;
-
-      const results = await Promise.allSettled(
-        needImage.map(alt =>
-          fetch(
-            `https://world.openfoodfacts.org/api/v2/product/${alt.barcode}.json?fields=image_front_url`,
-            { headers: { 'User-Agent': 'HealthyScan/1.0' }, signal: AbortSignal.timeout(7000) }
-          )
-            .then(r => r.ok ? r.json() : null)
-            .then(json => ({ barcode: alt.barcode, url: json?.product?.image_front_url || null }))
-            .catch(() => ({ barcode: alt.barcode, url: null }))
-        )
-      );
-
-      // Build a map of barcode → image URL
-      const imageMap = {};
-      results.forEach(r => {
-        if (r.status === 'fulfilled' && r.value.url) {
-          imageMap[r.value.barcode] = r.value.url;
-          // Save to Turso — next time this product appears, no API call needed
-          updateProductImageInTurso(r.value.barcode, r.value.url).catch(() => {});
-        }
-      });
-
-      // Update state with fetched images
-      if (Object.keys(imageMap).length > 0) {
-        setRealAlternatives(prev =>
-          prev.map(a => (imageMap[a.barcode] ? { ...a, image: imageMap[a.barcode] } : a))
-        );
-      }
     } catch (e) {
       console.log('⚠️ fetchRealAlternatives failed:', e.message);
     } finally {
@@ -571,7 +601,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   const displayed = allIngredients;
 
   const ingStyle = (_t) => {
-    if (_t === 'good')     return { icon: 'leaf',    color: PRIMARY,   bg: 'rgba(45,106,79,0.08)',  tag: 'GOOD'     };
+    if (_t === 'good')     return { icon: 'leaf',    color: PRIMARY,   bg: 'rgba(6,122,79,0.08)',  tag: 'GOOD'     };
     if (_t === 'bad')      return { icon: 'close',   color: ERROR_C,   bg: 'rgba(186,26,26,0.08)',  tag: 'CONCERN'  };
     return                        { icon: 'ellipse', color: WARNING_C, bg: 'rgba(217,119,6,0.08)',  tag: 'MODERATE' };
   };
@@ -666,13 +696,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
     : 'This product contains ingredients that may negatively impact your health.';
 
   // ── Alternatives ─────────────────────────────────────────────
-  const fallbackAlts = [
-    { name: 'Pure Spinach Elixir', brand: 'PREMIUM COLD PRESS', image: null, barcode: null, score: Math.min(95, score + 20) },
-    { name: 'Wild Celery Essence', brand: 'ZERO ADDITIVE · PURE', image: null, barcode: null, score: Math.min(93, score + 18) },
-    { name: 'Organic Green Blend', brand: 'COLD PRESSED · RAW', image: null, barcode: null, score: Math.min(91, score + 15) },
-    { name: 'Nature Harvest Mix', brand: 'WHOLE FOOD · CLEAN', image: null, barcode: null, score: Math.min(90, score + 12) },
-  ];
-  const altsData = realAlternatives.length > 0 ? realAlternatives : fallbackAlts;
+  const altsData = realAlternatives;
 
   // ═════════════════════════════════════════════════════════════════
   // RENDER — Dark Brutalism
@@ -729,12 +753,18 @@ const ResultsScreenV2 = ({ route, navigation }) => {
           <View style={st.summarySection}>
             <Text style={[st.ratingLabel, { color: scoreColor }]}>{getRatingLabel(score)}</Text>
             <Text style={st.productNameText} numberOfLines={2}>{productName}</Text>
-            {brandName ? <Text style={st.brandLabel}>{brandName}</Text> : null}
-            <Text style={st.verdictDesc}>
-              {score >= 70 ? 'This product has a healthy nutritional profile with beneficial ingredients.'
-               : score >= 40 ? 'This product is moderately healthy. Some ingredients may need attention.'
-               : 'This product may negatively impact your health. Consider a healthier alternative.'}
-            </Text>
+
+            {/* Save to History button */}
+            <TouchableOpacity
+              style={[st.saveToBestBtn, isInBest && { backgroundColor: '#2d6a4f' }]}
+              onPress={handleAddToBest}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={isInBest ? 'bookmark' : 'bookmark-outline'} size={18} color="#fff" />
+              <Text style={st.saveToBestTxt}>
+                {isInBest ? '✓ Saved to History' : 'Save to History'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           {/* ── WHY THIS SCORE toggle ────────────────────────────── */}
@@ -787,7 +817,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                     const isPenalty = r.type === 'penalty' || (r.impact && r.impact < 0);
                     const isBonus   = r.type === 'bonus'   || (r.impact && r.impact > 0);
                     const pillColor = isPenalty ? ERROR_C : isBonus ? PRIMARY : WARNING_C;
-                    const pillBg    = isPenalty ? 'rgba(186,26,26,0.08)' : isBonus ? 'rgba(45,106,79,0.08)' : 'rgba(217,119,6,0.08)';
+                    const pillBg    = isPenalty ? 'rgba(186,26,26,0.08)' : isBonus ? 'rgba(6,122,79,0.08)' : 'rgba(217,119,6,0.08)';
                     const pillIcon  = isPenalty ? 'remove-circle-outline' : isBonus ? 'checkmark-circle-outline' : 'information-circle-outline';
                     const impactStr = r.impact != null
                       ? (r.impact > 0 ? `+${r.impact}` : String(r.impact === 'cap' ? '⚠ cap' : r.impact))
@@ -941,7 +971,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                               {/* Verdict badge */}
                               {usdaInfo.healthVerdict && (() => {
                                 const vMap = {
-                                  good:     { bg: 'rgba(45,106,79,0.12)',  text: '#067A4F', label: 'Generally Safe' },
+                                  good:     { bg: 'rgba(6,122,79,0.12)',  text: '#067A4F', label: 'Generally Safe' },
                                   moderate: { bg: 'rgba(217,119,6,0.12)',  text: '#d97706', label: 'Moderate' },
                                   concern:  { bg: 'rgba(217,119,6,0.18)',  text: '#b45309', label: 'Use With Caution' },
                                   avoid:    { bg: 'rgba(186,26,26,0.12)',  text: '#ba1a1a', label: 'Avoid' },
@@ -1061,7 +1091,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                           {/* Verdict badge */}
                           {(() => {
                             const vMap = {
-                              good:     { bg: 'rgba(45,106,79,0.12)',  text: '#067A4F', label: 'Safe' },
+                              good:     { bg: 'rgba(6,122,79,0.12)',  text: '#067A4F', label: 'Safe' },
                               moderate: { bg: 'rgba(217,119,6,0.12)',  text: '#d97706', label: 'Moderate' },
                               concern:  { bg: 'rgba(217,119,6,0.18)',  text: '#b45309', label: 'Caution' },
                               avoid:    { bg: 'rgba(186,26,26,0.12)',  text: '#ba1a1a', label: 'Avoid' },
@@ -1121,6 +1151,10 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                 <ActivityIndicator size="small" color={PRIMARY} />
                 <Text style={{ color: ON_SURFACE_VAR, fontSize: 11, marginTop: 10 }}>Finding alternatives...</Text>
               </View>
+            ) : altsData.length === 0 ? (
+              <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                <Text style={{ color: ON_SURFACE_VAR, fontSize: 13 }}>No healthy alternatives found (80+)</Text>
+              </View>
             ) : (
               <FlatList
                 data={altsData}
@@ -1142,7 +1176,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                     >
                       {/* Square image inside card with score badge */}
                       <View style={st.altImgBox}>
-                        <AltImg uri={item.image} imgStyle={st.altImg} placeholderStyle={st.altImgPlaceholder} />
+                        <AltImg uri={item.image} barcode={item.barcode} imgStyle={st.altImg} placeholderStyle={st.altImgPlaceholder} />
                         <View style={[st.altScorePill, { backgroundColor: altScoreColor }]}>
                           <Text style={st.altScorePillText}>{item.score}/100</Text>
                         </View>
@@ -1199,7 +1233,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* ── SAVE TO LOG ───────────────────────────────────────── */}
+          {/* ── SAVE TO HISTORY ──────────────────────────────────── */}
           <View style={st.saveWrap}>
             <TouchableOpacity
               style={st.saveBtn}
@@ -1217,7 +1251,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                 });
               }}
             >
-              <Text style={st.saveBtnText}>SAVE TO LOG</Text>
+              <Text style={st.saveBtnText}>Save to History</Text>
             </TouchableOpacity>
           </View>
 
@@ -1277,7 +1311,7 @@ const st = StyleSheet.create({
   iconBtn:      { padding: 8 },
   avatarCircle: {
     width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(45,106,79,0.1)',
+    backgroundColor: 'rgba(6,122,79,0.1)',
     alignItems: 'center', justifyContent: 'center',
   },
 
@@ -1289,6 +1323,12 @@ const st = StyleSheet.create({
 
   // Product summary (below hero)
   summarySection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
+  saveToBestBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: '#067A4F', borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 20, marginTop: 14,
+  },
+  saveToBestTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
   ratingLabel:    { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
   productNameText:{ fontSize: 20, fontWeight: '700', color: ON_SURFACE, lineHeight: 26, marginBottom: 4 },
   brandLabel:     { fontSize: 13, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8 },
@@ -1298,8 +1338,8 @@ const st = StyleSheet.create({
   whyBtn: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(45,106,79,0.25)',
-    backgroundColor: 'rgba(45,106,79,0.06)',
+    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(6,122,79,0.25)',
+    backgroundColor: 'rgba(6,122,79,0.06)',
     marginBottom: 4,
   },
   whyBtnText: { fontSize: 13, fontWeight: '600', color: PRIMARY, flex: 1 },
@@ -1360,7 +1400,7 @@ const st = StyleSheet.create({
   section:      { paddingHorizontal: 20, paddingBottom: 12 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 0 },
 
-  ingCountBadge: { backgroundColor: 'rgba(45,106,79,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  ingCountBadge: { backgroundColor: 'rgba(6,122,79,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
   ingCountText:  { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
 
   // Ingredient — each row is its own white card
@@ -1387,7 +1427,7 @@ const st = StyleSheet.create({
     borderBottomRightRadius: 12,
     borderWidth: 1,
     borderTopWidth: 0,
-    borderColor: 'rgba(45,106,79,0.15)',
+    borderColor: 'rgba(6,122,79,0.15)',
     paddingHorizontal: 16,
     paddingVertical: 14,
     marginBottom: 8,
@@ -1429,7 +1469,7 @@ const st = StyleSheet.create({
   },
   aiCardLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 4 },
   aiCardSub:     { fontSize: 15, fontWeight: '500', color: ON_SURFACE, lineHeight: 21 },
-  aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(45,106,79,0.1)', alignItems: 'center', justifyContent: 'center' },
+  aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(6,122,79,0.1)', alignItems: 'center', justifyContent: 'center' },
   aiCardConnect: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: PRIMARY },
 
   // Alternatives

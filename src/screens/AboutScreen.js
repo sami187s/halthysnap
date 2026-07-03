@@ -5,465 +5,381 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Platform,
   Linking,
-  Dimensions,
   StatusBar,
-  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const AboutScreen = ({ navigation }) => {
+const PRIMARY   = '#00591d';
+const BG        = '#f8faf8';
+const SURFACE   = '#ffffff';
+const ON_BG     = '#191c1b';
+const ON_VAR    = '#40493e';
+const OUTLINE   = '#707a6d';
+const OUTLINE_V = '#bfc9bb';
+const ERROR     = '#ba1a1a';
+const SECONDARY = '#556158';
+
+const SectionHeader = ({ icon, title, accentColor = PRIMARY }) => (
+  <View style={styles.sectionHeader}>
+    <View style={[styles.sectionAccent, { backgroundColor: accentColor }]} />
+    <Ionicons name={icon} size={20} color={PRIMARY} style={{ marginRight: 8 }} />
+    <Text style={styles.sectionTitle}>{title}</Text>
+  </View>
+);
+
+export default function AboutScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+
   const openURL = async (url) => {
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
-      } else {
-        alert('Unable to open this link. Please check your internet connection.');
-      }
-    } catch (error) {
-      console.error('Error opening URL:', error);
-      alert('Unable to open this link at this time.');
-    }
+      if (await Linking.canOpenURL(url)) await Linking.openURL(url);
+    } catch {}
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: '#0a0a0a' }}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+    <View style={styles.screen}>
+      <StatusBar barStyle="dark-content" backgroundColor={BG} />
 
       {/* Header */}
-      <View style={st.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.backBtn}
         >
-          <Ionicons name="arrow-back" size={22} color="#a0a0a0" />
+          <Ionicons name="arrow-back" size={20} color={ON_BG} />
         </TouchableOpacity>
-        <Text style={st.headerTitle}>About</Text>
-        <View style={{ width: 22 }} />
+        <Text style={styles.headerTitle}>Data & Sources</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={st.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Logo Section */}
-        <View style={st.logoSection}>
-          <Image
-            source={require('../../assets/vee-logo.png')}
-            style={st.logoImage}
-            resizeMode="contain"
-          />
-          <Text style={st.appName}>vee</Text>
-          <Text style={st.version}>Version 1.0.0</Text>
-          <Text style={st.tagline}>Your personal health scanner for cosmetic products</Text>
-        </View>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 48 }]}
+        showsVerticalScrollIndicator={false}
+      >
 
-        {/* What We Do */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>What We Do</Text>
-          <Text style={st.cardText}>
-            Vee helps you make informed decisions about the products you use every single day. We analyze ingredients in food and personal care products so you can instantly see what's really inside — no chemistry degree needed.{`\n\n`}Scan a barcode or search for a product to get a clear health score, a full ingredient breakdown, and the knowledge to choose better.
+        {/* ── 1. About ── */}
+        <View style={styles.section}>
+          <Text style={styles.aboutHeadline}>
+            <Ionicons name="information-circle" size={26} color={PRIMARY} />{'  '}
+            About Vee
           </Text>
+          <Text style={styles.aboutBody}>
+            I'm Sami, the founder of VEE and a first-year nutrition student.{'\n\n'}
+            I built VEE for myself and for anyone who wants to better understand what they're
+            putting into their body. Whether it's checking ingredients, nutrition, or learning
+            more about everyday products, VEE is designed to make health information simple,
+            clear, and accessible.{'\n\n'}
+            My goal is to help people make more informed choices about their health through
+            easy-to-understand, reliable information. If you enjoy using VEE, I'd really
+            appreciate it if you could leave a rating or review on the App Store. Your support
+            helps more people discover VEE and motivates me to keep making it better.
+          </Text>
+          <TouchableOpacity
+            style={styles.rateBtn}
+            onPress={() => openURL('https://apps.apple.com/us/app/vee-product-check/id6751061358')}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="star" size={18} color="#fff" />
+            <Text style={styles.rateBtnText}>Rate VEE on the App Store</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Meet the Founder */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>Meet the Founder</Text>
-          <View style={st.founderRow}>
-            <View style={st.founderAvatar}>
-              <Text style={st.founderInitial}>S</Text>
+        <View style={styles.divider} />
+
+        {/* ── 2. Our Sources ── */}
+        <View style={styles.section}>
+          <SectionHeader icon="albums-outline" title="Our Sources" />
+
+          {/* Open Food Facts */}
+          <View style={styles.sourceCard}>
+            <View style={styles.sourceCardTop}>
+              <Text style={styles.sourceCardName}>Open Food Facts</Text>
+              <Text style={styles.sourcePrimary}>PRIMARY</Text>
             </View>
-            <View style={{ flex: 1, marginLeft: 14 }}>
-              <Text style={st.founderName}>Sami</Text>
-              <Text style={st.founderRole}>Co-founder of Vee · Nutrition Student</Text>
+            <Text style={styles.sourceCardDesc}>
+              A collaborative database of food products from around the world.
+              We utilize their live API for real-time ingredient analysis.
+            </Text>
+            <TouchableOpacity
+              style={styles.sourceLink}
+              onPress={() => openURL('https://world.openfoodfacts.org')}
+            >
+              <Text style={styles.sourceLinkText}>Visit Database</Text>
+              <Ionicons name="open-outline" size={14} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Open Beauty Facts */}
+          <View style={[styles.sourceCard, { marginTop: 12 }]}>
+            <View style={styles.sourceCardTop}>
+              <Text style={styles.sourceCardName}>Open Beauty Facts</Text>
+              <Text style={styles.sourcePrimary}>COSMETICS</Text>
+            </View>
+            <Text style={styles.sourceCardDesc}>
+              Open database of cosmetic products with full ingredient compositions
+              and safety assessments.
+            </Text>
+            <TouchableOpacity
+              style={styles.sourceLink}
+              onPress={() => openURL('https://world.openbeautyfacts.org')}
+            >
+              <Text style={styles.sourceLinkText}>Visit Database</Text>
+              <Ionicons name="open-outline" size={14} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
+
+          {/* SnapEngine bar chart */}
+          <View style={[styles.sourceCard, { marginTop: 12 }]}>
+            <Text style={styles.sourceCardName}>The SnapEngine™</Text>
+            <Text style={[styles.sourceCardDesc, { marginBottom: 16 }]}>
+              Our proprietary algorithm cross-references scanned data against
+              12 nutritional benchmarks.
+            </Text>
+            <View style={styles.barChartRow}>
+              <View style={styles.barChartBars}>
+                {[
+                  { label: 'PRO', h: 32 },
+                  { label: 'VIT', h: 48 },
+                  { label: 'FIB', h: 40 },
+                  { label: 'SUG', h: 16, muted: true },
+                  { label: 'SAT', h: 24, muted: true },
+                  { label: 'SOD', h: 20, muted: true },
+                ].map((b) => (
+                  <View key={b.label} style={styles.barItem}>
+                    <View style={[styles.bar, { height: b.h, backgroundColor: b.muted ? OUTLINE_V : PRIMARY }]} />
+                    <Text style={styles.barLabel}>{b.label}</Text>
+                  </View>
+                ))}
+              </View>
+              <View style={styles.barChartStatus}>
+                <Text style={styles.barChartStatusLabel}>STATUS</Text>
+                <Text style={styles.barChartStatusValue}>Optimized</Text>
+              </View>
             </View>
           </View>
-          <Text style={[st.cardText, { marginTop: 14 }]}>
-            Since I was young, I became hyper-aware of what I was putting into my body. The more I learned as a nutrition student, the more I realized how many harmful ingredients are hiding in plain sight — in the food we eat, the skincare we use, the products we trust every day.{`\n\n`}I built Vee because everyone deserves to know exactly what's in the products they use. Not buried in a tiny-print ingredient list, but clearly, instantly, and honestly.
-          </Text>
         </View>
 
-        {/* How It Works */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>How It Works</Text>
-          <View style={{ marginTop: 16 }}>
+        <View style={styles.divider} />
+
+        {/* ── 3. How Scoring Works ── */}
+        <View style={styles.section}>
+          <SectionHeader icon="analytics-outline" title="How Scoring Works" />
+
+          <View style={styles.scoreCenterCard}>
+            <Text style={styles.scoreIndexLabel}>Vee Index</Text>
+            <Text style={styles.scoreBig}>0–100</Text>
+            <Text style={styles.scoreIndexSub}>A unified nutritional quality score</Text>
+          </View>
+
+          <View style={[styles.bentoCard, { marginTop: 12 }]}>
             {[
-              { n: '1', title: 'Scan or Search',       text: 'Use your camera to scan product barcodes or search by product name' },
-              { n: '2', title: 'Analyze Ingredients',  text: 'Our algorithm analyzes each ingredient against our comprehensive safety database' },
-              { n: '3', title: 'Get Your Score',       text: 'Receive an easy-to-understand health score from 0–100 with detailed recommendations' },
-            ].map((step) => (
-              <View key={step.n} style={st.step}>
-                <View style={st.stepNum}>
-                  <Text style={st.stepNumText}>{step.n}</Text>
+              { label: 'Optimal',  range: '70–100', color: PRIMARY },
+              { label: 'Moderate', range: '40–69',  color: SECONDARY },
+              { label: 'Avoid',    range: '0–39',   color: ERROR },
+            ].map((item, i, arr) => (
+              <View key={item.label}>
+                <View style={styles.scoreRow}>
+                  <View style={[styles.scoreDot, { backgroundColor: item.color }]} />
+                  <Text style={styles.scoreRowLabel}>{item.label}</Text>
+                  <Text style={[styles.scoreRowRange, { color: item.color }]}>{item.range}</Text>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={st.stepTitle}>{step.title}</Text>
-                  <Text style={st.stepText}>{step.text}</Text>
-                </View>
+                {i < arr.length - 1 && <View style={styles.rowDivider} />}
               </View>
             ))}
           </View>
         </View>
 
-        {/* Scoring System */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>Our Scoring System</Text>
-          {[
-            { range: '75–100', label: 'Excellent', sub: 'Safe, beneficial ingredients',      color: '#4CAF50' },
-            { range: '50–74',  label: 'Good',      sub: 'Generally safe for regular use',    color: '#8BC34A' },
-            { range: '25–49',  label: 'Mediocre',  sub: 'Some concerning ingredients',       color: '#FF9800' },
-            { range: '0–24',   label: 'Poor',      sub: 'Contains risky ingredients',        color: '#F44336' },
-          ].map((item) => (
-            <View key={item.label} style={st.scoreRow}>
-              <View style={[st.scorePill, { backgroundColor: item.color }]}>
-                <Text style={st.scorePillText}>{item.range}</Text>
+        <View style={styles.divider} />
+
+        {/* ── 4. Data Limitations ── */}
+        <View style={styles.section}>
+          <SectionHeader icon="warning-outline" title="Data Limitations" accentColor={OUTLINE} />
+          <View style={styles.limitationCard}>
+            <View style={styles.limitationInner}>
+              <Ionicons name="shield-checkmark-outline" size={24} color={OUTLINE} style={{ marginTop: 2 }} />
+              <View style={{ flex: 1, marginLeft: 14 }}>
+                <Text style={styles.limitationTitle}>Verified Intelligence</Text>
+                <Text style={styles.limitationBody}>
+                  While we strive for 100% accuracy, users should verify critical information
+                  directly on physical packaging. Vee is a nutritional guidance tool,
+                  not a medical device.
+                </Text>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={st.scoreLabel}>{item.label}</Text>
-                <Text style={st.scoreSub}>{item.sub}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-
-        {/* Data Sources */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>Data Sources</Text>
-          <Text style={[st.cardText, { marginBottom: 12 }]}>Our ingredient analysis is powered by:</Text>
-
-          <TouchableOpacity style={st.linkRow} onPress={() => openURL('https://world.openbeautyfacts.org')}>
-            <Ionicons name="globe-outline" size={18} color="#4CAF50" />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={st.linkTitle}>Open Beauty Facts</Text>
-              <Text style={st.linkSub}>Open database of cosmetic products with ingredients and compositions</Text>
-            </View>
-            <Ionicons name="open-outline" size={14} color="#444" />
-          </TouchableOpacity>
-
-          <View style={[st.linkRow, { borderBottomWidth: 0 }]}>
-            <Ionicons name="library-outline" size={18} color="#4CAF50" />
-            <View style={{ flex: 1, marginLeft: 10 }}>
-              <Text style={st.linkTitle}>Comprehensive Ingredient Database</Text>
-              <Text style={st.linkSub}>Curated database of cosmetic ingredients with safety assessments</Text>
             </View>
           </View>
         </View>
 
-        {/* Disclaimer */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>Important Notice</Text>
-          <View style={st.disclaimer}>
-            <Ionicons name="information-circle-outline" size={22} color="#FF9800" style={{ marginTop: 2 }} />
-            <Text style={st.disclaimerText}>
-              This app provides general information about cosmetic ingredients and is not intended as medical advice.
-              Always consult healthcare professionals for specific concerns and perform patch tests before using new products.
-            </Text>
+        {/* ── CTA Card ── */}
+        <View style={styles.ctaCard}>
+          <Text style={styles.ctaTitle}>Still have questions?</Text>
+          <Text style={styles.ctaBody}>
+            Our team is here to help you navigate your nutritional journey.
+          </Text>
+          <TouchableOpacity
+            style={styles.ctaBtn}
+            onPress={() => openURL('mailto:samis2005s18@gmail.com')}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.ctaBtnText}>Contact Our Support Team</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ── Footer ── */}
+        <View style={styles.footer}>
+          <Text style={styles.footerBrand}>Vee</Text>
+          <View style={styles.footerLinks}>
+            <TouchableOpacity onPress={() => openURL('https://sites.google.com/view/vee-privacy-policy')}>
+              <Text style={styles.footerLink}>Privacy Policy</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
+              <Text style={styles.footerLink}>Terms</Text>
+            </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Contact & Support */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>Contact & Support</Text>
-          <Text style={[st.cardText, { marginBottom: 14 }]}>Have questions or suggestions? We'd love to hear from you!</Text>
-          <TouchableOpacity style={st.actionBtn} onPress={() => navigation.navigate('Sources')}>
-            <Ionicons name="library-outline" size={18} color="#a0a0a0" />
-            <Text style={st.actionBtnText}>View Data Sources</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={st.actionBtn} onPress={() => openURL('mailto:samis2005s18@gmail.com')}>
-            <Ionicons name="mail-outline" size={18} color="#a0a0a0" />
-            <Text style={st.actionBtnText}>Contact Support</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Legal & Privacy */}
-        <View style={st.card}>
-          <Text style={st.cardTitle}>Legal & Privacy</Text>
-          <Text style={[st.cardText, { marginBottom: 14 }]}>Your privacy and security are important to us.</Text>
-
-          <TouchableOpacity style={st.legalBtn} onPress={() => openURL('https://sites.google.com/view/vee-privacy-policy')}>
-            <View style={st.legalIcon}><Ionicons name="shield-checkmark" size={20} color="#4CAF50" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={st.legalTitle}>Privacy Policy</Text>
-              <Text style={st.legalSub}>Learn how we protect your data and respect your privacy</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#444" />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[st.legalBtn, { marginBottom: 0 }]} onPress={() => openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/')}>
-            <View style={st.legalIcon}><Ionicons name="document-text" size={20} color="#2196F3" /></View>
-            <View style={{ flex: 1 }}>
-              <Text style={st.legalTitle}>Terms of Use (EULA)</Text>
-              <Text style={st.legalSub}>Read our terms and conditions for using the app</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color="#444" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Footer */}
-        <View style={{ alignItems: 'center', paddingVertical: 32 }}>
-          <Text style={st.footerText}>Made with ❤️ for healthier choices</Text>
-          <Text style={st.copyright}>© 2025 HealthyScan. All rights reserved.</Text>
+          <Text style={styles.footerCopy}>© 2025 Vee. All rights reserved.</Text>
         </View>
 
       </ScrollView>
     </View>
   );
-};
+}
 
-const st = StyleSheet.create({
+const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: BG },
+
   header: {
-    height: Platform.OS === 'ios' ? 90 : 72,
-    paddingTop: Platform.OS === 'ios' ? 48 : 28,
-    paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(10,10,10,0.95)',
+    paddingHorizontal: 20,
+    paddingBottom: 12,
+    backgroundColor: BG,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
+    borderBottomColor: OUTLINE_V,
   },
-  headerTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(240,240,240,0.8)',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+  backBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#f2f4f2',
+    alignItems: 'center', justifyContent: 'center',
   },
-  scrollContent: {
-    paddingTop: 28,
-    paddingHorizontal: 22,
-    paddingBottom: 60,
+  headerTitle: { fontSize: 16, fontWeight: '700', color: ON_BG },
+
+  content: { paddingHorizontal: 20, paddingTop: 28, gap: 0 },
+
+  section: { marginBottom: 40 },
+
+  /* Section header */
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  sectionAccent: { width: 4, height: 32, borderRadius: 4, marginRight: 12 },
+  sectionTitle: { fontSize: 22, fontWeight: '700', color: ON_BG, letterSpacing: -0.3 },
+
+  divider: {
+    height: 1,
+    marginBottom: 40,
+    backgroundColor: 'transparent',
+    borderBottomWidth: 1,
+    borderBottomColor: OUTLINE_V,
+    opacity: 0.4,
   },
-  logoSection: {
+
+  /* About */
+  aboutHeadline: {
+    fontSize: 26, fontWeight: '800', color: ON_BG,
+    letterSpacing: -0.5, marginBottom: 14,
+  },
+  aboutBody: {
+    fontSize: 15, color: ON_VAR, lineHeight: 24,
+  },
+  rateBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    gap: 8, backgroundColor: PRIMARY, borderRadius: 14,
+    paddingVertical: 14, paddingHorizontal: 20, marginTop: 20,
+  },
+  rateBtnText: { fontSize: 15, fontWeight: '700', color: '#fff', letterSpacing: 0.2 },
+
+  /* Source cards */
+  sourceCard: {
+    backgroundColor: SURFACE, borderRadius: 16,
+    padding: 18, borderWidth: StyleSheet.hairlineWidth, borderColor: OUTLINE_V,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04, shadowRadius: 20, elevation: 2,
+  },
+  sourceCardTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  sourceCardName: { fontSize: 17, fontWeight: '700', color: ON_BG },
+  sourcePrimary: { fontSize: 10, fontWeight: '800', color: PRIMARY, letterSpacing: 1.5 },
+  sourceCardDesc: { fontSize: 14, color: ON_VAR, lineHeight: 21 },
+  sourceLink: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
+  sourceLinkText: { fontSize: 14, fontWeight: '700', color: PRIMARY },
+
+  /* Bar chart */
+  barChartRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
+  barChartBars: { flexDirection: 'row', alignItems: 'flex-end', gap: 8 },
+  barItem: { alignItems: 'center', gap: 4 },
+  bar: { width: 8, borderRadius: 4 },
+  barLabel: { fontSize: 8, fontWeight: '700', color: OUTLINE, textTransform: 'uppercase' },
+  barChartStatus: { alignItems: 'flex-end' },
+  barChartStatusLabel: { fontSize: 9, fontWeight: '700', color: OUTLINE, letterSpacing: 1, textTransform: 'uppercase' },
+  barChartStatusValue: { fontSize: 15, fontWeight: '800', color: PRIMARY },
+
+  /* Score section */
+  scoreCenterCard: {
+    backgroundColor: '#f2f4f2',
+    borderRadius: 16, paddingVertical: 24,
     alignItems: 'center',
-    paddingVertical: 36,
   },
-  logoImage: {
-    width: 180,
-    height: 130,
-    marginBottom: 8,
-  },
-  appName: {
-    fontSize: 26,
-    fontWeight: '700',
-    color: '#ffffff',
-    marginBottom: 4,
-    letterSpacing: 1,
-  },
-  version: {
-    fontSize: 12,
-    color: '#555555',
-    marginBottom: 8,
-    letterSpacing: 1,
-  },
-  tagline: {
-    fontSize: 14,
-    color: '#a0a0a0',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  card: {
-    backgroundColor: '#111111',
-    borderRadius: 20,
-    padding: 20,
-    marginBottom: 12,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.07)',
-  },
-  cardTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(240,240,240,0.6)',
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 12,
-  },
-  cardText: {
-    fontSize: 14,
-    color: '#a0a0a0',
-    lineHeight: 22,
-  },
-  step: {
-    flexDirection: 'row',
-    marginBottom: 18,
-    alignItems: 'flex-start',
-  },
-  stepNum: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: '#1a1a1a',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 14,
-    marginTop: 1,
-  },
-  stepNumText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#4CAF50',
-  },
-  stepTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e0e0e0',
-    marginBottom: 4,
-  },
-  stepText: {
-    fontSize: 13,
-    color: '#777777',
-    lineHeight: 19,
+  scoreIndexLabel: { fontSize: 11, fontWeight: '700', color: OUTLINE, letterSpacing: 2, textTransform: 'uppercase', marginBottom: 6 },
+  scoreBig: { fontSize: 48, fontWeight: '800', color: PRIMARY, letterSpacing: -2, lineHeight: 52 },
+  scoreIndexSub: { fontSize: 13, color: ON_VAR, marginTop: 6 },
+
+  bentoCard: {
+    backgroundColor: SURFACE, borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: OUTLINE_V,
+    overflow: 'hidden',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04, shadowRadius: 20, elevation: 2,
   },
   scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 14,
-    gap: 14,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16, gap: 12,
   },
-  scorePill: {
-    width: 64,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scorePillText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  scoreLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e0e0e0',
-    marginBottom: 2,
-  },
-  scoreSub: {
-    fontSize: 12,
-    color: '#666666',
-  },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
-  },
-  linkTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e0e0e0',
-    marginBottom: 2,
-  },
-  linkSub: {
-    fontSize: 12,
-    color: '#666666',
-    lineHeight: 17,
-  },
-  disclaimer: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,152,0,0.07)',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,152,0,0.2)',
-    gap: 10,
-    alignItems: 'flex-start',
-  },
-  disclaimerText: {
-    flex: 1,
-    fontSize: 13,
-    color: '#a07020',
-    lineHeight: 20,
-  },
-  actionBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.07)',
-    marginBottom: 10,
-  },
-  actionBtnText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#e0e0e0',
-  },
-  legalBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 14,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.07)',
-    marginBottom: 10,
-  },
-  legalIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: '#222222',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  legalTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e0e0e0',
-    marginBottom: 2,
-  },
-  legalSub: {
-    fontSize: 12,
-    color: '#666666',
-    lineHeight: 17,
-  },
-  footerText: {
-    fontSize: 13,
-    color: '#555555',
-    marginBottom: 4,
-  },
-  founderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  founderAvatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#4CAF50',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  founderInitial: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  founderName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#ffffff',
-    marginBottom: 2,
-  },
-  founderRole: {
-    fontSize: 12,
-    color: '#4CAF50',
-    letterSpacing: 0.3,
-  },
-  copyright: {
-    fontSize: 11,
-    color: '#333333',
-    letterSpacing: 0.5,
-  },
-});
+  scoreDot: { width: 8, height: 8, borderRadius: 4 },
+  scoreRowLabel: { flex: 1, fontSize: 15, fontWeight: '700', color: ON_BG },
+  scoreRowRange: { fontSize: 20, fontWeight: '700' },
+  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#f2f4f2', marginHorizontal: 20 },
 
-export default AboutScreen;
+  /* Limitation */
+  limitationCard: {
+    borderRadius: 16, padding: 18,
+    backgroundColor: '#f2f4f2',
+    borderLeftWidth: 4, borderLeftColor: OUTLINE,
+  },
+  limitationInner: { flexDirection: 'row', alignItems: 'flex-start' },
+  limitationTitle: { fontSize: 16, fontWeight: '700', color: ON_BG, marginBottom: 6 },
+  limitationBody: { fontSize: 14, color: ON_VAR, lineHeight: 21 },
+
+  /* CTA */
+  ctaCard: {
+    backgroundColor: PRIMARY, borderRadius: 20,
+    padding: 28, alignItems: 'center', marginBottom: 40,
+    shadowColor: PRIMARY, shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25, shadowRadius: 20, elevation: 6,
+  },
+  ctaTitle: { fontSize: 22, fontWeight: '700', color: '#fff', marginBottom: 8 },
+  ctaBody: { fontSize: 14, color: 'rgba(255,255,255,0.85)', textAlign: 'center', lineHeight: 21, marginBottom: 20 },
+  ctaBtn: {
+    backgroundColor: '#fff', borderRadius: 99,
+    paddingVertical: 14, paddingHorizontal: 28, width: '100%', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3,
+  },
+  ctaBtnText: { fontSize: 15, fontWeight: '700', color: PRIMARY },
+
+  /* Footer */
+  footer: { alignItems: 'center', gap: 12, paddingVertical: 24, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: OUTLINE_V },
+  footerBrand: { fontSize: 20, fontWeight: '700', color: PRIMARY },
+  footerLinks: { flexDirection: 'row', gap: 32 },
+  footerLink: { fontSize: 14, color: ON_VAR, textDecorationLine: 'underline' },
+  footerCopy: { fontSize: 12, color: OUTLINE, opacity: 0.8 },
+});

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -37,46 +37,62 @@ import ProductAIChat from '../components/ProductAIChat';
 import IngredientDNAHelix from '../components/IngredientDNAHelix';
 import { saveToHistory } from '../utils/historyManager';
 import { getFreeRecommendationUsage, useFreeRecommendation } from '../utils/dailyReset';
+import { getIngredientInfo } from '../services/usdaAPI';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import axios from 'axios';
 
 const { width: W } = Dimensions.get('window');
 
-// -- Dark Brutalism Palette --
-const BG             = '#000000';
-const SURFACE        = '#131313';
-const SURFACE_LOW    = '#1b1b1b';
-const SURFACE_HIGH   = '#2a2a2a';
-const OUTLINE        = '#474747';
-const ON_SURFACE     = '#e2e2e2';
-const ON_SURFACE_VAR = '#c6c6c6';
+const CosmeticAltImg = React.memo(({ uri, imgStyle }) => {
+  const [err, setErr] = React.useState(false);
+  if (!uri || err) {
+    return (
+      <View style={[imgStyle, { alignItems: 'center', justifyContent: 'center' }]}>
+        <Ionicons name="flask-outline" size={28} color="#bfcaba" />
+      </View>
+    );
+  }
+  return <Image source={{ uri }} style={imgStyle} resizeMode="cover" onError={() => setErr(true)} />;
+});
+
+// -- Light Wellness Palette --
+const BG             = '#fafaf5';
+const SURFACE        = 'rgba(250,250,245,0.92)';
+const SURFACE_LOW    = '#ffffff';
+const SURFACE_HIGH   = '#eeeee9';
+const OUTLINE        = '#bfcaba';
+const ON_SURFACE     = '#1a1c19';
+const ON_SURFACE_VAR = '#40493d';
 const WHITE          = '#ffffff';
+const PRIMARY        = '#067A4F';
+const ERROR_C        = '#ba1a1a';
+const WARNING_C      = '#d97706';
 
 // -- Gauge constants --
-const GAUGE_R    = 96;
+const GAUGE_R    = 72;
 const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 
 const getScoreColor = (sc) => {
-  if (sc >= 70) return '#4ADE80';
-  if (sc >= 40) return '#FACC15';
-  return '#F87171';
+  if (sc >= 70) return PRIMARY;
+  if (sc >= 40) return WARNING_C;
+  return ERROR_C;
 };
 
 const getVerdict = (sc) => {
-  if (sc >= 85) return 'EXCELLENT';
-  if (sc >= 70) return 'GREAT';
-  if (sc >= 45) return 'MODERATE';
-  if (sc >= 30) return 'POOR';
-  return 'VERY POOR';
+  if (sc >= 85) return 'Excellent';
+  if (sc >= 70) return 'Good';
+  if (sc >= 45) return 'Moderate';
+  if (sc >= 30) return 'Poor';
+  return 'Very Poor';
 };
 
 // -- VEE COLOR PALETTE --
 const C = {
-  greenDark: '#1E5C3A',
-  green: '#2A7D4F',
-  greenMid: '#4CAF7C',
-  greenLight: '#E8F5EE',
+  greenDark: '#067A4F',
+  green: '#067A4F',
+  greenMid: '#067A4F',
+  greenLight: '#E5F2EC',
   greenBg: 'rgba(42,125,79,0.10)',
   greenBr: 'rgba(42,125,79,0.22)',
   amber: '#E8820C',
@@ -144,21 +160,37 @@ const incrementAIDailyUsage = async () => {
 // -- INGREDIENT HELPERS --
 const getIngIcon = (n) => {
   const l = n.toLowerCase();
-  if (l.includes('water') || l.includes('aqua')) return 'water-outline';
-  if (l.includes('glycerin') || l.includes('hyaluronic') || l.includes('sorbitol')) return 'rainy-outline';
-  if (l.includes('oil') || l.includes('butter') || l.includes('squalane')) return 'flame-outline';
-  if (l.includes('extract') || l.includes('aloe') || l.includes('botanical') || l.includes('chamomil')) return 'leaf-outline';
-  if (l.includes('vitamin') || l.includes('tocopherol') || l.includes('retinol') || l.includes('niacinamide') || l.includes('panthenol')) return 'medkit-outline';
-  if (l.includes('sunscreen') || l.includes('spf') || l.includes('avobenzone')) return 'sunny-outline';
-  if (l.includes('zinc oxide') || l.includes('titanium') || l.includes('mica')) return 'diamond-outline';
-  if (l.includes('fragrance') || l.includes('parfum') || l.includes('linalool') || l.includes('limonene')) return 'rose-outline';
-  if (l.includes('dimethicone') || l.includes('siloxane') || l.includes('silicone')) return 'ellipse-outline';
-  if (l.includes('cetearyl') || l.includes('stearate') || l.includes('laureth') || l.includes('polysorbate')) return 'git-merge-outline';
-  if (l.includes('acid') || l.includes('glycolic') || l.includes('salicylic')) return 'flask-outline';
-  if (l.includes('paraben') || l.includes('phenoxyethanol') || l.includes('preservative')) return 'shield-outline';
-  if (l.includes('sulfate') || l.includes('sulphate')) return 'warning-outline';
-  if (l.includes('alcohol') || l.includes('ethanol')) return 'wine-outline';
-  return 'ellipsis-horizontal-circle-outline';
+  if (l.includes('water') || l.includes('aqua'))                                       return 'water';
+  if (l.includes('glycerin') || l.includes('hyaluronic') || l.includes('sorbitol') ||
+      l.includes('betaine') || l.includes('panthenol'))                                return 'rainy';
+  if (l.includes('oil') || l.includes('butter') || l.includes('squalane') ||
+      l.includes('jojoba') || l.includes('argan') || l.includes('shea'))               return 'drop';
+  if (l.includes('extract') || l.includes('aloe') || l.includes('botanical') ||
+      l.includes('chamomil') || l.includes('green tea') || l.includes('calendula'))    return 'leaf';
+  if (l.includes('vitamin') || l.includes('tocopherol') || l.includes('retinol') ||
+      l.includes('niacinamide') || l.includes('ascorbic') || l.includes('coenzyme'))   return 'medical';
+  if (l.includes('sunscreen') || l.includes('spf') || l.includes('avobenzone') ||
+      l.includes('oxybenzone') || l.includes('octinoxate'))                             return 'sunny';
+  if (l.includes('zinc oxide') || l.includes('titanium') || l.includes('mica') ||
+      l.includes('silica') || l.includes('bismuth'))                                    return 'diamond';
+  if (l.includes('fragrance') || l.includes('parfum') || l.includes('linalool') ||
+      l.includes('limonene') || l.includes('geraniol'))                                 return 'sparkles';
+  if (l.includes('dimethicone') || l.includes('siloxane') || l.includes('silicone') ||
+      l.includes('cyclomethicone'))                                                      return 'layers';
+  if (l.includes('cetearyl') || l.includes('stearate') || l.includes('laureth') ||
+      l.includes('polysorbate') || l.includes('emulsif'))                               return 'git-merge';
+  if (l.includes('acid') || l.includes('glycolic') || l.includes('salicylic') ||
+      l.includes('lactic') || l.includes('mandelic') || l.includes('azelaic'))          return 'flask';
+  if (l.includes('paraben') || l.includes('phenoxyethanol') || l.includes('preserv') ||
+      l.includes('methylisothiazolinone'))                                               return 'shield-checkmark';
+  if (l.includes('sulfate') || l.includes('sulphate') || l.includes('sls') ||
+      l.includes('sles'))                                                                return 'warning';
+  if (l.includes('color') || l.includes('colour') || l.includes('dye') ||
+      l.includes('pigment') || l.includes('ci '))                                       return 'color-palette';
+  if (l.includes('alcohol') || l.includes('ethanol'))                                   return 'wine';
+  if (l.includes('peptide') || l.includes('collagen') || l.includes('keratin') ||
+      l.includes('protein') || l.includes('amino'))                                     return 'fitness';
+  return 'nutrition';
 };
 
 const getShortDesc = (n) => {
@@ -293,27 +325,22 @@ const getSafetyRatings = (analysis) => {
 const ScoreGauge = ({ score, scoreColor }) => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 1200, useNativeDriver: false }).start();
+    Animated.timing(anim, { toValue: 1, duration: 1100, useNativeDriver: false }).start();
   }, [score]);
   const dashOffset = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [GAUGE_CIRC, GAUGE_CIRC - (GAUGE_CIRC * score) / 100],
   });
+  const SIZE = 190;
+  const CX   = SIZE / 2;
   return (
     <View style={g.container}>
-      <View style={g.outerRing} />
-      <View style={g.innerRing} />
-      <Svg
-        width={200} height={200}
-        style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}
-      >
-        <SvgCircle
-          cx={100} cy={100} r={GAUGE_R}
-          stroke={SURFACE_HIGH} strokeWidth={8} fill="transparent"
-        />
+      <View style={g.gaugeBg} />
+      <Svg width={SIZE} height={SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
+        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={SURFACE_HIGH} strokeWidth={9} fill="transparent" />
         <AnimatedSvgCircle
-          cx={100} cy={100} r={GAUGE_R}
-          stroke={scoreColor} strokeWidth={8}
+          cx={CX} cy={CX} r={GAUGE_R}
+          stroke={scoreColor} strokeWidth={9}
           fill="transparent"
           strokeDasharray={GAUGE_CIRC}
           strokeDashoffset={dashOffset}
@@ -321,12 +348,8 @@ const ScoreGauge = ({ score, scoreColor }) => {
         />
       </Svg>
       <View style={g.center}>
-        <View style={g.scannedRow}>
-          <Ionicons name="people-outline" size={11} color={OUTLINE} />
-          <Text style={g.scannedText}>  SCANNED BY THOUSANDS</Text>
-        </View>
-        <Text style={g.scoreNum}>{score}</Text>
-        <Text style={g.healthLabel}>HEALTH SCORE</Text>
+        <Text style={[g.scoreNum, { color: scoreColor }]}>{score}</Text>
+        <Text style={g.scoreDenom}>/100</Text>
       </View>
     </View>
   );
@@ -339,6 +362,8 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   const devProduct = route?.params?.devProduct || null;
   const devAnalysis = route?.params?.devAnalysis || null;
   const devZoomOut = route?.params?.devZoomOut || false;
+  const preloadedData = route?.params?.preloadedData || null;
+  const skipFetch = route?.params?.skipFetch || false;
 
   const safeAreaInsets = useSafeAreaInsetsWithFallback();
   const [product, setProduct] = useState(null);
@@ -360,6 +385,9 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   const [realAlternatives, setRealAlternatives] = useState([]);
   const [altsLoading, setAltsLoading] = useState(false);
   const [showAllIngredients, setShowAllIngredients] = useState(false);
+  const [expandedIngredient, setExpandedIngredient] = useState(null);
+  const [usdaCache, setUsdaCache]                   = useState({});
+  const [usdaLoading, setUsdaLoading]               = useState(null);
   const containerFade = useRef(new Animated.Value(0)).current;
   const ringAnim = useRef(new Animated.Value(0)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -373,6 +401,23 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     if (devProduct && devAnalysis) {
       setProduct(devProduct);
       setAnalysis(devAnalysis);
+      setLoading(false);
+      setPremiumLoading(false);
+      Animated.timing(containerFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
+      checkSubscriptionStatus();
+    } else if (skipFetch && preloadedData) {
+      // Elite product: use hardcoded data, skip all API calls
+      const stub = {
+        product_name: preloadedData.product_name,
+        brands: preloadedData.brands,
+        image_url: preloadedData.image_url,
+        ingredients_text: preloadedData.ingredients_text || '',
+        nutriments: preloadedData.nutriments || {},
+      };
+      const stubAnalysis = analyzeIngredients(stub.ingredients_text, 'cosmetic', {}, stub);
+      stubAnalysis.score = preloadedData.curatedScore;
+      setProduct(stub);
+      setAnalysis(stubAnalysis);
       setLoading(false);
       setPremiumLoading(false);
       Animated.timing(containerFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
@@ -472,13 +517,12 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       });
       if (response.data?.products) {
         const alts = response.data.products
-          .filter(p => 
+          .filter(p =>
             p.product_name && p.product_name.trim() !== '' &&
             p.code && p.code !== barcode &&
             (p.image_url || p.image_front_url) &&
             p.ingredients_text && p.ingredients_text.trim().length > 10
           )
-          .slice(0, 8)
           .map(p => {
             const ingText = p.ingredients_text || '';
             let altScore = 65;
@@ -494,7 +538,9 @@ export default function CosmeticResultsScreen({ route, navigation }) {
               score: altScore,
             };
           })
-          .sort((a, b) => b.score - a.score);
+          .filter(p => p.score >= 80)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5);
         if (alts.length > 0) {
           setRealAlternatives(alts);
         }
@@ -666,7 +712,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       return n === l || n === norm || l.includes(n) || n.includes(norm);
     });
     if (existing && !existing.isUnknown) {
-      if (existing.score >= 90) return { status: 'EXCELLENT', color: '#1B5E20' };
+      if (existing.score >= 90) return { status: 'EXCELLENT', color: '#067A4F' };
       if (existing.score >= 75) return { status: 'GOOD', color: C.green };
       if (existing.score >= 45) return { status: 'MODERATE', color: C.amber };
       return { status: 'POOR', color: C.red };
@@ -701,6 +747,22 @@ export default function CosmeticResultsScreen({ route, navigation }) {
 
   const handleGoBack = useCallback(() => navigation.goBack(), [navigation]);
   const handleScanAnother = useCallback(() => navigation.navigate('Home', { startScanning: true }), [navigation]);
+
+  const handleIngredientTap = async (ing) => {
+    const key = (ing.name || '').toLowerCase().trim();
+    if (expandedIngredient === key) { setExpandedIngredient(null); return; }
+    setExpandedIngredient(key);
+    if (usdaCache[key]) return;
+    setUsdaLoading(key);
+    try {
+      const info = await getIngredientInfo(ing.name || key);
+      setUsdaCache(prev => ({ ...prev, [key]: info }));
+    } catch {
+      setUsdaCache(prev => ({ ...prev, [key]: null }));
+    } finally {
+      setUsdaLoading(null);
+    }
+  };
 
   const score = useMemo(() => analysis?.score || 50, [analysis?.score]);
   const scoreColor = useMemo(() => getScoreColor(score), [score]);
@@ -963,8 +1025,8 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   ];
 
   // \u2500\u2500 Derived render data \u2500\u2500
-  const productName = (product?.product_name || product?.name || 'Unknown Product').toUpperCase();
-  const brandName   = product?.brands ? product.brands.toUpperCase() : '';
+  const productName = product?.product_name || product?.name || 'Unknown Product';
+  const brandName   = product?.brands || '';
   const verdict     = getVerdict(score);
   const verdictDesc =
     score >= 70 ? 'This product has a safe ingredient profile suitable for most skin types.'
@@ -985,30 +1047,10 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   const displayed = showAllIngredients ? allIngredientsForDisplay : allIngredientsForDisplay.slice(0, 5);
 
   const ingStyle = (_t, name) => {
-    // Map by ingredient name first (same logic as food screen)
-    const n = (name || '').toLowerCase();
-    let icon = 'ellipse-outline';
-    if (n.includes('water') || n.includes('aqua'))                                  icon = 'water-outline';
-    else if (n.includes('caffeine') || n.includes('retinol') || n.includes('niacinamide') || n.includes('vitamin c') || n.includes('ascorbic')) icon = 'flash-outline';
-    else if (n.includes('fragrance') || n.includes('parfum') || n.includes('aroma') || n.includes('scent')) icon = 'restaurant-outline';
-    else if (n.includes('preserv') || n.includes('phenoxyethanol') || n.includes('sorbate') || n.includes('benzoate') || n.includes('methylparaben') || n.includes('propylparaben')) icon = 'shield-checkmark-outline';
-    else if (n.includes('colour') || n.includes('color') || n.includes('dye') || n.includes('pigment') || n.includes('ci ')) icon = 'color-palette-outline';
-    else if (n.includes('acid') || n.includes('citrate') || n.includes('phosphat') || n.includes('lactic') || n.includes('glycolic') || n.includes('salicylic')) icon = 'flask-outline';
-    else if (n.includes('oil') || n.includes('butter') || n.includes('fat') || n.includes('lipid') || n.includes('seed') || n.includes('jojoba') || n.includes('argan') || n.includes('coconut')) icon = 'drop-outline';
-    else if (n.includes('silicone') || n.includes('dimethicone') || n.includes('cyclopentasiloxane')) icon = 'layers-outline';
-    else if (n.includes('alcohol') || n.includes('ethanol') || n.includes('denat')) icon = 'wine-outline';
-    else if (n.includes('extract') || n.includes('herb') || n.includes('plant') || n.includes('aloe') || n.includes('green tea') || n.includes('chamomile') || n.includes('calendula')) icon = 'leaf-outline';
-    else if (n.includes('vitamin') || n.includes('mineral') || n.includes('peptide') || n.includes('collagen') || n.includes('hyaluron') || n.includes('nourish')) icon = 'fitness-outline';
-    else if (n.includes('emulsif') || n.includes('steareth') || n.includes('ceteareth') || n.includes('peg-') || n.includes('polysorbate') || n.includes('lecithin')) icon = 'layers-outline';
-    else if (n.includes('thicken') || n.includes('gum') || n.includes('carbomer') || n.includes('xanthan') || n.includes('cellulose')) icon = 'layers-outline';
-    else if (n.includes('sodium') || n.includes('chloride') || n.includes('salt')) icon = 'analytics-outline';
-    else if (_t === 'good')  icon = 'leaf-outline';
-    else if (_t === 'bad')   icon = 'warning-outline';
-    else                     icon = 'information-circle-outline';
-
-    if (_t === 'good')     return { icon, color: '#4ADE80', bg: '#1a3326', tag: 'GOOD'     };
-    if (_t === 'bad')      return { icon, color: '#F87171', bg: '#3b1a1a', tag: 'RISKY'    };
-    return                        { icon, color: '#FACC15', bg: '#2e2a14', tag: 'OK'       };
+    const icon = getIngIcon(name || '');
+    if (_t === 'good')     return { icon, color: '#067A4F', bg: '#dcfce7', tag: 'GOOD'     };
+    if (_t === 'bad')      return { icon, color: '#ef4444', bg: '#fee2e2', tag: 'AVOID'    };
+    return                        { icon, color: '#eab308', bg: '#fef9c3', tag: 'MODERATE' };
   };
 
   const fallbackAlts = [
@@ -1022,16 +1064,16 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   // \u2500\u2500 LOADING / ERROR \u2500\u2500
   if (loading) return (
     <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' }}>
-      <ActivityIndicator size="large" color="#4ADE80" />
-      <Text style={{ fontSize: 13, color: ON_SURFACE_VAR, marginTop: 14, letterSpacing: 1, fontWeight: '500' }}>Analyzing product...</Text>
+      <ActivityIndicator size="large" color={PRIMARY} />
+      <Text style={{ fontSize: 13, color: ON_SURFACE_VAR, marginTop: 14, fontWeight: '500' }}>Analyzing product...</Text>
     </View>
   );
   if (error || !product || !analysis) return (
     <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingTop: safeAreaInsets.top + 50 }}>
-      <Ionicons name="alert-circle-outline" size={48} color="#F87171" />
-      <Text style={{ fontSize: 13, color: ON_SURFACE_VAR, marginTop: 14, letterSpacing: 1, fontWeight: '500' }}>{error || 'Missing data'}</Text>
-      <TouchableOpacity style={{ marginTop: 24, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 }} onPress={handleGoBack}>
-        <Text style={{ color: ON_SURFACE, fontSize: 10, fontWeight: '900', letterSpacing: 3 }}>GO BACK</Text>
+      <Ionicons name="alert-circle-outline" size={48} color={ERROR_C} />
+      <Text style={{ fontSize: 13, color: ON_SURFACE_VAR, marginTop: 14, fontWeight: '500' }}>{error || 'Missing data'}</Text>
+      <TouchableOpacity style={{ marginTop: 24, borderRadius: 12, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 }} onPress={handleGoBack}>
+        <Text style={{ color: ON_SURFACE, fontSize: 14, fontWeight: '600' }}>Go Back</Text>
       </TouchableOpacity>
     </View>
   );
@@ -1041,28 +1083,33 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   // ============================================================
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
-      <StatusBar barStyle="light-content" backgroundColor={BG} />
+      <StatusBar barStyle="dark-content" backgroundColor={BG} />
 
       {/* FIXED HEADER */}
       <View style={[st.header, { paddingTop: safeAreaInsets.top + 8 }]}>
         <View style={st.headerLeft}>
           <TouchableOpacity onPress={handleGoBack} style={st.iconBtn}>
-            <Ionicons name="arrow-back" size={22} color={WHITE} />
+            <Ionicons name="arrow-back" size={22} color={PRIMARY} />
           </TouchableOpacity>
-          <Text style={st.headerTitle}>SCAN RESULTS</Text>
+          <Text style={st.headerTitle}>Scan Results</Text>
         </View>
-        <TouchableOpacity onPress={handleShare} style={st.iconBtn}>
-          <Ionicons name="share-social-outline" size={22} color={WHITE} />
-        </TouchableOpacity>
+        <View style={st.headerRight}>
+          <TouchableOpacity onPress={handleShare} style={st.iconBtn}>
+            <Ionicons name="share-outline" size={22} color={ON_SURFACE_VAR} />
+          </TouchableOpacity>
+          <View style={st.avatarCircle}>
+            <Ionicons name="person" size={14} color={PRIMARY} />
+          </View>
+        </View>
       </View>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: safeAreaInsets.top + 64, paddingBottom: safeAreaInsets.bottom + 100 }}
+        contentContainerStyle={{ paddingTop: safeAreaInsets.top + 56, paddingBottom: safeAreaInsets.bottom + 100 }}
       >
         <Animated.View style={{ opacity: fadeAnim }}>
 
-          {/* HERO: Product Image */}
+          {/* HERO: Product Image with centered Gauge */}
           <View style={st.heroContainer}>
             {product.image_url ? (
               <Image source={{ uri: product.image_url }} style={st.heroImage} resizeMode="cover" />
@@ -1071,31 +1118,18 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                 <Ionicons name="flask-outline" size={80} color={OUTLINE} />
               </View>
             )}
-            <LinearGradient
-              colors={['#000000', 'rgba(0,0,0,0.4)', 'transparent']}
-              start={{ x: 0, y: 1 }}
-              end={{ x: 0, y: 0 }}
-              style={st.heroGradient}
-            />
-            <View style={st.heroTextBox}>
-              <Text style={st.heroLabel}>ANALYSIS COMPLETE</Text>
-              <Text style={st.heroProductName} numberOfLines={2}>{productName}</Text>
+            <View style={st.heroScrim} />
+            <View style={st.gaugeCenterWrap}>
+              <ScoreGauge score={score} scoreColor={scoreColor} />
             </View>
           </View>
 
-          {/* GAUGE */}
-          <View style={st.gaugeSection}>
-            <ScoreGauge score={score} scoreColor={scoreColor} />
-            <TouchableOpacity style={st.whyBtn}>
-              <Text style={st.whyBtnText}>WHY THIS SCORE?</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* VERDICT BADGE + DESCRIPTION */}
-          <View style={st.verdictSection}>
-            <View style={[st.verdictBadge, { backgroundColor: scoreColor }]}>
-              <Text style={st.verdictBadgeText}>{verdict}</Text>
-            </View>
+          {/* PRODUCT SUMMARY */}
+          <View style={st.summarySection}>
+            <Text style={[st.ratingLabel, { color: scoreToColor(score) }]}>
+              {scoreToLabel(score).toUpperCase()} SAFETY RATING
+            </Text>
+            <Text style={st.productNameText} numberOfLines={2}>{productName}</Text>
             {brandName ? <Text style={st.brandLabel}>{brandName}</Text> : null}
             <Text style={st.verdictDesc}>{verdictDesc}</Text>
           </View>
@@ -1103,65 +1137,122 @@ export default function CosmeticResultsScreen({ route, navigation }) {
           {/* INGREDIENT BREAKDOWN */}
           {displayed.length > 0 && (
             <View style={st.section}>
-              <Text style={st.sectionTitle}>INGREDIENT BREAKDOWN</Text>
-              {displayed.map((ing, idx) => {
-                const s = ingStyle(ing._t, ing.name);
-                const isLast = idx === displayed.length - 1;
-                const description = ing.notes || ing.concerns || null;
-                return (
-                  <View key={idx} style={[st.ingCard, !isLast && st.ingCardBorder]}>
-                    {/* Top row: icon + name + badge */}
-                    <View style={st.ingCardTop}>
-                      <View style={[st.ingCardIcon, { backgroundColor: s.bg }]}>
-                        <Ionicons name={s.icon} size={17} color={s.color} />
+              <View style={st.sectionHeader}>
+                <Text style={st.sectionTitle}>Ingredient Breakdown</Text>
+                <Text style={st.viewLabels}>{allIngredientsForDisplay.length} ITEMS</Text>
+              </View>
+              <View style={st.ingList}>
+                {displayed.map((ing, idx) => {
+                  const s = ingStyle(ing._t, ing.name);
+                  const description = ing.notes || ing.concerns || null;
+                  const key = (ing.name || '').toLowerCase().trim();
+                  const isExpanded = expandedIngredient === key;
+                  const isLoadingThis = usdaLoading === key;
+                  const usdaInfo = usdaCache[key];
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      activeOpacity={0.75}
+                      onPress={() => handleIngredientTap(ing)}
+                    >
+                      <View style={[st.ingRow, isExpanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 }]}>
+                        <View style={[st.ingIconBox, { backgroundColor: s.bg }]}>
+                          <Ionicons name={s.icon} size={18} color={s.color} />
+                        </View>
+                        <View style={st.ingCardMeta}>
+                          <Text style={st.ingCardName} numberOfLines={1}>{ing.name || 'Unknown'}</Text>
+                          {description ? <Text style={st.ingCardDesc} numberOfLines={1}>{description}</Text> : null}
+                        </View>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <View style={[st.ingBadge, { backgroundColor: s.bg, borderColor: s.color + '33' }]}>
+                            <Text style={[st.ingBadgeText, { color: s.color }]}>{s.tag}</Text>
+                          </View>
+                          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#8a9e87" />
+                        </View>
                       </View>
-                      <View style={st.ingCardMeta}>
-                        <Text style={st.ingCardName} numberOfLines={2}>{ing.name || 'Unknown'}</Text>
-                      </View>
-                      <View style={[st.ingBadge, { backgroundColor: s.bg, borderColor: s.color + '55' }]}>
-                        <Text style={[st.ingBadgeText, { color: s.color }]}>{s.tag}</Text>
-                      </View>
-                    </View>
-                    {/* Description row */}
-                    {description ? (
-                      <View style={[st.ingDescRow, { borderLeftColor: s.color + '55' }]}>
-                        <Ionicons
-                          name={ing._t === 'bad' ? 'warning-outline' : 'information-circle-outline'}
-                          size={12}
-                          color={s.color}
-                          style={{ marginRight: 5, marginTop: 1 }}
-                        />
-                        <Text style={st.ingDescText}>{description}</Text>
-                      </View>
-                    ) : null}
-                  </View>
-                );
-              })}
-              {allIngredientsForDisplay.length > 5 && (
-                <TouchableOpacity
-                  style={st.showMore}
-                  onPress={() => setShowAllIngredients(!showAllIngredients)}
-                >
-                  <Text style={st.showMoreText}>
-                    {showAllIngredients ? 'SHOW LESS' : `+ ${allIngredientsForDisplay.length - 5} MORE INGREDIENTS`}
-                  </Text>
-                </TouchableOpacity>
-              )}
+
+                      {isExpanded && (
+                        <View style={st.ingDetailPanel}>
+                          {isLoadingThis ? (
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                              <ActivityIndicator size="small" color={PRIMARY} />
+                              <Text style={st.ingDetailLabel}>Looking up database...</Text>
+                            </View>
+                          ) : usdaInfo ? (
+                            <>
+                              {usdaInfo.healthVerdict && (() => {
+                                const vMap = {
+                                  good:     { bg: 'rgba(45,106,79,0.12)',  text: '#067A4F', label: 'Generally Safe' },
+                                  moderate: { bg: 'rgba(217,119,6,0.12)',  text: '#d97706', label: 'Moderate' },
+                                  concern:  { bg: 'rgba(217,119,6,0.18)',  text: '#b45309', label: 'Use With Caution' },
+                                  avoid:    { bg: 'rgba(186,26,26,0.12)',  text: '#ba1a1a', label: 'Avoid' },
+                                };
+                                const vc = vMap[usdaInfo.healthVerdict] || vMap.moderate;
+                                return (
+                                  <View style={[st.ingVerdictBadge, { backgroundColor: vc.bg }]}>
+                                    <Text style={[st.ingVerdictText, { color: vc.text }]}>{vc.label}</Text>
+                                  </View>
+                                );
+                              })()}
+                              <View style={st.ingDetailRow}>
+                                <Ionicons name="information-circle-outline" size={16} color={PRIMARY} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={st.ingDetailLabel}>What is it?</Text>
+                                  <Text style={st.ingDetailText}>{usdaInfo.whatItIs}</Text>
+                                </View>
+                              </View>
+                              <View style={[st.ingDetailRow, { marginTop: 10 }]}>
+                                <Ionicons name="flash-outline" size={16} color={PRIMARY} />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={st.ingDetailLabel}>What does it do?</Text>
+                                  <Text style={st.ingDetailText}>{usdaInfo.whatItDoes}</Text>
+                                </View>
+                              </View>
+                              {usdaInfo.whoSays ? (
+                                <View style={[st.ingDetailRow, { marginTop: 10 }]}>
+                                  <Ionicons name="globe-outline" size={16} color="#1565c0" />
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={[st.ingDetailLabel, { color: '#1565c0' }]}>WHO / JECFA</Text>
+                                    <Text style={st.ingDetailText}>{usdaInfo.whoSays}</Text>
+                                  </View>
+                                </View>
+                              ) : null}
+                              <Text style={st.ingDetailSource}>Source: {usdaInfo.source}</Text>
+                            </>
+                          ) : (
+                            <Text style={st.ingDetailText}>No information available for this ingredient.</Text>
+                          )}
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+                {allIngredientsForDisplay.length > 5 && (
+                  <TouchableOpacity
+                    style={st.showMore}
+                    onPress={() => setShowAllIngredients(!showAllIngredients)}
+                  >
+                    <Text style={st.showMoreText}>
+                      {showAllIngredients ? 'Show less' : `+ ${allIngredientsForDisplay.length - 5} more ingredients`}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           )}
 
           {/* BETTER ALTERNATIVES */}
           <View style={st.altSection}>
             <View style={st.altHeader}>
-              <Text style={st.sectionTitle}>BETTER ALTERNATIVES</Text>
+              <Text style={st.sectionTitle}>Better Alternatives</Text>
               <TouchableOpacity>
-                <Text style={st.altViewAll}>VIEW ALL</Text>
+                <Text style={st.altViewAll}>View all</Text>
               </TouchableOpacity>
             </View>
             {altsLoading && realAlternatives.length === 0 ? (
               <View style={{ paddingVertical: 28, alignItems: 'center' }}>
-                <ActivityIndicator size="small" color="#4ADE80" />
-                <Text style={{ color: ON_SURFACE_VAR, fontSize: 11, marginTop: 10, letterSpacing: 1 }}>FINDING ALTERNATIVES...</Text>
+                <ActivityIndicator size="small" color={PRIMARY} />
+                <Text style={{ color: ON_SURFACE_VAR, fontSize: 11, marginTop: 10 }}>Finding alternatives...</Text>
               </View>
             ) : (
               <FlatList
@@ -1179,19 +1270,16 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                       onPress={() => item.barcode && navigation.push('CosmeticResults', { barcode: item.barcode })}
                     >
                       <View style={st.altImgBox}>
-                        {item.image ? (
-                          <Image source={{ uri: item.image }} style={st.altImg} resizeMode="cover" />
-                        ) : (
-                          <View style={[st.altImg, st.altImgPlaceholder]}>
-                            <Ionicons name="flask-outline" size={28} color={OUTLINE} />
-                          </View>
-                        )}
-                        <View style={[st.altScoreBadge, { borderColor: altScoreColor }]}>
-                          <Text style={[st.altScoreNum, { color: altScoreColor }]}>{item.score}</Text>
+                        <CosmeticAltImg uri={item.image} imgStyle={st.altImg} />
+                        <View style={[st.altScoreBadge, { backgroundColor: altScoreColor }]}>
+                          <Text style={st.altScoreBadgeText}>{item.score}/100</Text>
                         </View>
                       </View>
-                      <Text style={st.altName} numberOfLines={2}>{(item.name || '').toUpperCase()}</Text>
-                      <Text style={st.altBrand} numberOfLines={1}>{(item.brand || '').toUpperCase()}</Text>
+                      <Text style={st.altName} numberOfLines={1}>{item.name || ''}</Text>
+                      <Text style={st.altBrand} numberOfLines={1}>{item.brand || ''}</Text>
+                      <View style={st.altViewBtn}>
+                        <Text style={st.altViewBtnText}>VIEW ITEM</Text>
+                      </View>
                     </TouchableOpacity>
                   );
                 }}
@@ -1216,7 +1304,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
               }}
             >
               <View style={st.aiCardIcon}>
-                <Ionicons name="sparkles" size={22} color={BG} />
+                <Ionicons name="sparkles" size={22} color={PRIMARY} />
               </View>
               <View style={{ flex: 1, marginLeft: 16 }}>
                 <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
@@ -1224,12 +1312,12 @@ export default function CosmeticResultsScreen({ route, navigation }) {
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                 <Text style={st.aiCardConnect}>CONNECT</Text>
-                <Ionicons name="arrow-forward" size={14} color="#4ADE80" />
+                <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
               </View>
             </TouchableOpacity>
           </View>
 
-          {/* SAVE TO LOG */}
+          {/* SAVE TO HISTORY */}
           <View style={st.saveWrap}>
             <TouchableOpacity
               style={st.saveBtn}
@@ -1244,7 +1332,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                 source: product.source || 'Unknown',
               })}
             >
-              <Text style={st.saveBtnText}>SAVE TO LOG</Text>
+              <Text style={st.saveBtnText}>Save to History</Text>
             </TouchableOpacity>
           </View>
 
@@ -1268,86 +1356,130 @@ export default function CosmeticResultsScreen({ route, navigation }) {
 // GAUGE STYLES
 // =============================================================
 const g = StyleSheet.create({
-  container:   { width: 240, height: 240, alignItems: 'center', justifyContent: 'center' },
-  outerRing:   { position: 'absolute', top: 0, left: 0, width: 240, height: 240, borderRadius: 120, borderWidth: 1, borderColor: 'rgba(71,71,71,0.3)' },
-  innerRing:   { position: 'absolute', top: 20, left: 20, width: 200, height: 200, borderRadius: 100, borderWidth: 8, borderColor: SURFACE_HIGH },
-  center:      { position: 'absolute', alignItems: 'center' },
-  scannedRow:  { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  scannedText: { fontSize: 9, fontWeight: '700', letterSpacing: 1, color: OUTLINE, textTransform: 'uppercase' },
-  scoreNum:    { fontSize: 80, fontWeight: '900', letterSpacing: -4, lineHeight: 84, color: WHITE },
-  healthLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 4, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginTop: 2 },
+  container:  { width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
+  gaugeBg:    { position: 'absolute', width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,0.85)' },
+  center:     { position: 'absolute', alignItems: 'center' },
+  scoreNum:   { fontSize: 52, fontWeight: '800', letterSpacing: -2, lineHeight: 56 },
+  scoreDenom: { fontSize: 16, fontWeight: '500', color: ON_SURFACE_VAR, marginTop: -2 },
 });
 
 // =============================================================
-// MAIN STYLES \u2014 Dark Brutalism
+// MAIN STYLES \u2014 Light Wellness
 // =============================================================
 const st = StyleSheet.create({
   header: {
     position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
     backgroundColor: SURFACE,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 24, paddingBottom: 12,
+    paddingHorizontal: 20, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)',
   },
-  headerLeft:  { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  headerTitle: { fontSize: 12, fontWeight: '900', letterSpacing: 3, color: WHITE, textTransform: 'uppercase' },
-  iconBtn:     { padding: 8 },
+  headerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  headerTitle:  { fontSize: 17, fontWeight: '700', color: ON_SURFACE },
+  iconBtn:      { padding: 8 },
+  avatarCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(45,106,79,0.1)', alignItems: 'center', justifyContent: 'center' },
 
-  heroContainer:   { width: '100%', height: 320, position: 'relative' },
-  heroImage:       { width: '100%', height: '100%', opacity: 0.75 },
+  heroContainer:   { width: '100%', height: 280, position: 'relative', backgroundColor: SURFACE_HIGH },
+  heroImage:       { width: '100%', height: '100%' },
   heroPlaceholder: { backgroundColor: SURFACE_HIGH, alignItems: 'center', justifyContent: 'center' },
-  heroGradient:    { position: 'absolute', bottom: 0, left: 0, right: 0, height: 200 },
-  heroTextBox:     { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: 28, paddingBottom: 28 },
-  heroLabel:       { fontSize: 9, fontWeight: '700', letterSpacing: 4, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 6 },
-  heroProductName: { fontSize: 28, fontWeight: '900', letterSpacing: -1, color: WHITE, lineHeight: 32 },
+  heroScrim:       { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,250,245,0.18)' },
+  gaugeCenterWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+
+  summarySection:   { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
+  ratingLabel:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
+  verdictBadge:     { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginBottom: 16 },
+  verdictBadgeText: { fontSize: 12, fontWeight: '600' },
+  productNameText:  { fontSize: 20, fontWeight: '700', color: ON_SURFACE, lineHeight: 26, marginBottom: 4 },
+  brandLabel:       { fontSize: 13, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8 },
+  verdictDesc:      { fontSize: 13, color: ON_SURFACE_VAR, lineHeight: 20, marginBottom: 4 },
 
   gaugeSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 12 },
-  whyBtn:       { marginTop: 14, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.2)', paddingBottom: 2 },
-  whyBtnText:   { fontSize: 9, fontWeight: '700', letterSpacing: 3, color: WHITE },
 
-  verdictSection:   { alignItems: 'center', paddingHorizontal: 32, paddingBottom: 36 },
-  verdictBadge:     { paddingHorizontal: 16, paddingVertical: 5, marginBottom: 14 },
-  verdictBadgeText: { color: '#1a1c1c', fontSize: 9, fontWeight: '900', letterSpacing: 5, textTransform: 'uppercase' },
-  brandLabel:       { fontSize: 10, fontWeight: '600', letterSpacing: 2, color: ON_SURFACE_VAR, marginBottom: 10, textTransform: 'uppercase' },
-  verdictDesc:      { fontSize: 13, color: ON_SURFACE_VAR, textAlign: 'center', lineHeight: 20 },
+  section:       { paddingHorizontal: 20, paddingBottom: 12 },
+  sectionTitle:  { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 0 },
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
+  viewLabels:    { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
 
-  section:      { paddingHorizontal: 28, paddingBottom: 28 },
-  sectionTitle: { fontSize: 9, fontWeight: '900', letterSpacing: 4, color: ON_SURFACE, textTransform: 'uppercase', marginBottom: 20 },
-  ingCard:       { paddingVertical: 14 },
-  ingCardBorder: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(71,71,71,0.2)' },
-  ingCardTop:    { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  ingCardIcon:   { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  ingList:       { gap: 8 },
+  ingRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: 16,
+    backgroundColor: SURFACE_LOW,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  ingIconBox:    { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
   ingCardMeta:   { flex: 1, marginRight: 10 },
-  ingCardName:   { fontSize: 14, fontWeight: '600', color: WHITE },
-  ingBadge:      { paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, borderWidth: 1, flexShrink: 0 },
-  ingBadgeText:  { fontSize: 9, fontWeight: '800', letterSpacing: 2, textTransform: 'uppercase' },
-  ingDescRow:    { flexDirection: 'row', alignItems: 'flex-start', marginTop: 8, marginLeft: 56, paddingRight: 4, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: '#474747' },
-  ingDescText:   { fontSize: 11, color: ON_SURFACE_VAR, lineHeight: 16, flexShrink: 1 },
-  showMore:     { marginTop: 14, paddingVertical: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(71,71,71,0.2)', alignItems: 'center' },
-  showMoreText: { fontSize: 9, fontWeight: '700', letterSpacing: 3, color: ON_SURFACE_VAR },
+  ingCardName:   { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 2 },
+  ingCardDesc:   { fontSize: 12, color: ON_SURFACE_VAR, lineHeight: 16 },
+  ingBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1, flexShrink: 0 },
+  ingBadgeText:  { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
+  showMore:      { paddingTop: 12, alignItems: 'center' },
+  showMoreText:  { fontSize: 12, fontWeight: '600', color: PRIMARY },
 
-  aiCardWrap: { paddingHorizontal: 28, marginBottom: 16 },
+  ingDetailPanel: {
+    backgroundColor: '#f0f5f0',
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    borderWidth: 1,
+    borderTopWidth: 0,
+    borderColor: 'rgba(45,106,79,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  ingVerdictBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, marginBottom: 12 },
+  ingVerdictText:  { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
+  ingDetailRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  ingDetailLabel:  { fontSize: 11, fontWeight: '700', color: PRIMARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+  ingDetailText:   { fontSize: 13, color: '#1a1c19', lineHeight: 19 },
+  ingDetailSource: { fontSize: 10, color: '#6b7c69', marginTop: 10, textAlign: 'right', fontStyle: 'italic' },
+
+  aiCardWrap: { paddingHorizontal: 20, marginBottom: 16 },
   aiCard: {
     backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: OUTLINE,
-    padding: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderRadius: 16, padding: 20,
+    flexDirection: 'row', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
   },
-  aiCardLabel:   { fontSize: 9, fontWeight: '900', letterSpacing: 3, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 6 },
-  aiCardSub:     { fontSize: 15, fontWeight: '300', color: WHITE, lineHeight: 21 },
-  aiCardIcon:    { width: 52, height: 52, borderRadius: 26, backgroundColor: '#4ADE80', alignItems: 'center', justifyContent: 'center' },
-  aiCardConnect: { fontSize: 9, fontWeight: '800', letterSpacing: 2, color: '#4ADE80' },
+  aiCardLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 4 },
+  aiCardSub:     { fontSize: 15, fontWeight: '500', color: ON_SURFACE, lineHeight: 21 },
+  aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(45,106,79,0.1)', alignItems: 'center', justifyContent: 'center' },
+  aiCardConnect: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: PRIMARY },
 
-  altSection:        { marginBottom: 36 },
-  altHeader:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 28, marginBottom: 20 },
-  altViewAll:        { fontSize: 9, fontWeight: '700', letterSpacing: 3, color: '#4ADE80' },
-  altCard:           { width: 140, backgroundColor: SURFACE_LOW },
-  altImgBox:         { width: 140, height: 140, position: 'relative', backgroundColor: SURFACE_HIGH },
-  altImg:            { width: 140, height: 140 },
+  altSection:        { marginBottom: 32 },
+  altHeader:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
+  altViewAll:        { fontSize: 12, fontWeight: '600', color: PRIMARY },
+  altCard: {
+    width: 180,
+    backgroundColor: SURFACE_LOW,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  altImgBox:         { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: SURFACE_HIGH, overflow: 'hidden', marginBottom: 8 },
+  altImg:            { width: '100%', height: '100%' },
   altImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  altScoreBadge:     { position: 'absolute', top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: BG, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
-  altScoreNum:  { fontSize: 10, fontWeight: '900', letterSpacing: 0 },
-  altName:      { fontSize: 10, fontWeight: '700', color: WHITE, letterSpacing: 0.5, lineHeight: 14, marginTop: 10, paddingHorizontal: 10 },
-  altBrand:     { fontSize: 9, fontWeight: '500', color: ON_SURFACE_VAR, letterSpacing: 1, marginTop: 4, marginBottom: 12, paddingHorizontal: 10 },
+  altScoreBadge:     { position: 'absolute', top: 8, right: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
+  altScoreBadgeText: { fontSize: 10, fontWeight: '700', color: WHITE },
+  altName:      { fontSize: 14, fontWeight: '700', color: ON_SURFACE, paddingHorizontal: 4, marginBottom: 2 },
+  altBrand:     { fontSize: 12, color: ON_SURFACE_VAR, paddingHorizontal: 4, marginBottom: 8 },
+  altViewBtn:   { backgroundColor: SURFACE_HIGH, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
+  altViewBtnText: { fontSize: 11, fontWeight: '700', color: ON_SURFACE, textTransform: 'uppercase', letterSpacing: 0.5 },
 
-  saveWrap:    { paddingHorizontal: 28, marginBottom: 8 },
-  saveBtn:     { width: '100%', backgroundColor: WHITE, height: 60, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: '#1a1c1c', fontSize: 10, fontWeight: '900', letterSpacing: 5 },
+  saveWrap:    { paddingHorizontal: 20, marginBottom: 8 },
+  saveBtn:     { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  saveBtnText: { color: WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

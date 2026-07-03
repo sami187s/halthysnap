@@ -753,18 +753,6 @@ const ResultsScreenV2 = ({ route, navigation }) => {
           <View style={st.summarySection}>
             <Text style={[st.ratingLabel, { color: scoreColor }]}>{getRatingLabel(score)}</Text>
             <Text style={st.productNameText} numberOfLines={2}>{productName}</Text>
-
-            {/* Save to History button */}
-            <TouchableOpacity
-              style={[st.saveToBestBtn, isInBest && { backgroundColor: '#2d6a4f' }]}
-              onPress={handleAddToBest}
-              activeOpacity={0.8}
-            >
-              <Ionicons name={isInBest ? 'bookmark' : 'bookmark-outline'} size={18} color="#fff" />
-              <Text style={st.saveToBestTxt}>
-                {isInBest ? '✓ Saved to History' : 'Save to History'}
-              </Text>
-            </TouchableOpacity>
           </View>
 
           {/* ── WHY THIS SCORE toggle ────────────────────────────── */}

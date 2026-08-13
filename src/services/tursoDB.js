@@ -1,60 +1,47 @@
 /**
  * Turso Database Service
- * Queries the self-hosted product database via Turso HTTP API.
+ * Queries the self-hosted product database through a Cloudflare Worker proxy
+ * (cf-turso-proxy/) instead of talking to Turso directly. The real Turso
+ * token lives only in that Worker as a secret — the app only ever sends a
+ * named action + params, never raw SQL or a DB credential. This replaces an
+ * earlier version that shipped a live read-write Turso token inside the app
+ * bundle.
  * Schema: code, product_name, ingredients_text, nutriscore_grade, nova_group,
  *         energy_100g, fat_100g, saturated_fat_100g, sugars_100g, salt_100g,
  *         proteins_100g, fiber_100g, additives_tags, labels_tags, countries_tags,
  *         allergens, image_url
  */
 
-const TURSO_URL = 'https://vee-2-samis187s.aws-us-east-2.turso.io';
-const TURSO_TOKEN =
-  'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJhIjoicnciLCJpYXQiOjE3NzU2MTY1MDUsImlkIjoiMDE5ZDZhZmItZjcwMS03NmI5LTk3ZjgtNjM2Yzg0YjNkYmQ0IiwicmlkIjoiZTkyNmY2ZmYtNzdhZC00M2YyLWI5MDUtYTQ0MDU5MWI1MmQxIn0.f6SltaZu58g1QIBN21rhEDjd7LFp4gbUGKPEHSGoQNoCg8gXgwQeNKjlwk9UVNDSBoXxAL8QPzR7keRlSSe6BA';
+const PROXY_URL = 'https://vee-turso-proxy.samis1979s4.workers.dev';
 
 /**
- * Execute a SQL query against the Turso database via the HTTP pipeline API.
+ * Call the Turso proxy Worker with a named action + params.
  * @param {number} timeoutMs - Reject after this many ms (default 10s). Pass lower for search queries.
  */
-async function tursoQuery(sql, args = [], timeoutMs = 10000) {
-  const body = {
-    requests: [
-      {
-        type: 'execute',
-        stmt: {
-          sql,
-          args: args.map((v) => ({ type: 'text', value: String(v) })),
-        },
-      },
-      { type: 'close' },
-    ],
-  };
+async function tursoAction(action, params = {}, timeoutMs = 10000) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, ...params }),
+      signal: controller.signal,
+    });
 
-  // Use Promise.race for timeout — works reliably across all RN/Hermes versions
-  const fetchPromise = fetch(`${TURSO_URL}/v2/pipeline`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${TURSO_TOKEN}`,
-    },
-    body: JSON.stringify(body),
-  });
-  const timeoutPromise = new Promise((_, reject) =>
-    setTimeout(() => reject(new Error(`Turso query timed out after ${timeoutMs}ms`)), timeoutMs)
-  );
+    if (!response.ok) {
+      throw new Error(`Turso proxy HTTP error: ${response.status}`);
+    }
 
-  const response = await Promise.race([fetchPromise, timeoutPromise]);
+    const json = await response.json();
+    if (json.error) {
+      throw new Error(json.error);
+    }
 
-  if (!response.ok) {
-    throw new Error(`Turso HTTP error: ${response.status}`);
+    return json.result;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const json = await response.json();
-  const result = json?.results?.[0];
-  if (!result || result.type !== 'ok') {
-    throw new Error('Turso query failed');
-  }
-
-  return result.response.result;
 }
 
 /**
@@ -149,7 +136,7 @@ function isConstructedUrl(url) {
 async function forceSetImageUrl(barcode, url) {
   if (!barcode || !url) return;
   try {
-    await tursoQuery('UPDATE products SET image_url = ? WHERE code = ?', [url, barcode]);
+    await tursoAction('updateProductImage', { barcode, imageUrl: url });
   } catch { /* non-critical */ }
 }
 
@@ -195,10 +182,7 @@ async function resolveAndPersistImage(barcode) {
  */
 export async function fetchProductFromTurso(barcode) {
   try {
-    const result = await tursoQuery(
-      'SELECT * FROM products WHERE code = ? LIMIT 1',
-      [barcode]
-    );
+    const result = await tursoAction('getProduct', { barcode });
 
     const rows = tursoRowsToObjects(result);
     if (!rows.length || !rows[0].product_name) return null;
@@ -225,18 +209,55 @@ export async function fetchProductFromTurso(barcode) {
  */
 export async function searchProductsInTurso(query) {
   try {
-    // 6s timeout — enough for a good connection, short enough to not block
-    // USDA + Open Beauty Facts results on slow cellular.
-    const result = await tursoQuery(
-      "SELECT * FROM products WHERE product_name LIKE ? LIMIT 20",
-      [`%${query}%`],
-      6000
-    );
-
+    const result = await tursoAction('searchProducts', { query }, 6000);
     const rows = tursoRowsToObjects(result);
     return rows.filter((r) => r.product_name).map(tursoRowToProduct);
   } catch (error) {
     console.log('⚠️ TursoDB: Search failed for', query, '-', error?.message);
+    return [];
+  }
+}
+
+// ─── CURATED / BEST PRODUCTS (shared across ALL users) ───────────────────────
+
+/**
+ * Save a product to the shared curated list (visible to ALL users).
+ * Table creation is handled inside the proxy Worker.
+ */
+export async function saveCuratedProduct(entry) {
+  try {
+    await tursoAction('saveCuratedProduct', { entry }, 8000);
+    return true;
+  } catch (e) {
+    console.log('⚠️ saveCuratedProduct error:', e?.message);
+    return false;
+  }
+}
+
+/**
+ * Fetch all curated products from Turso (for VeeList screen).
+ * Returns [] on failure so the hardcoded list still shows.
+ */
+export async function fetchCuratedProducts() {
+  try {
+    const result = await tursoAction('fetchCuratedProducts', {}, 8000);
+    const rows = tursoRowsToObjects(result);
+    return rows.map(r => ({
+      id: r.barcode,
+      barcode: r.barcode,
+      name: r.name,
+      brand: r.brand,
+      category: r.product_type === 'food' ? 'FOOD' : 'COSMETIC',
+      filterCat: r.product_type === 'food' ? 'Food' : 'Cosmetic',
+      tag: 'TOP PICK',
+      defaultScore: parseInt(r.score) || 0,
+      image: r.image_url || null,
+      productType: r.product_type || 'food',
+      ingredients: r.ingredients || '',
+      nutriments: {},
+    }));
+  } catch (e) {
+    console.log('⚠️ fetchCuratedProducts error:', e?.message);
     return [];
   }
 }
@@ -254,10 +275,7 @@ export async function updateProductImageInTurso(barcode, imageUrl) {
   if (!barcode || !imageUrl) return;
   try {
     // Always overwrite — replaces broken constructed URLs with real ones
-    await tursoQuery(
-      'UPDATE products SET image_url = ? WHERE code = ?',
-      [imageUrl, barcode]
-    );
+    await tursoAction('updateProductImage', { barcode, imageUrl });
   } catch {
     // Non-critical
   }
@@ -271,10 +289,7 @@ export async function updateIngredientsInTurso(barcode, ingredientsText) {
   // Require at least 15 characters to avoid overwriting with garbage or stub values
   if (!barcode || !ingredientsText || ingredientsText.trim().length < 15) return;
   try {
-    await tursoQuery(
-      'UPDATE products SET ingredients_text = ? WHERE code = ?',
-      [ingredientsText.trim(), barcode]
-    );
+    await tursoAction('updateIngredients', { barcode, ingredientsText: ingredientsText.trim() });
   } catch {
     // Non-critical
   }
@@ -286,24 +301,9 @@ export async function updateIngredientsInTurso(barcode, ingredientsText) {
  */
 export async function updateNutritionInTurso(barcode, nutriments) {
   if (!barcode || !nutriments) return;
-  const n = nutriments;
-  // Build SET clause only for columns that have a value to write
-  const updates = [];
-  const params = [];
-  const add = (col, val) => {
-    if (val != null) { updates.push(`${col} = COALESCE(${col}, ?)`); params.push(String(val)); }
-  };
-  add('energy_100g',        n['energy-kcal_100g']);
-  add('fat_100g',           n['fat_100g']);
-  add('saturated_fat_100g', n['saturated-fat_100g']);
-  add('sugars_100g',        n['sugars_100g']);
-  add('salt_100g',          n['salt_100g']);
-  add('proteins_100g',      n['proteins_100g']);
-  add('fiber_100g',         n['fiber_100g']);
-  if (!updates.length) return;
-  params.push(barcode);
+  // Only-fill-if-null logic (COALESCE) lives server-side in the proxy Worker now.
   try {
-    await tursoQuery(`UPDATE products SET ${updates.join(', ')} WHERE code = ?`, params);
+    await tursoAction('updateNutrition', { barcode, nutriments });
   } catch { /* non-critical */ }
 }
 
@@ -315,62 +315,54 @@ export async function updateNutritionInTurso(barcode, nutriments) {
 export async function saveProductToTurso(barcode, product) {
   if (!barcode || !product || !product.product_name) return;
   try {
-    const n = product.nutriments || {};
-    await tursoQuery(
-      `INSERT OR IGNORE INTO products
-         (code, product_name, ingredients_text, image_url,
-          energy_100g, fat_100g, saturated_fat_100g, sugars_100g,
-          salt_100g, proteins_100g, fiber_100g,
-          nutriscore_grade, nova_group, labels_tags, allergens, additives_tags)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        barcode,
-        product.product_name || '',
-        product.ingredients_text || '',
-        product.image_url || '',
-        n['energy-kcal_100g'] != null ? String(n['energy-kcal_100g']) : null,
-        n['fat_100g'] != null ? String(n['fat_100g']) : null,
-        n['saturated-fat_100g'] != null ? String(n['saturated-fat_100g']) : null,
-        n['sugars_100g'] != null ? String(n['sugars_100g']) : null,
-        n['salt_100g'] != null ? String(n['salt_100g']) : null,
-        n['proteins_100g'] != null ? String(n['proteins_100g']) : null,
-        n['fiber_100g'] != null ? String(n['fiber_100g']) : null,
-        product.nutriscore_grade || null,
-        product.nova_group ? String(product.nova_group) : null,
-        product.categories || product.labels || '',
-        Array.isArray(product.allergens_tags) ? product.allergens_tags.join(',') : '',
-        Array.isArray(product.additives_tags) ? product.additives_tags.join(',') : '',
-      ]
-    );
+    await tursoAction('saveProduct', { barcode, product });
     console.log('✅ TursoDB: Saved new product', barcode, '-', product.product_name);
   } catch (error) {
     console.log('⚠️ TursoDB: Save failed for', barcode, '-', error.message);
   }
 }
 
+// ── Ingredient Info Cache ────────────────────────────────────────────────────
+// Caches ingredient definitions + health verdict + WHO notes in Turso so we
+// never call USDA more than once per unique ingredient name.
+
+export async function getIngredientInfoFromTurso(name) {
+  if (!name) return null;
+  try {
+    const result = await tursoAction('getIngredientInfo', { name }, 5000);
+    if (!result) return null;
+    const rows = tursoRowsToObjects(result);
+    if (!rows.length) return null;
+    const r = rows[0];
+    return {
+      name: r.name,
+      whatItIs:      r.what_it_is,
+      whatItDoes:    r.what_it_does,
+      healthVerdict: r.health_verdict,
+      whoSays:       r.who_says,
+      source:        r.source,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function saveIngredientInfoToTurso(info) {
+  if (!info || !info.name) return;
+  try {
+    await tursoAction('saveIngredientInfo', { info });
+  } catch { /* non-critical */ }
+}
+
 export async function fetchAlternativesByCategory(categoryKeyword, excludeBarcode, limit = 30) {
   try {
-    // Prefer products that have an image_url
-    const result = await tursoQuery(
-      `SELECT * FROM products
-       WHERE product_name LIKE ?
-         AND code != ?
-         AND image_url IS NOT NULL
-         AND image_url != ''
-       LIMIT ?`,
-      [`%${categoryKeyword}%`, excludeBarcode || '', String(limit)]
-    );
+    // Proxy returns { withImage, fallback } — fallback is only present when
+    // withImage had fewer than 5 rows, same condition the merge below used to
+    // decide with when this ran as two separate direct Turso queries.
+    const { withImage, fallback } = await tursoAction('fetchAlternatives', { categoryKeyword, excludeBarcode, limit });
 
-    const rows = tursoRowsToObjects(result);
-    if (rows.length < 5) {
-      // Fallback: also fetch without image filter and mix in
-      const fallback = await tursoQuery(
-        `SELECT * FROM products
-         WHERE product_name LIKE ?
-           AND code != ?
-         LIMIT ?`,
-        [`%${categoryKeyword}%`, excludeBarcode || '', String(limit)]
-      );
+    const rows = tursoRowsToObjects(withImage);
+    if (fallback) {
       const fbRows = tursoRowsToObjects(fallback);
       const merged = [...rows];
       for (const r of fbRows) {

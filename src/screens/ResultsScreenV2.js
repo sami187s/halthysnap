@@ -118,26 +118,30 @@ const AltImg = React.memo(({ uri, barcode, imgStyle, placeholderStyle }) => {
 });
 
 // ── Light Wellness Palette ──────────────────────────────────────────
-const BG             = '#fafaf5';
-const SURFACE        = 'rgba(250,250,245,0.92)';
-const SURFACE_LOW    = '#ffffff';
-const SURFACE_HIGH   = '#eeeee9';
-const OUTLINE        = '#bfcaba';
-const ON_SURFACE     = '#1a1c19';
-const ON_SURFACE_VAR = '#40493d';
-const WHITE          = '#ffffff';
+const BG             = '#FBFBF9';
+const SURFACE        = 'rgba(251,251,249,0.92)';
+const SURFACE_LOW    = '#FFFFFF';
+const SURFACE_HIGH   = '#F5F5F1';
+const OUTLINE        = '#D9D9D4';
+const ON_SURFACE     = '#171717';
+const ON_SURFACE_VAR = '#737373';
+const WHITE          = '#FFFFFF';
 const PRIMARY        = '#067A4F';
-const ERROR_C        = '#ba1a1a';
-const WARNING_C      = '#d97706';
+const GOOD_C         = '#84CC16';
+const ERROR_C        = '#EF4444';
+const WARNING_C      = '#F59E0B';
 
 // ── Gauge constants ─────────────────────────────────────────────────
 const GAUGE_R    = 72;
 const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 
 // ── Helpers ─────────────────────────────────────────────────────────
+// Purely-style 4-band score scale — aligned with ScoreRing.getScoreBand
+// so score colors agree across every screen.
 const getScoreColor = (sc) => {
-  if (sc >= 70) return PRIMARY;
-  if (sc >= 40) return WARNING_C;
+  if (sc >= 75) return PRIMARY;
+  if (sc >= 50) return GOOD_C;
+  if (sc >= 25) return WARNING_C;
   return ERROR_C;
 };
 
@@ -183,7 +187,7 @@ const ScoreGauge = ({ score, scoreColor }) => {
       {/* White circle background so gauge is readable over any image */}
       <View style={g.gaugeBg} />
       <Svg width={SIZE} height={SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={SURFACE_HIGH} strokeWidth={9} fill="transparent" />
+        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={OUTLINE} strokeWidth={9} fill="transparent" />
         <AnimatedSvgCircle
           cx={CX} cy={CX} r={GAUGE_R}
           stroke={scoreColor} strokeWidth={9}
@@ -1268,7 +1272,8 @@ const g = StyleSheet.create({
   gaugeBg: {
     position: 'absolute',
     width: 170, height: 170, borderRadius: 85,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
   },
   center:      { position: 'absolute', alignItems: 'center' },
   scoreNum:    { fontSize: 52, fontWeight: '800', letterSpacing: -2, lineHeight: 56 },
@@ -1282,7 +1287,7 @@ const st = StyleSheet.create({
   // Loading / Error
   center:        { flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center' },
   loadText:      { fontSize: 13, color: ON_SURFACE_VAR, marginTop: 14, fontWeight: '500' },
-  goBackBtn:     { marginTop: 24, borderRadius: 12, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 },
+  goBackBtn:     { marginTop: 24, borderRadius: 24, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 },
   goBackBtnText: { color: ON_SURFACE, fontSize: 14, fontWeight: '600' },
 
   // Header
@@ -1306,17 +1311,17 @@ const st = StyleSheet.create({
   // Hero with centered gauge
   heroContainer:  { width: '100%', height: 280, position: 'relative', backgroundColor: SURFACE_HIGH },
   heroImage:      { width: '100%', height: '100%' },
-  heroScrim:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,250,245,0.18)' },
+  heroScrim:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(251,251,249,0.18)' },
   gaugeCenterWrap:{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
 
   // Product summary (below hero)
   summarySection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
   saveToBestBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: '#067A4F', borderRadius: 14,
+    gap: 8, backgroundColor: PRIMARY, borderRadius: 24,
     paddingVertical: 14, paddingHorizontal: 20, marginTop: 14,
   },
-  saveToBestTxt: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  saveToBestTxt: { color: WHITE, fontSize: 15, fontWeight: '700' },
   ratingLabel:    { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
   productNameText:{ fontSize: 20, fontWeight: '700', color: ON_SURFACE, lineHeight: 26, marginBottom: 4 },
   brandLabel:     { fontSize: 13, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8 },
@@ -1326,7 +1331,7 @@ const st = StyleSheet.create({
   whyBtn: {
     flexDirection: 'row', alignItems: 'center',
     paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: 12, borderWidth: 1, borderColor: 'rgba(6,122,79,0.25)',
+    borderRadius: 24, borderWidth: 1, borderColor: 'rgba(6,122,79,0.25)',
     backgroundColor: 'rgba(6,122,79,0.06)',
     marginBottom: 4,
   },
@@ -1337,10 +1342,10 @@ const st = StyleSheet.create({
   // WHY THIS SCORE expandable
   whySection: {
     marginHorizontal: 20, marginBottom: 24,
-    backgroundColor: SURFACE_LOW, borderRadius: 16,
-    borderWidth: 1, borderColor: OUTLINE,
+    backgroundColor: SURFACE_LOW, borderRadius: 20,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
     padding: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
   },
   whyBarsWrap:    { marginBottom: 16 },
   whyBarRow:      { marginBottom: 12 },
@@ -1366,15 +1371,15 @@ const st = StyleSheet.create({
     paddingVertical: 18, paddingHorizontal: 20,
     marginBottom: 24,
     borderWidth: 1, borderColor: OUTLINE,
-    borderRadius: 12, backgroundColor: SURFACE_LOW,
+    borderRadius: 16, backgroundColor: SURFACE_LOW,
   },
   noNutText: { fontSize: 13, color: ON_SURFACE_VAR, flex: 1 },
   bentoGrid:         { marginBottom: 20 },
   bentoRow:          { flexDirection: 'row' },
   bentoCell:         {
-    flex: 1, backgroundColor: '#F2F2F2', borderRadius: 12, padding: 14,
-    borderWidth: 1, borderColor: 'rgba(191,202,186,0.35)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 12, elevation: 2,
+    flex: 1, backgroundColor: SURFACE_HIGH, borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
   },
   bentoCellBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, flexShrink: 0 },
   bentoCellBadgeText:{ fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
@@ -1388,18 +1393,18 @@ const st = StyleSheet.create({
   section:      { paddingHorizontal: 20, paddingBottom: 12 },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 0 },
 
-  ingCountBadge: { backgroundColor: 'rgba(6,122,79,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  ingCountBadge: { backgroundColor: 'rgba(6,122,79,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
   ingCountText:  { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
 
   // Ingredient — each row is its own white card
   ingCard:  {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: SURFACE_LOW, borderRadius: 12, padding: 14,
-    borderWidth: 1, borderColor: 'rgba(191,202,186,0.2)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    backgroundColor: SURFACE_LOW, borderRadius: 16, padding: 14,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 1,
     marginBottom: 8,
   },
-  ingSquare:     { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 },
+  ingSquare:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 },
   ingCardMeta:   { flex: 1, marginRight: 10 },
   ingCardName:   { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 2 },
   ingCardDesc:   { fontSize: 12, color: ON_SURFACE_VAR, lineHeight: 16 },
@@ -1410,9 +1415,9 @@ const st = StyleSheet.create({
 
   // Ingredient detail panel (shown on tap)
   ingDetailPanel: {
-    backgroundColor: '#f0f5f0',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    backgroundColor: 'rgba(6,122,79,0.05)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
     borderWidth: 1,
     borderTopWidth: 0,
     borderColor: 'rgba(6,122,79,0.15)',
@@ -1420,28 +1425,28 @@ const st = StyleSheet.create({
     paddingVertical: 14,
     marginBottom: 8,
   },
-  ingVerdictBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, marginBottom: 12 },
+  ingVerdictBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, marginBottom: 12 },
   ingVerdictText:  { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
   ingDetailRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
-  ingDetailLabel:  { fontSize: 11, fontWeight: '700', color: '#067A4F', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
-  ingDetailText:   { fontSize: 13, color: '#1a1c19', lineHeight: 19 },
-  ingDetailSource: { fontSize: 10, color: '#6b7c69', marginTop: 10, textAlign: 'right', fontStyle: 'italic' },
+  ingDetailLabel:  { fontSize: 11, fontWeight: '700', color: PRIMARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
+  ingDetailText:   { fontSize: 13, color: ON_SURFACE, lineHeight: 19 },
+  ingDetailSource: { fontSize: 10, color: ON_SURFACE_VAR, marginTop: 10, textAlign: 'right', fontStyle: 'italic' },
 
   // Additives pills
-  additivePill:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, backgroundColor: 'rgba(217,119,6,0.08)', borderWidth: 1, borderColor: 'rgba(217,119,6,0.25)' },
+  additivePill:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)' },
   additivePillText:     { fontSize: 11, fontWeight: '600', color: WARNING_C },
   additivePillActive:   { backgroundColor: WARNING_C, borderColor: WARNING_C },
-  additivePillTextActive: { color: '#fff' },
+  additivePillTextActive: { color: WHITE },
 
   additivePanel: {
     marginTop: 14,
-    backgroundColor: '#fff8f0',
-    borderRadius: 12,
+    backgroundColor: 'rgba(245,158,11,0.05)',
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(217,119,6,0.2)',
+    borderColor: 'rgba(245,158,11,0.2)',
     padding: 16,
   },
-  additivePanelCode: { width: 48, height: 48, borderRadius: 10, backgroundColor: 'rgba(217,119,6,0.12)', alignItems: 'center', justifyContent: 'center' },
+  additivePanelCode: { width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(245,158,11,0.12)', alignItems: 'center', justifyContent: 'center' },
   additivePanelCodeText: { fontSize: 11, fontWeight: '800', color: WARNING_C },
 
   showMore:     { marginTop: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', alignItems: 'center' },
@@ -1450,10 +1455,10 @@ const st = StyleSheet.create({
   // AI card
   aiCardWrap: { paddingHorizontal: 20, marginBottom: 16 },
   aiCard: {
-    backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: OUTLINE,
-    borderRadius: 16, padding: 20,
+    backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+    borderRadius: 20, padding: 20,
     flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
   },
   aiCardLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 4 },
   aiCardSub:     { fontSize: 15, fontWeight: '500', color: ON_SURFACE, lineHeight: 21 },
@@ -1466,23 +1471,23 @@ const st = StyleSheet.create({
   altViewAll:        { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
   altCard:           {
     width: 170, backgroundColor: SURFACE_LOW, borderRadius: 20, padding: 8,
-    borderWidth: 1, borderColor: 'rgba(191,202,186,0.15)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
+    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 3,
   },
-  altImgBox:         { width: 154, height: 154, position: 'relative', backgroundColor: SURFACE_HIGH, borderRadius: 12, overflow: 'hidden', marginBottom: 8 },
+  altImgBox:         { width: 154, height: 154, position: 'relative', backgroundColor: SURFACE_HIGH, borderRadius: 16, overflow: 'hidden', marginBottom: 8 },
   altImg:            { width: 154, height: 154 },
   altImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  altScorePill:      { position: 'absolute', top: 8, right: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20 },
+  altScorePill:      { position: 'absolute', top: 8, right: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
   altScorePillText:  { fontSize: 10, fontWeight: '800', color: WHITE },
   altInfo:           { paddingHorizontal: 4 },
   altName:           { fontSize: 13, fontWeight: '700', color: ON_SURFACE, lineHeight: 17, marginBottom: 2, paddingHorizontal: 4 },
   altBrand:          { fontSize: 11, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8, paddingHorizontal: 4 },
-  altViewBtn:        { backgroundColor: SURFACE_HIGH, borderRadius: 8, paddingVertical: 9, alignItems: 'center' },
+  altViewBtn:        { backgroundColor: SURFACE_HIGH, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
   altViewBtnText:    { fontSize: 11, fontWeight: '700', color: ON_SURFACE, letterSpacing: 0.4 },
 
   // Save
   saveWrap:     { paddingHorizontal: 20, marginBottom: 8 },
-  saveBtn:      { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  saveBtn:      { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   saveBtnText:  { color: WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });
 

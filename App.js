@@ -360,18 +360,10 @@ function App() {
         // Check if user has seen onboarding
         await checkOnboarding();
 
-        // One-time migration: grant chatbot access only to new users
-        // Old users (already had app) see "Coming Soon" to protect API costs
-        const chatbotAccessChecked = await AsyncStorage.getItem('chatbotAccessChecked');
-        if (!chatbotAccessChecked) {
-          const hasSeenOnboarding = await AsyncStorage.getItem('hasSeenOnboarding');
-          const chatbotAccess = hasSeenOnboarding ? 'coming_soon' : 'enabled';
-          await AsyncStorage.multiSet([
-            ['chatbotAccess', chatbotAccess],
-            ['chatbotAccessChecked', 'true'],
-          ]);
-          console.log('✅ Chatbot access set:', chatbotAccess);
-        }
+        // AI chatbot is turned off for everyone (new and existing users) until
+        // it's ready to launch — protects API costs. Set unconditionally on every
+        // launch so no prior 'enabled' value lingers on a device.
+        await AsyncStorage.setItem('chatbotAccess', 'coming_soon');
 
         // 🖼️ Prefetch Vee List images so they're ready instantly
         const VEE_IMAGE_URLS = [

@@ -49,33 +49,37 @@ const CosmeticAltImg = React.memo(({ uri, imgStyle }) => {
   if (!uri || err) {
     return (
       <View style={[imgStyle, { alignItems: 'center', justifyContent: 'center' }]}>
-        <Ionicons name="flask-outline" size={28} color="#bfcaba" />
+        <Ionicons name="flask-outline" size={28} color="#D9D9D4" />
       </View>
     );
   }
   return <Image source={{ uri }} style={imgStyle} resizeMode="cover" onError={() => setErr(true)} />;
 });
 
-// -- Light Wellness Palette --
-const BG             = '#fafaf5';
-const SURFACE        = 'rgba(250,250,245,0.92)';
-const SURFACE_LOW    = '#ffffff';
-const SURFACE_HIGH   = '#eeeee9';
-const OUTLINE        = '#bfcaba';
-const ON_SURFACE     = '#1a1c19';
-const ON_SURFACE_VAR = '#40493d';
-const WHITE          = '#ffffff';
+// -- Light Wellness Palette (Purely-aligned) --
+const BG             = '#FBFBF9';
+const SURFACE        = 'rgba(251,251,249,0.92)';
+const SURFACE_LOW    = '#FFFFFF';
+const SURFACE_HIGH   = '#F5F5F1';
+const OUTLINE        = '#D9D9D4';
+const ON_SURFACE     = '#171717';
+const ON_SURFACE_VAR = '#737373';
+const WHITE          = '#FFFFFF';
 const PRIMARY        = '#067A4F';
-const ERROR_C        = '#ba1a1a';
-const WARNING_C      = '#d97706';
+const GOOD_C         = '#84CC16';
+const ERROR_C        = '#EF4444';
+const WARNING_C      = '#F59E0B';
 
 // -- Gauge constants --
 const GAUGE_R    = 72;
 const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 
+// Purely-style 4-band score scale — aligned with ScoreRing.getScoreBand
+// so score colors agree across every screen.
 const getScoreColor = (sc) => {
-  if (sc >= 70) return PRIMARY;
-  if (sc >= 40) return WARNING_C;
+  if (sc >= 75) return PRIMARY;
+  if (sc >= 50) return GOOD_C;
+  if (sc >= 25) return WARNING_C;
   return ERROR_C;
 };
 
@@ -87,43 +91,45 @@ const getVerdict = (sc) => {
   return 'Very Poor';
 };
 
-// -- VEE COLOR PALETTE --
+// -- VEE COLOR PALETTE (Purely-aligned) --
 const C = {
   greenDark: '#067A4F',
   green: '#067A4F',
   greenMid: '#067A4F',
-  greenLight: '#E5F2EC',
-  greenBg: 'rgba(42,125,79,0.10)',
-  greenBr: 'rgba(42,125,79,0.22)',
-  amber: '#E8820C',
-  amberLight: '#FEF3E7',
-  amberBg: 'rgba(232,130,12,0.10)',
-  amberBr: 'rgba(232,130,12,0.22)',
-  red: '#D94040',
-  redLight: '#FDEAEA',
-  redBg: 'rgba(217,64,64,0.10)',
-  redBr: 'rgba(217,64,64,0.22)',
-  purple: '#7C3AED',
-  purpleBg: 'rgba(124,58,237,.09)',
-  text: '#1A2318',
-  text2: '#3A3F4A',
-  muted: '#6B7C6A',
-  muted2: '#A0A8B4',
-  divider: '#EAEEEA',
-  bg: '#F7F9F6',
+  greenLight: 'rgba(6,122,79,0.08)',
+  greenBg: 'rgba(6,122,79,0.08)',
+  greenBr: 'rgba(6,122,79,0.22)',
+  amber: '#F59E0B',
+  amberLight: 'rgba(245,158,11,0.10)',
+  amberBg: 'rgba(245,158,11,0.10)',
+  amberBr: 'rgba(245,158,11,0.22)',
+  red: '#EF4444',
+  redLight: 'rgba(239,68,68,0.10)',
+  redBg: 'rgba(239,68,68,0.10)',
+  redBr: 'rgba(239,68,68,0.22)',
+  purple: '#7B61FF',
+  purpleBg: 'rgba(123,97,255,.09)',
+  text: '#171717',
+  text2: '#404040',
+  muted: '#737373',
+  muted2: '#A3A3A3',
+  divider: 'rgba(0,0,0,0.06)',
+  bg: '#FBFBF9',
   blue: '#3B6FE8',
   blueLight: '#E8F0FE',
-  sep: '#EAEEEA',
-  sep2: '#E4E6EA',
+  sep: 'rgba(0,0,0,0.06)',
+  sep2: 'rgba(0,0,0,0.08)',
   page: '#FFFFFF',
 };
 
-const scoreToColor = (s) => s >= 70 ? C.green : s >= 40 ? C.amber : C.red;
+// Score/rating label color mirrors the same 4-band scale as getScoreColor.
+const scoreToColor = (s) => getScoreColor(s);
 const scoreToLabel = (s) => s >= 85 ? 'Excellent' : s >= 70 ? 'Good' : s >= 50 ? 'Use with Caution' : s >= 30 ? 'Poor' : 'Risky';
 const scoreToVerdictBg = (s) => {
-  if (s >= 70) return { bg: 'rgba(42,125,79,0.15)', border: 'rgba(42,125,79,0.3)' };
-  if (s >= 40) return { bg: 'rgba(232,130,12,0.15)', border: 'rgba(232,130,12,0.3)' };
-  return { bg: 'rgba(217,64,64,0.15)', border: 'rgba(217,64,64,0.3)' };
+  if (s >= 75) return { bg: 'rgba(6,122,79,0.10)', border: 'rgba(6,122,79,0.25)' };
+  if (s >= 50) return { bg: 'rgba(132,204,22,0.14)', border: 'rgba(132,204,22,0.3)' };
+  if (s >= 25) return { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)' };
+  return { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)' };
 };
 const scoreToDesc = (s, analysis) => {
   const bad = analysis?.badCount || analysis?.badIngredients?.length || 0;
@@ -630,6 +636,11 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   const generateAIAnalysis = async () => {
     if (!product || !analysis || aiLoading) return;
 
+    // AI features are globally off ("coming soon") until launch — see App.js.
+    // This auto-triggered analysis must respect that flag too, not just the chat UI.
+    const chatbotAccess = await AsyncStorage.getItem('chatbotAccess');
+    if (chatbotAccess !== 'enabled') return;
+
     // For non-premium, non-trial, non-search users: the UI button already
     // decremented freeRecUsage before calling this, so skip the old daily
     // limit check here. Only block if we are absolutely sure the user has
@@ -1048,9 +1059,9 @@ export default function CosmeticResultsScreen({ route, navigation }) {
 
   const ingStyle = (_t, name) => {
     const icon = getIngIcon(name || '');
-    if (_t === 'good')     return { icon, color: '#067A4F', bg: '#dcfce7', tag: 'GOOD'     };
-    if (_t === 'bad')      return { icon, color: '#ef4444', bg: '#fee2e2', tag: 'AVOID'    };
-    return                        { icon, color: '#eab308', bg: '#fef9c3', tag: 'MODERATE' };
+    if (_t === 'good')     return { icon, color: PRIMARY,   bg: 'rgba(6,122,79,0.08)',  tag: 'GOOD'     };
+    if (_t === 'bad')      return { icon, color: ERROR_C,   bg: 'rgba(239,68,68,0.10)', tag: 'AVOID'    };
+    return                        { icon, color: WARNING_C, bg: 'rgba(245,158,11,0.10)', tag: 'MODERATE' };
   };
 
   const fallbackAlts = [
@@ -1167,7 +1178,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                           <View style={[st.ingBadge, { backgroundColor: s.bg, borderColor: s.color + '33' }]}>
                             <Text style={[st.ingBadgeText, { color: s.color }]}>{s.tag}</Text>
                           </View>
-                          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#8a9e87" />
+                          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#A3A3A3" />
                         </View>
                       </View>
 
@@ -1182,10 +1193,10 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                             <>
                               {usdaInfo.healthVerdict && (() => {
                                 const vMap = {
-                                  good:     { bg: 'rgba(45,106,79,0.12)',  text: '#067A4F', label: 'Generally Safe' },
-                                  moderate: { bg: 'rgba(217,119,6,0.12)',  text: '#d97706', label: 'Moderate' },
-                                  concern:  { bg: 'rgba(217,119,6,0.18)',  text: '#b45309', label: 'Use With Caution' },
-                                  avoid:    { bg: 'rgba(186,26,26,0.12)',  text: '#ba1a1a', label: 'Avoid' },
+                                  good:     { bg: 'rgba(6,122,79,0.10)',   text: '#067A4F', label: 'Generally Safe' },
+                                  moderate: { bg: 'rgba(245,158,11,0.10)', text: '#F59E0B', label: 'Moderate' },
+                                  concern:  { bg: 'rgba(245,158,11,0.18)', text: '#B45309', label: 'Use With Caution' },
+                                  avoid:    { bg: 'rgba(239,68,68,0.10)',  text: '#EF4444', label: 'Avoid' },
                                 };
                                 const vc = vMap[usdaInfo.healthVerdict] || vMap.moderate;
                                 return (
@@ -1357,7 +1368,11 @@ export default function CosmeticResultsScreen({ route, navigation }) {
 // =============================================================
 const g = StyleSheet.create({
   container:  { width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
-  gaugeBg:    { position: 'absolute', width: 170, height: 170, borderRadius: 85, backgroundColor: 'rgba(255,255,255,0.85)' },
+  gaugeBg:    {
+    position: 'absolute', width: 170, height: 170, borderRadius: 85,
+    backgroundColor: 'rgba(255,255,255,0.88)',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
+  },
   center:     { position: 'absolute', alignItems: 'center' },
   scoreNum:   { fontSize: 52, fontWeight: '800', letterSpacing: -2, lineHeight: 56 },
   scoreDenom: { fontSize: 16, fontWeight: '500', color: ON_SURFACE_VAR, marginTop: -2 },
@@ -1378,12 +1393,12 @@ const st = StyleSheet.create({
   headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
   headerTitle:  { fontSize: 17, fontWeight: '700', color: ON_SURFACE },
   iconBtn:      { padding: 8 },
-  avatarCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(45,106,79,0.1)', alignItems: 'center', justifyContent: 'center' },
+  avatarCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(6,122,79,0.1)', alignItems: 'center', justifyContent: 'center' },
 
   heroContainer:   { width: '100%', height: 280, position: 'relative', backgroundColor: SURFACE_HIGH },
   heroImage:       { width: '100%', height: '100%' },
   heroPlaceholder: { backgroundColor: SURFACE_HIGH, alignItems: 'center', justifyContent: 'center' },
-  heroScrim:       { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(250,250,245,0.18)' },
+  heroScrim:       { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(251,251,249,0.18)' },
   gaugeCenterWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
 
   summarySection:   { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
@@ -1430,7 +1445,7 @@ const st = StyleSheet.create({
     borderBottomRightRadius: 12,
     borderWidth: 1,
     borderTopWidth: 0,
-    borderColor: 'rgba(45,106,79,0.15)',
+    borderColor: 'rgba(6,122,79,0.15)',
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
@@ -1450,7 +1465,7 @@ const st = StyleSheet.create({
   },
   aiCardLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 4 },
   aiCardSub:     { fontSize: 15, fontWeight: '500', color: ON_SURFACE, lineHeight: 21 },
-  aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(45,106,79,0.1)', alignItems: 'center', justifyContent: 'center' },
+  aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(6,122,79,0.1)', alignItems: 'center', justifyContent: 'center' },
   aiCardConnect: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: PRIMARY },
 
   altSection:        { marginBottom: 32 },
@@ -1480,6 +1495,6 @@ const st = StyleSheet.create({
   altViewBtnText: { fontSize: 11, fontWeight: '700', color: ON_SURFACE, textTransform: 'uppercase', letterSpacing: 0.5 },
 
   saveWrap:    { paddingHorizontal: 20, marginBottom: 8 },
-  saveBtn:     { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  saveBtn:     { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   saveBtnText: { color: WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
 });

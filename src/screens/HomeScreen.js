@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import { useScanContext } from '../contexts/ScanContext';
 import { useTheme } from '../contexts/ThemeContext';
 import SmartPostScanHandler, { useSmartPostScan } from '../components/SmartPostScanHandler';
 import ScanResultPreview from '../components/ScanResultPreview';
+import ScoreRing from '../components/ScoreRing';
 import { getHistory, getHistoryStats } from '../utils/historyManager';
 import {
   createFadeAnimation,
@@ -45,7 +46,7 @@ try {
         Camera not available on this device
       </Text>
       <TouchableOpacity
-        style={{ backgroundColor: '#4CAF50', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25 }}
+        style={{ backgroundColor: '#067A4F', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25 }}
         onPress={onClose}
       >
         <Text style={{ color: '#fff', fontSize: 16 }}>Close</Text>
@@ -57,6 +58,7 @@ try {
 const { width: screenWidth } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
 const DAILY_SCAN_LIMIT = 2;
+
 
 const HomeScreen = ({ navigation, route }) => {
   const { setIsScanning } = useScanContext();
@@ -78,6 +80,8 @@ const HomeScreen = ({ navigation, route }) => {
   const [totalScans, setTotalScans] = useState(0);
   const [recentScans, setRecentScans] = useState([]);
   const [savedProducts, setSavedProducts] = useState([]);
+  const [activeFilter, setActiveFilter] = useState('all');
+  const [showScanPicker, setShowScanPicker] = useState(false);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -322,18 +326,31 @@ const HomeScreen = ({ navigation, route }) => {
     navigation.navigate('Subscription');
   };
 
+  const openHistoryItem = (item) => {
+    if (item.productType === 'cosmetic') {
+      navigation.navigate('CosmeticResults', { barcode: item.barcode });
+    } else {
+      navigation.navigate('Results', { barcode: item.barcode });
+    }
+  };
+
+  const listSource = savedProducts.length > 0 ? savedProducts : recentScans;
+  const listData = activeFilter === 'all'
+    ? listSource
+    : listSource.filter((item) => (item.productType || 'food') === activeFilter);
+
   const progressWidth = isPremium ? 1 : remainingScans / DAILY_SCAN_LIMIT;
 
   // Loading state
   if (!isLoaded) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#131313', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
+      <View style={{ flex: 1, backgroundColor: '#FBFBF9', justifyContent: 'center', alignItems: 'center', gap: 12 }}>
         <Svg width={50} height={50} viewBox="0 0 50 50">
-          <Path d="M25 5C18 8 10 18 10 28C10 38 18 45 25 45C32 45 40 38 40 28C40 18 32 8 25 5Z" fill="#2E7D32" />
-          <Path d="M18 10C13 16 10 24 13 32" stroke="#4CAF50" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+          <Path d="M25 5C18 8 10 18 10 28C10 38 18 45 25 45C32 45 40 38 40 28C40 18 32 8 25 5Z" fill="#067A4F" />
+          <Path d="M18 10C13 16 10 24 13 32" stroke="#067A4F" strokeWidth={2.5} fill="none" strokeLinecap="round" />
         </Svg>
-        <Text style={{ fontSize: 20, fontWeight: '800', color: '#ffffff', letterSpacing: 1, textTransform: 'uppercase' }}>HealthyScan</Text>
-        <Text style={{ fontSize: 13, color: '#919191', fontWeight: '500' }}>Loading...</Text>
+        <Text style={{ fontSize: 20, fontWeight: '800', color: '#1C1C1E', letterSpacing: 1, textTransform: 'uppercase' }}>Vee</Text>
+        <Text style={{ fontSize: 13, color: '#6E6E73', fontWeight: '500' }}>Loading...</Text>
       </View>
     );
   }
@@ -362,26 +379,28 @@ const HomeScreen = ({ navigation, route }) => {
   // Main Home Screen — Wellness Sanctuary
   // =========================================
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.bg} />
+    <View style={{ flex: 1, backgroundColor: '#FBFBF9' }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FBFBF9" />
 
       {/* -- FIXED HEADER -- */}
-      <View style={[noir.header, { backgroundColor: isDark ? 'rgba(10,10,10,0.8)' : 'rgba(245,245,245,0.95)', borderBottomColor: theme.headerBorder }]}>
-        <View style={noir.headerLeft}>
-          <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); navigation.navigate('Settings'); }}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="arrow-back" size={22} color={theme.textMuted} />
-          </TouchableOpacity>
-          <Text style={[noir.headerTitle, { color: theme.text }]}>Wellness Sanctuary</Text>
-        </View>
+      <View style={noir.header}>
         <TouchableOpacity
-          onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); Alert.alert('Coming Soon', 'Profile is coming in a future update!', [{ text: 'OK' }]); }}
-          style={[noir.avatarBtn, { backgroundColor: theme.bgIcon, borderColor: theme.border }]}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={noir.headerLeft}
+          onPress={() => navigation.navigate('Profile')}
+          activeOpacity={0.7}
         >
-          <Ionicons name="person" size={18} color={theme.text} />
+          <View style={noir.avatarCircle}>
+            <Ionicons name="person" size={16} color="#067A4F" />
+          </View>
+          <Text style={noir.headerBrand}>Vee</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={noir.iconBtn}
+          onPress={() => navigation.navigate('Settings')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="settings-outline" size={22} color="#556158" />
         </TouchableOpacity>
       </View>
 
@@ -390,86 +409,129 @@ const HomeScreen = ({ navigation, route }) => {
         contentContainerStyle={noir.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Greeting */}
-        <View style={noir.greeting}>
-          <Text style={[noir.greetingLabel, { color: theme.textMuted }]}>WELCOME BACK</Text>
-          <Text style={[noir.greetingName, { color: theme.text }]}>Hey, {userName}!</Text>
+        {/* Hero */}
+        <View style={noir.hero}>
+          <Text style={noir.heroTitle}>Know what's really{'\n'}in your products.</Text>
+          <Text style={noir.heroSubtitle}>
+            Search a product or scan its barcode to get an instant health score and safer alternatives.
+          </Text>
         </View>
 
-        {/* Cards */}
-        <View style={noir.cardsSection}>
+        {/* Search bar */}
+        <TouchableOpacity
+          style={noir.searchBar}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('Search')}
+        >
+          <Ionicons name="search" size={18} color="#A3A3A3" />
+          <Text style={noir.searchBarText}>Search product, brand or barcode</Text>
+        </TouchableOpacity>
 
-          {/* Food Card */}
-          <TouchableOpacity
-            style={noir.card}
-            activeOpacity={0.92}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('food'); }}
-          >
-            <Image
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCVN8OqpMJu8XEkG4bT4rEO2ih5Ywq65AVsDoRO4y7d82Z7D5NBYTMS5P3Ed_Nitk_tLK2dA3q0HNJOlHt158vjTJKMWU_HZ4aux5whdjhi-RXshv_lCpktOOwet1j2yoltSPJgZ0rC4NSFXYCyFLLgB7-kqWksO5FgmW2wSjgy8yjB1NEwvhZmRvIgfj9UvgBaT5XxyxLEAIXEvPEeDQy1I8Hcjh9VYWUJrS87bfvn1PpyLuxhRAlovOyfFBEM0CcMAB8s26wRnkJp' }}
-              style={noir.cardBgImage}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(10,10,10,0.35)', '#0a0a0a']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View style={noir.cardContent}>
-              <View style={noir.cardTop}>
-                <Text style={noir.cardTitle}>Scan Food</Text>
-                <Text style={noir.cardSubtitle}>Instant nutritional analysis</Text>
-              </View>
+        {/* Category filters */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={noir.filterTabsScroll}
+          contentContainerStyle={noir.filterTabsContent}
+        >
+          {[
+            { key: 'all', label: 'All' },
+            { key: 'food', label: 'Food' },
+            { key: 'cosmetic', label: 'Cosmetics' },
+          ].map((f) => (
+            <TouchableOpacity
+              key={f.key}
+              style={[noir.filterChip, activeFilter === f.key && noir.filterChipActive]}
+              activeOpacity={0.85}
+              onPress={() => setActiveFilter(f.key)}
+            >
+              <Text style={[noir.filterChipText, activeFilter === f.key && noir.filterChipTextActive]}>
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Product list — matches Purely's Home: no section header, straight into the list */}
+        {listData.length === 0 ? (
+          <View style={noir.emptyList}>
+            <Ionicons name="search-outline" size={22} color="#C0C0C5" />
+            <Text style={noir.emptyListTitle}>No products found</Text>
+            <Text style={noir.emptyListText}>Scan a barcode to add your first product.</Text>
+          </View>
+        ) : (
+          <View style={noir.listWrap}>
+            {listData.map((item) => (
               <TouchableOpacity
-                style={noir.cardBtn}
+                key={item.id}
+                style={noir.productRow}
                 activeOpacity={0.85}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('food'); }}
+                onPress={() => openHistoryItem(item)}
               >
-                <Text style={noir.cardBtnText}>SCAN NOW</Text>
-                <Ionicons name="barcode-outline" size={14} color="#000000" />
+                <View style={noir.productIconWrap}>
+                  {item.productImage ? (
+                    <Image source={{ uri: item.productImage }} style={noir.productImg} resizeMode="cover" />
+                  ) : (
+                    <Ionicons
+                      name={item.productType === 'cosmetic' ? 'sparkles-outline' : 'nutrition-outline'}
+                      size={18}
+                      color="#067A4F"
+                    />
+                  )}
+                </View>
+                <View style={noir.productInfo}>
+                  <Text style={noir.productName} numberOfLines={1}>{item.productName}</Text>
+                  <Text style={noir.productBrand}>{item.productType === 'cosmetic' ? 'Cosmetics' : 'Food'}</Text>
+                </View>
+                <ScoreRing score={item.score || 0} size={40} stroke={4} />
               </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-
-          {/* Cosmetic Card */}
-          <TouchableOpacity
-            style={noir.card}
-            activeOpacity={0.92}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('cosmetic'); }}
-          >
-            <Image
-              source={{ uri: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCOHUDvv7KLGJw8CTEt1hg7e4s50Ji4bdnV3ekfdUOfRtyRBTDgoLSImXCobPS78VAuggAKnI9e0K3RC0I-iU_NofS63UfoqPoimV2LZUQ71VXU4MhKAa_D69wnebHWdPpEJO6ZnMGcT8tJVSfrkWFaC1A3PjWVqoC7q-qjCh57gwnn8tyRB1gAh1o3eCWxZS81CICzPm1pD2Jjek7yXxf-nUIJkeFAhwUJsEEClZ0e86esK53KaIkZfrNK6FpZ9Q8tfpeKvubLu722' }}
-              style={noir.cardBgImage}
-              resizeMode="cover"
-            />
-            <LinearGradient
-              colors={['transparent', 'rgba(10,10,10,0.35)', '#0a0a0a']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={StyleSheet.absoluteFillObject}
-            />
-            <View style={noir.cardContent}>
-              <View style={noir.cardTop}>
-                <Text style={noir.cardTitle}>Scan Cosmetic</Text>
-                <Text style={noir.cardSubtitle}>Ingredient safety check</Text>
-              </View>
-              <TouchableOpacity
-                style={noir.cardBtn}
-                activeOpacity={0.85}
-                onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('cosmetic'); }}
-              >
-                <Text style={noir.cardBtnText}>SCAN NOW</Text>
-                <Ionicons name="barcode-outline" size={14} color="#000000" />
-              </TouchableOpacity>
-            </View>
-          </TouchableOpacity>
-
-        </View>
-
-
+            ))}
+          </View>
+        )}
 
       </ScrollView>
+
+      {/* Floating scan button — Purely's reference design has no equivalent (it uses a
+          separate bottom-tab "Scan" page instead), but scanning is this app's core
+          feature so it needs a reachable entry point without cluttering the Home
+          composition above. */}
+      <TouchableOpacity
+        style={noir.fab}
+        activeOpacity={0.85}
+        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowScanPicker(true); }}
+      >
+        <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
+      </TouchableOpacity>
+
+      {/* Scan-type picker sheet */}
+      <Modal
+        visible={showScanPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowScanPicker(false)}
+      >
+        <TouchableOpacity style={hs.modalOverlay} activeOpacity={1} onPress={() => setShowScanPicker(false)}>
+          <View style={noir.pickerSheet}>
+            <Text style={noir.pickerTitle}>What are you scanning?</Text>
+            <TouchableOpacity
+              style={noir.pickerOption}
+              activeOpacity={0.85}
+              onPress={() => { setShowScanPicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('food'); }}
+            >
+              <Ionicons name="nutrition-outline" size={18} color="#067A4F" />
+              <Text style={noir.pickerOptionText}>Food</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={noir.pickerOption}
+              activeOpacity={0.85}
+              onPress={() => { setShowScanPicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('cosmetic'); }}
+            >
+              <Ionicons name="sparkles-outline" size={18} color="#067A4F" />
+              <Text style={noir.pickerOptionText}>Cosmetics</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Post-Scan Handler */}
       <SmartPostScanHandler
@@ -492,7 +554,7 @@ const HomeScreen = ({ navigation, route }) => {
           <Animated.View style={[hs.modalWrap, { transform: [{ scale: modalScale }] }]}>
             <View style={hs.modalBody}>
               <View style={hs.modalIcon}>
-                <Ionicons name="diamond" size={36} color="#4CAF50" />
+                <Ionicons name="diamond" size={36} color="#067A4F" />
               </View>
               <Text style={hs.modalTitle}>Daily Limit Reached</Text>
               <Text style={hs.modalMsg}>
@@ -502,7 +564,7 @@ const HomeScreen = ({ navigation, route }) => {
               <View style={hs.modalFeatures}>
                 {['Unlimited AI Analysis', 'Advanced Health Insights', 'AI Ingredient Expert'].map((f) => (
                   <View key={f} style={hs.modalFeatureRow}>
-                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                    <Ionicons name="checkmark-circle" size={16} color="#067A4F" />
                     <Text style={hs.modalFeatureLabel}>{f}</Text>
                   </View>
                 ))}
@@ -548,35 +610,35 @@ const noir = StyleSheet.create({
     zIndex: 50,
     height: Platform.OS === 'ios' ? 90 : 72,
     paddingTop: Platform.OS === 'ios' ? 48 : 28,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(10,10,10,0.8)',
+    backgroundColor: 'rgba(251,251,249,0.92)',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
+    gap: 12,
   },
-  headerTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(240,240,240,0.8)',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
-  avatarBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#1a1a1a',
+  avatarCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#e8ede8',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(45,106,79,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  headerBrand: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#067A4F',
+    letterSpacing: -0.3,
   },
   iconBtn: { padding: 4 },
 
@@ -594,7 +656,7 @@ const noir = StyleSheet.create({
   greetingLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#a0a0a0',
+    color: '#6E6E73',
     letterSpacing: 4,
     textTransform: 'uppercase',
     marginBottom: 4,
@@ -602,8 +664,164 @@ const noir = StyleSheet.create({
   greetingName: {
     fontSize: 40,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#1C1C1E',
     letterSpacing: -1,
+  },
+
+  /* ── Hero (matches Purely's Home heading) ── */
+  hero: {
+    marginBottom: 28,
+    gap: 10,
+  },
+  heroTitle: {
+    fontSize: 32,
+    fontWeight: '700',
+    color: '#171717',
+    letterSpacing: -0.8,
+    lineHeight: 38,
+  },
+  heroSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#737373',
+    maxWidth: 340,
+  },
+
+  /* ── Search bar ── */
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.08)',
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  searchBarText: {
+    fontSize: 14,
+    color: '#A3A3A3',
+  },
+
+  /* ── Empty list state ── */
+  emptyList: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 48,
+    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(0,0,0,0.1)',
+  },
+  emptyListTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#171717',
+    marginTop: 4,
+  },
+  emptyListText: {
+    fontSize: 13,
+    color: '#A3A3A3',
+    textAlign: 'center',
+    maxWidth: 220,
+  },
+  listWrap: {
+    gap: 12,
+  },
+  productImg: {
+    width: '100%',
+    height: '100%',
+  },
+
+  /* ── Floating scan button ── */
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 28,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#067A4F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#067A4F',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+
+  /* ── Scan-type picker sheet ── */
+  pickerSheet: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    bottom: 28,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 20,
+    gap: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 8,
+  },
+  pickerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#171717',
+    marginBottom: 4,
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: '#F5F5F1',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  pickerOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#171717',
+  },
+
+  /* ── Start-a-scan compact cards ── */
+  scanRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  scanCard: {
+    flex: 1,
+    height: 140,
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#1a1a1a',
+  },
+  scanCardContent: {
+    flex: 1,
+    padding: 14,
+    justifyContent: 'flex-end',
+  },
+  scanCardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginBottom: 8,
+  },
+  scanCardBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 
   /* ── Cards ── */
@@ -611,54 +829,165 @@ const noir = StyleSheet.create({
     marginBottom: 32,
   },
   card: {
-    height: 320,
-    borderRadius: 24,
+    height: 260,
+    borderRadius: 28,
     overflow: 'hidden',
-    backgroundColor: '#121212',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginBottom: 24,
+    backgroundColor: '#1a1a1a',
+    marginBottom: 20,
   },
   cardBgImage: {
     ...StyleSheet.absoluteFillObject,
-    opacity: 0.7,
   },
   cardContent: {
     flex: 1,
-    padding: 32,
+    padding: 28,
     justifyContent: 'space-between',
   },
   cardTop: {
-    marginTop: 16,
+    marginTop: 8,
   },
   cardTitle: {
-    fontSize: 32,
-    fontWeight: '300',
-    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: '700',
+    color: '#FFFFFF',
     letterSpacing: -0.5,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   cardSubtitle: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#a0a0a0',
-    letterSpacing: 1,
+    fontSize: 13,
+    fontWeight: '300',
+    color: 'rgba(255,255,255,0.8)',
+    letterSpacing: 0,
   },
   cardBtn: {
-    backgroundColor: '#ffffff',
-    paddingVertical: 16,
-    borderRadius: 16,
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 14,
+    borderRadius: 28,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   cardBtnText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#000000',
+    color: '#067A4F',
     letterSpacing: 3,
     textTransform: 'uppercase',
+  },
+
+  /* ── Best Products Filter List ── */
+  filterSection: {
+    marginBottom: 32,
+  },
+  filterSectionTitle: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#1C1C1E',
+    letterSpacing: -0.5,
+    marginBottom: 4,
+  },
+  filterSectionSub: {
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#6E6E73',
+    marginBottom: 16,
+  },
+  filterTabsScroll: {
+    marginBottom: 16,
+  },
+  filterTabsContent: {
+    gap: 8,
+    paddingRight: 4,
+  },
+  filterChip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F3F0',
+    borderWidth: 1,
+    borderColor: 'rgba(45,106,79,0.12)',
+  },
+  filterChipActive: {
+    backgroundColor: '#067A4F',
+    borderColor: '#067A4F',
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#5A5A5F',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+  },
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.06)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  productRank: {
+    width: 28,
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  productRankText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#C0C0C5',
+    letterSpacing: 0.5,
+  },
+  productIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#F0F7F3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    overflow: 'hidden',
+  },
+  productInfo: {
+    flex: 1,
+  },
+  productName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1C1C1E',
+    marginBottom: 2,
+  },
+  productBrand: {
+    fontSize: 11,
+    fontWeight: '400',
+    color: '#8E8E93',
+  },
+  productScoreBadge: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: '#067A4F',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  productScoreText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.5,
   },
 
   /* ── Recent Activity ── */
@@ -678,29 +1007,29 @@ const noir = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#111111',
+    backgroundColor: '#F1F8F1',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(45,106,79,0.15)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   activityTitle: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#ffffff',
+    color: '#1C1C1E',
     marginBottom: 2,
   },
   activitySub: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#a0a0a0',
+    color: '#6E6E73',
     letterSpacing: 3,
     textTransform: 'uppercase',
   },
   activitySeeAll: {
     fontSize: 10,
     fontWeight: '700',
-    color: 'rgba(255,255,255,0.4)',
+    color: '#067A4F',
     letterSpacing: 3,
     textTransform: 'uppercase',
   },
@@ -724,18 +1053,18 @@ const hs = StyleSheet.create({
     overflow: 'hidden',
   },
   modalBody: {
-    backgroundColor: '#1b1b1b',
+    backgroundColor: '#FFFFFF',
     padding: 28,
     alignItems: 'center',
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: '#474747',
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   modalIcon: {
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: '#1f1f1f',
+    backgroundColor: '#F1F8F1',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
@@ -743,24 +1072,24 @@ const hs = StyleSheet.create({
   modalTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#e2e2e2',
+    color: '#1C1C1E',
     marginBottom: 10,
   },
   modalMsg: {
     fontSize: 14,
-    color: '#c6c6c6',
+    color: '#6E6E73',
     textAlign: 'center',
     lineHeight: 21,
     marginBottom: 18,
   },
   modalFeatures: {
     width: '100%',
-    backgroundColor: '#131313',
+    backgroundColor: '#F8FAF5',
     borderRadius: 14,
     padding: 14,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: '#474747',
+    borderColor: 'rgba(45,106,79,0.15)',
   },
   modalFeatureRow: {
     flexDirection: 'row',
@@ -770,20 +1099,21 @@ const hs = StyleSheet.create({
   },
   modalFeatureLabel: {
     fontSize: 13,
-    color: '#e2e2e2',
+    color: '#1C1C1E',
     fontWeight: '500',
   },
   modalUpgradeBtn: {
     width: '100%',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#067A4F',
     paddingVertical: 16,
     alignItems: 'center',
     marginBottom: 12,
+    borderRadius: 16,
   },
   modalUpgradeTxt: {
     fontSize: 13,
     fontWeight: '900',
-    color: '#1a1c1c',
+    color: '#FFFFFF',
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
@@ -793,7 +1123,7 @@ const hs = StyleSheet.create({
   },
   modalLaterTxt: {
     fontSize: 13,
-    color: '#c6c6c6',
+    color: '#6E6E73',
     fontWeight: '500',
   },
   modalLegal: {
@@ -802,7 +1132,7 @@ const hs = StyleSheet.create({
   },
   modalLegalPrice: {
     fontSize: 11,
-    color: '#919191',
+    color: '#AEAEB2',
     fontWeight: '500',
   },
   modalLegalRow: {
@@ -811,12 +1141,12 @@ const hs = StyleSheet.create({
   },
   modalLegalLink: {
     fontSize: 11,
-    color: '#919191',
+    color: '#AEAEB2',
     textDecorationLine: 'underline',
   },
   modalLegalDot: {
     fontSize: 11,
-    color: '#919191',
+    color: '#AEAEB2',
   },
 });
 

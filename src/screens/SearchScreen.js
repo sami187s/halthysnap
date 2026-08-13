@@ -12,6 +12,7 @@ import {
   Alert,
   Platform,
   Dimensions,
+  KeyboardAvoidingView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
@@ -22,14 +23,14 @@ import { getProductTypeFromCategories } from '../utils/enhancedIngredientAnalyze
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import { useTheme } from '../contexts/ThemeContext';
 
-// ── Dark theme tokens ─────────────────────────────────────────────────
-const BG           = '#0a0a0a';
-const SURFACE_LOW  = '#111111';
-const SURFACE_MID  = '#1a1a1a';
-const SURFACE_HIGH = '#222222';
-const ON_SURFACE   = '#ffffff';
-const ON_SURF_VAR  = '#a0a0a0';
-const OUTLINE_VAR  = '#333333';
+// ── Purely-inspired light theme tokens ────────────────────────────────
+const BG           = '#FBFBF9';
+const SURFACE_LOW  = '#FFFFFF';
+const SURFACE_MID  = '#F5F5F1';
+const SURFACE_HIGH = '#EFEFEA';
+const ON_SURFACE   = '#171717';
+const ON_SURF_VAR  = '#737373';
+const OUTLINE_VAR  = 'rgba(0,0,0,0.08)';
 
 const FILTER_TABS = [
   { key: 'all',      label: 'All',      icon: 'grid-outline'      },
@@ -42,8 +43,8 @@ const ProductImg = React.memo(({ uri, typeIcon, theme: t }) => {
   const [err, setErr] = React.useState(false);
   if (!uri || err) {
     return (
-      <View style={[st.productImg, st.productImgPlaceholder, { backgroundColor: t?.bgIcon || '#1a1a1a' }]}>
-        <Ionicons name={typeIcon} size={24} color={t?.textMuted || '#666'} />
+      <View style={[st.productImg, st.productImgPlaceholder, { backgroundColor: t?.bgIcon || '#F5F5F1' }]}>
+        <Ionicons name={typeIcon} size={24} color={t?.textMuted || '#737373'} />
       </View>
     );
   }
@@ -208,7 +209,7 @@ const SearchScreen = ({ navigation }) => {
           {item.brand ? (
             <Text style={[st.productBrand, { color: theme.textMuted }]} numberOfLines={1}>{item.brand}</Text>
           ) : null}
-          <View style={[st.typeChip, { backgroundColor: isFood ? 'rgba(46,125,50,0.15)' : 'rgba(107,63,160,0.15)' }]}>
+          <View style={[st.typeChip, { backgroundColor: isFood ? 'rgba(6,122,79,0.08)' : 'rgba(107,63,160,0.12)' }]}>
             <Ionicons name={typeIcon} size={11} color={isFood ? '#067A4F' : '#9C6ADE'} />
             <Text style={[st.typeChipText, { color: isFood ? '#067A4F' : '#9C6ADE' }]}>{typeLabel}</Text>
           </View>
@@ -241,11 +242,15 @@ const SearchScreen = ({ navigation }) => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: theme.bg }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: theme.bg }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={0}
+    >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.bg} />
 
       {/* ── FIXED HEADER ─────────────────────────────────── */}
-      <View style={[st.header, { backgroundColor: isDark ? 'rgba(10,10,10,0.95)' : 'rgba(245,245,245,0.97)', borderBottomColor: theme.headerBorder }]}>
+      <View style={[st.header, { paddingTop: safeAreaInsets.top + 12, height: safeAreaInsets.top + 52, backgroundColor: theme.headerBg, borderBottomColor: theme.headerBorder }]}>
         <View style={st.headerLeft}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -258,7 +263,7 @@ const SearchScreen = ({ navigation }) => {
       </View>
 
       {/* ── SEARCH BAR ──────────────────────────────────── */}
-      <View style={[st.searchBar, { marginTop: Platform.OS === 'ios' ? 90 : 72, backgroundColor: theme.bg }]}>
+      <View style={[st.searchBar, { marginTop: safeAreaInsets.top + 52, backgroundColor: theme.bg }]}>
         <View style={[st.searchInputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
           <Ionicons name="search-outline" size={20} color={theme.textMuted} />
           <TextInput
@@ -285,7 +290,7 @@ const SearchScreen = ({ navigation }) => {
           activeOpacity={0.85}
         >
           {loading
-            ? <ActivityIndicator size="small" color="#000000" />
+            ? <ActivityIndicator size="small" color="#FFFFFF" />
             : <Text style={st.searchBtnText}>Search</Text>
           }
         </TouchableOpacity>
@@ -324,7 +329,7 @@ const SearchScreen = ({ navigation }) => {
                 onPress={() => setActiveFilter(tab.key)}
                 activeOpacity={0.7}
               >
-                <Ionicons name={tab.icon} size={13} color={isActive ? '#000000' : theme.textMuted} />
+                <Ionicons name={tab.icon} size={13} color={isActive ? '#FFFFFF' : theme.textMuted} />
                 <Text style={[st.filterTabText, { color: theme.textMuted }, isActive && st.filterTabTextActive]}>
                   {tab.label}
                 </Text>
@@ -348,6 +353,8 @@ const SearchScreen = ({ navigation }) => {
         contentContainerStyle={st.listContent}
         ListEmptyComponent={renderEmpty}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       />
 
       {/* ── BOTTOM HINT ─────────────────────────────────── */}
@@ -357,25 +364,23 @@ const SearchScreen = ({ navigation }) => {
           <Text style={[st.bottomHintLink, { color: theme.text }]}>Try scanning the barcode</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 };
 
 const st = StyleSheet.create({
-  // Header — matches HomeScreen dark header
+  // Header — safe area applied inline via safeAreaInsets.top
   header: {
     position: 'absolute',
     top: 0, left: 0, right: 0,
     zIndex: 50,
-    height: Platform.OS === 'ios' ? 90 : 72,
-    paddingTop: Platform.OS === 'ios' ? 48 : 28,
     paddingHorizontal: 24,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(10,10,10,0.95)',
+    backgroundColor: 'rgba(251,251,249,0.92)',
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.07)',
+    borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   headerLeft: {
     flexDirection: 'row',
@@ -384,8 +389,8 @@ const st = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(240,240,240,0.8)',
+    fontWeight: '600',
+    color: '#171717',
     letterSpacing: 3,
     textTransform: 'uppercase',
   },
@@ -404,12 +409,12 @@ const st = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: SURFACE_LOW,
-    borderRadius: 16,
-    paddingHorizontal: 14,
+    borderRadius: 24,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     gap: 10,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   searchInput: {
     flex: 1,
@@ -417,13 +422,13 @@ const st = StyleSheet.create({
     color: ON_SURFACE,
   },
   searchBtn: {
-    backgroundColor: '#ffffff',
-    borderRadius: 16,
+    backgroundColor: '#067A4F',
+    borderRadius: 24,
     paddingVertical: 12,
     paddingHorizontal: 20,
   },
   searchBtnText: {
-    color: '#000000',
+    color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1,
@@ -443,7 +448,7 @@ const st = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   statusText: {
     fontSize: 12,
@@ -466,15 +471,15 @@ const st = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 9,
     paddingHorizontal: 10,
-    borderRadius: 12,
+    borderRadius: 999,
     gap: 5,
     backgroundColor: SURFACE_LOW,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: 'rgba(0,0,0,0.08)',
   },
   filterTabActive: {
-    backgroundColor: '#ffffff',
-    borderColor: 'transparent',
+    backgroundColor: '#067A4F',
+    borderColor: '#067A4F',
   },
   filterTabText: {
     fontSize: 12,
@@ -483,7 +488,7 @@ const st = StyleSheet.create({
     letterSpacing: 0.5,
   },
   filterTabTextActive: {
-    color: '#000000',
+    color: '#FFFFFF',
   },
   filterBadge: {
     backgroundColor: SURFACE_HIGH,
@@ -494,7 +499,7 @@ const st = StyleSheet.create({
     alignItems: 'center',
   },
   filterBadgeActive: {
-    backgroundColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: 'rgba(255,255,255,0.25)',
   },
   filterBadgeText: {
     fontSize: 11,
@@ -502,7 +507,7 @@ const st = StyleSheet.create({
     color: ON_SURF_VAR,
   },
   filterBadgeTextActive: {
-    color: '#000000',
+    color: '#FFFFFF',
   },
 
   // Results list
@@ -519,13 +524,18 @@ const st = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    borderBottomColor: 'rgba(0,0,0,0.06)',
     backgroundColor: SURFACE_LOW,
     gap: 14,
     borderRadius: 16,
     marginBottom: 8,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
   },
   productImgWrap: { position: 'relative' },
   productImg: {
@@ -610,7 +620,7 @@ const st = StyleSheet.create({
     paddingVertical: 18,
     paddingHorizontal: 20,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255,255,255,0.07)',
+    borderTopColor: 'rgba(0,0,0,0.06)',
     backgroundColor: BG,
   },
   bottomHintText: {
@@ -620,7 +630,7 @@ const st = StyleSheet.create({
   bottomHintLink: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#ffffff',
+    color: ON_SURFACE,
     letterSpacing: 0.5,
   },
 });

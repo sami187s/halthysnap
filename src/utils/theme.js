@@ -1,34 +1,34 @@
-// Centralized Light Green Theme for HealthyScan / Vee App
-// Clean, fresh green aesthetic with natural accents
+﻿// Centralized theme for HealthyScan / Vee App
+// Purely-inspired: warm off-white canvas, quiet neutral cards, brand green as the one accent
 
 export const THEME = {
   // Core backgrounds
-  background: '#F5F5F0',
+  background: '#FBFBF9',
   backgroundLight: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceLight: '#F8FAF5',
-  surfaceDark: '#EDF5E1',
+  surfaceLight: '#FBFBF9',
+  surfaceDark: '#F5F5F1',
 
-  // Gradient backgrounds
-  gradientStart: '#B2DFBC',
-  gradientMid: '#C8E6C9',
-  gradientEnd: '#F5F5F0',
-  gradientColors: ['#B2DFBC', '#C8E6C9', '#E8F5E9', '#F1F8E9', '#F5F5F0'],
+  // Gradient backgrounds — flattened to the warm off-white (no visible gradient, matches Purely's flat canvas)
+  gradientStart: '#FBFBF9',
+  gradientMid: '#FBFBF9',
+  gradientEnd: '#FBFBF9',
+  gradientColors: ['#FBFBF9', '#FBFBF9', '#FBFBF9', '#FBFBF9', '#FBFBF9'],
 
   // Borders & dividers
-  border: '#E0E0E0',
-  borderLight: '#EEEEEE',
-  borderSubtle: '#F0F0F0',
-  borderGreen: '#C8E6C9',
-  divider: '#EEEEEE',
+  border: '#E5E5E1',
+  borderLight: '#EFEFEA',
+  borderSubtle: '#F5F5F1',
+  borderGreen: '#BED9CE',
+  divider: '#EFEFEA',
 
   // Primary accent (Green)
-  primary: '#4CAF50',
-  primaryDark: '#2E7D32',
-  primaryDeep: '#1B5E20',
-  primaryLight: '#66BB6A',
-  primaryMuted: 'rgba(76, 175, 80, 0.08)',
-  primaryGlow: 'rgba(46, 125, 50, 0.15)',
+  primary: '#067A4F',
+  primaryDark: '#033D28',
+  primaryDeep: '#0D2B1F',
+  primaryLight: '#40916C',
+  primaryMuted: 'rgba(45, 106, 79, 0.08)',
+  primaryGlow: 'rgba(45, 106, 79, 0.15)',
 
   // Orange accent (Analyze Meal, warnings)
   orange: '#FF9800',
@@ -37,25 +37,25 @@ export const THEME = {
   orangeMuted: 'rgba(255, 152, 0, 0.08)',
 
   // Text hierarchy
-  text: '#212121',
-  textSecondary: '#757575',
-  textTertiary: '#9E9E9E',
-  textGreen: '#1B5E20',
+  text: '#171717',
+  textSecondary: '#737373',
+  textTertiary: '#A3A3A3',
+  textGreen: '#067A4F',
   textWhite: '#FFFFFF',
 
-  // Health score colors (semantic — keep unchanged)
-  excellent: '#1B5E20',
-  good: '#4CAF50',
-  moderate: '#FF9800',
-  poor: '#F44336',
-  warning: '#FF9800',
-  error: '#F44336',
+  // Health score colors — 4-band scale (excellent/good/moderate/poor), Purely-style
+  excellent: '#067A4F',
+  good: '#84CC16',
+  moderate: '#F59E0B',
+  poor: '#EF4444',
+  warning: '#F59E0B',
+  error: '#EF4444',
 
   // Health score backgrounds
-  excellentBg: 'rgba(27, 94, 32, 0.1)',
-  goodBg: 'rgba(76, 175, 80, 0.1)',
-  moderateBg: 'rgba(255, 152, 0, 0.1)',
-  poorBg: 'rgba(244, 67, 54, 0.1)',
+  excellentBg: 'rgba(6, 122, 79, 0.08)',
+  goodBg: 'rgba(132, 204, 22, 0.12)',
+  moderateBg: 'rgba(245, 158, 11, 0.10)',
+  poorBg: 'rgba(239, 68, 68, 0.10)',
   unknownBg: 'rgba(158, 158, 158, 0.08)',
 
   // AI/Premium — purple for AI distinction (modern pattern: Notion AI, Apple Intelligence)
@@ -64,10 +64,10 @@ export const THEME = {
   aiPurpleLight: 'rgba(123, 97, 255, 0.12)',
   aiAccent: '#7B61FF',
   aiAccentBg: 'rgba(123, 97, 255, 0.08)',
-  premiumGreen: '#2E7D32',
+  premiumGreen: '#067A4F',
 
   // Redesigned color palette (4 core semantic colors)
-  brandGreen: '#2E7D32',     // actions, confirmed, good
+  brandGreen: '#067A4F',     // actions, confirmed, good
   warningOrange: '#F57C00',  // moderate, watch out
   dangerRed: '#C62828',      // bad, avoid
   aiViolet: '#7B61FF',       // AI features only
@@ -89,32 +89,33 @@ export const SPACING = {
   lg: 20,
   xl: 24,
   xxl: 32,
-  contentHorizontal: 20,
-  headerVertical: 15,
+  contentHorizontal: 24,
+  headerVertical: 18,
 };
 
 // Shadow helpers
 export const GLOW = {
   green: {
-    shadowColor: '#2E7D32',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
   },
   greenStrong: {
-    shadowColor: '#1B5E20',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 8,
   },
+  // Soft, diffuse "floating card" shadow — Purely uses a wide low-opacity shadow instead of a hard drop shadow
   card: {
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
   },
   subtle: {
     shadowColor: '#000',
@@ -128,24 +129,24 @@ export const GLOW = {
 // Common card style
 export const CARD = {
   backgroundColor: THEME.surface,
-  borderRadius: 16,
+  borderRadius: 20,
   borderWidth: 1,
   borderColor: THEME.border,
   ...GLOW.card,
 };
 
-// Common input style
+// Common input style — rounded-full pill, matching Purely's search/input fields
 export const INPUT = {
   backgroundColor: THEME.surface,
   borderWidth: 1,
   borderColor: THEME.border,
-  borderRadius: 12,
+  borderRadius: 24,
   color: THEME.text,
-  paddingHorizontal: 16,
+  paddingHorizontal: 18,
   paddingVertical: 12,
 };
 
-// Standardized header style (white bar + green title)
+// Standardized header style (warm off-white blur bar + green title)
 export const HEADER = {
   container: {
     flexDirection: 'row',
@@ -153,7 +154,7 @@ export const HEADER = {
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.headerVertical,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    backgroundColor: 'rgba(251, 251, 249, 0.92)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.06)',
   },
@@ -165,7 +166,7 @@ export const HEADER = {
   backButton: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#F1F8E9',
+    backgroundColor: '#EEF6F2',
     minWidth: 40,
     minHeight: 40,
     justifyContent: 'center',

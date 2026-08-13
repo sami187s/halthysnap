@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { THEME, SPACING } from '../../utils/theme';
@@ -66,14 +66,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.85)',
+    backgroundColor: 'rgba(251,251,249,0.92)',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.06)',
   },
   headerBtn: {
     padding: 8,
     borderRadius: 20,
-    backgroundColor: '#F1F8E9',
+    backgroundColor: '#F5F5F1',
     minWidth: 40,
     minHeight: 40,
     justifyContent: 'center',

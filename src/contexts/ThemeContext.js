@@ -1,68 +1,50 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+﻿import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = '@healthyscan_theme';
+const STORAGE_KEY = '@healthyscan_theme_v2';
 
-// Light and dark palettes — used by every screen that consumes this context
+// Purely-inspired light palette — used by every screen that consumes this context.
+// Dark mode is intentionally retired (design is light-only now): THEMES.dark aliases
+// THEMES.light below so the existing isDark/toggleTheme API in SettingsScreen keeps
+// working without a crash, it just no longer changes anything visually.
+const light = {
+  dark: false,
+  bg:           '#FBFBF9',
+  bgCard:       '#FFFFFF',
+  bgIcon:       '#F5F5F1',
+  border:       'rgba(0,0,0,0.08)',
+  borderRow:    'rgba(0,0,0,0.06)',
+  text:         '#171717',
+  textMuted:    '#737373',
+  textDim:      '#A3A3A3',
+  chevron:      '#A3A3A3',
+  statusBar:    'dark-content',
+  tabBg:        '#FFFFFF',
+  tabBorder:    'rgba(0,0,0,0.07)',
+  tabActive:    '#067A4F',
+  tabInactive:  '#A3A3A3',
+  tabActiveBg:  'rgba(6,122,79,0.10)',
+  headerBg:     'rgba(251,251,249,0.92)',
+  headerBorder: 'rgba(0,0,0,0.06)',
+  toggleBg:     '#FFFFFF',
+  toggleTrack:  '#E5E5E1',
+  toggleThumb:  '#FFFFFF',
+  toggleActive: '#067A4F',
+};
+
 export const THEMES = {
-  dark: {
-    dark: true,
-    bg:           '#0a0a0a',
-    bgCard:       '#111111',
-    bgIcon:       '#1a1a1a',
-    border:       'rgba(255,255,255,0.07)',
-    borderRow:    'rgba(255,255,255,0.06)',
-    text:         '#e0e0e0',
-    textMuted:    '#a0a0a0',
-    textDim:      '#444444',
-    chevron:      '#444444',
-    statusBar:    'light-content',
-    tabBg:        '#0a0a0a',
-    tabBorder:    'rgba(255,255,255,0.05)',
-    tabActive:    '#ffffff',
-    tabInactive:  '#666666',
-    tabActiveBg:  '#1a1a1a',
-    headerBg:     'rgba(10,10,10,0.95)',
-    headerBorder: 'rgba(255,255,255,0.07)',
-    toggleBg:     '#1a1a1a',
-    toggleTrack:  '#333333',
-    toggleThumb:  '#aaaaaa',
-    toggleActive: '#4CAF50',
-  },
-  light: {
-    dark: false,
-    bg:           '#f5f5f5',
-    bgCard:       '#ffffff',
-    bgIcon:       '#f0f0f0',
-    border:       'rgba(0,0,0,0.08)',
-    borderRow:    'rgba(0,0,0,0.06)',
-    text:         '#111111',
-    textMuted:    '#555555',
-    textDim:      '#999999',
-    chevron:      '#999999',
-    statusBar:    'dark-content',
-    tabBg:        '#ffffff',
-    tabBorder:    'rgba(0,0,0,0.08)',
-    tabActive:    '#111111',      // ← black label in light mode (was white)
-    tabInactive:  '#888888',
-    tabActiveBg:  '#f0f0f0',
-    headerBg:     'rgba(245,245,245,0.97)',
-    headerBorder: 'rgba(0,0,0,0.07)',
-    toggleBg:     '#ffffff',
-    toggleTrack:  '#e0e0e0',
-    toggleThumb:  '#aaaaaa',
-    toggleActive: '#4CAF50',
-  },
+  light,
+  dark: light,
 };
 
 const ThemeContext = createContext({
-  theme: THEMES.dark,
-  isDark: true,
+  theme: THEMES.light,
+  isDark: false,
   toggleTheme: () => {},
 });
 
 export const ThemeProvider = ({ children }) => {
-  const [isDark, setIsDark] = useState(true); // default: dark
+  const [isDark, setIsDark] = useState(false); // default: light
 
   // Load saved preference on mount
   useEffect(() => {

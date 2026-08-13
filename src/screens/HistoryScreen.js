@@ -13,8 +13,12 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+
+const BEST_PRODUCTS_KEY = '@vee_curated_products';
 import { Ionicons } from '@expo/vector-icons';
+import ScoreRing from '../components/ScoreRing';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import {
@@ -59,13 +63,57 @@ const HistoryScreen = () => {
   const [isPremium, setIsPremium] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [stats, setStats] = useState(null);
+  const [curatedIds, setCuratedIds] = useState(new Set());
+  const [isDevMode, setIsDevMode] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
       loadHistory();
+      loadCuratedIds();
+      AsyncStorage.getItem('@vee_dev_mode').then(v => setIsDevMode(v === 'true'));
       return () => {};
     }, [])
   );
+
+  const loadCuratedIds = async () => {
+    try {
+      const raw = await AsyncStorage.getItem(BEST_PRODUCTS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      setCuratedIds(new Set(list.map(p => p.barcode)));
+    } catch { setCuratedIds(new Set()); }
+  };
+
+  const handleAddToBest = async (item) => {
+    try {
+      const raw = await AsyncStorage.getItem(BEST_PRODUCTS_KEY);
+      const list = raw ? JSON.parse(raw) : [];
+      const already = list.some(p => p.barcode === item.barcode);
+      if (already) {
+        Alert.alert('Already in Best', `"${item.productName}" is already in the Best section.`);
+        return;
+      }
+      const entry = {
+        id: item.barcode,
+        barcode: item.barcode,
+        name: item.productName,
+        brand: item.brand || 'Unknown Brand',
+        category: item.productType === 'food' ? 'FOOD' : 'COSMETIC',
+        filterCat: item.productType === 'food' ? 'Food' : 'Cosmetic',
+        tag: 'TOP PICK',
+        defaultScore: Math.round(item.score || 0),
+        image: item.productImage || null,
+        productType: item.productType || 'food',
+        ingredients: item.ingredients || '',
+        nutriments: item.nutriments || {},
+      };
+      const updated = [entry, ...list];
+      await AsyncStorage.setItem(BEST_PRODUCTS_KEY, JSON.stringify(updated));
+      setCuratedIds(prev => new Set([...prev, item.barcode]));
+      Alert.alert('Added to Best! 🏆', `"${item.productName}" now appears in the Best section for all users.`);
+    } catch (e) {
+      Alert.alert('Error', 'Could not add product. Please try again.');
+    }
+  };
 
   const loadHistory = async () => {
     try {
@@ -152,12 +200,6 @@ const HistoryScreen = () => {
     }
   };
 
-  const getScoreColor = (score) => {
-    if (score >= 70) return '#067A4F';
-    if (score >= 40) return '#FF9800';
-    return '#F44336';
-  };
-
   const formatDate = (timestamp) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -180,10 +222,10 @@ const HistoryScreen = () => {
     return (
       <View style={[s.root, { backgroundColor: theme.bg }]}>
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-        <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(250,250,245,0.95)', borderBottomColor: theme.headerBorder }]}>
+        <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(251,251,249,0.92)', borderBottomColor: theme.headerBorder }]}>
           <View style={s.headerLeft}>
             <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
-            <Text style={s.headerTitle}>HealthySnap</Text>
+            <Text style={s.headerTitle}>Vee</Text>
           </View>
           <Ionicons name="notifications-outline" size={22} color="#067A4F" />
         </View>
@@ -218,19 +260,28 @@ const HistoryScreen = () => {
           </View>
         </View>
 
-        {/* Score + delete */}
-        <View style={s.rowRight}>
-          <View style={[s.scorePill, { borderColor: getScoreColor(item.score), backgroundColor: getScoreColor(item.score) + '0D' }]}>
-            <Text style={[s.scoreNum, { color: getScoreColor(item.score) }]}>{Math.round(item.score)}</Text>
+          {/* Score + actions */}
+          <View style={s.rowRight}>
+            <ScoreRing score={item.score} size={46} stroke={5} />
+            <TouchableOpacity
+              onPress={() => handleAddToBest(item)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={s.trophyBtn}
+            >
+              <Ionicons
+                name={curatedIds.has(item.barcode) ? 'trophy' : 'trophy-outline'}
+                size={16}
+                color={curatedIds.has(item.barcode) ? '#067A4F' : theme.textDim}
+              />
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => handleDeleteItem(item.id, item.productName)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              style={s.trashBtn}
+            >
+              <Ionicons name="trash-outline" size={16} color={theme.textDim} />
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={() => handleDeleteItem(item.id, item.productName)}
-            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-            style={s.trashBtn}
-          >
-            <Ionicons name="trash-outline" size={16} color={theme.textDim} />
-          </TouchableOpacity>
-        </View>
       </TouchableOpacity>
     );
   };
@@ -242,8 +293,8 @@ const HistoryScreen = () => {
         {[
           { value: stats.totalScans, label: 'SCANS', color: theme.text },
           { value: stats.healthyCount, label: 'HEALTHY', color: '#067A4F' },
-          { value: stats.moderateCount, label: 'MODERATE', color: '#FF9800' },
-          { value: stats.riskyCount, label: 'RISKY', color: '#F44336' },
+          { value: stats.moderateCount, label: 'MODERATE', color: '#F59E0B' },
+          { value: stats.riskyCount, label: 'RISKY', color: '#EF4444' },
         ].map(({ value, label, color }) => (
           <View key={label} style={s.statCell}>
             <Text style={[s.statNum, { color }]}>{value}</Text>
@@ -263,7 +314,7 @@ const HistoryScreen = () => {
       </Text>
       <TouchableOpacity style={s.scanNowBtn} onPress={() => navigation.navigate('Home')} activeOpacity={0.85}>
         <Text style={s.scanNowText}>SCAN NOW</Text>
-        <Ionicons name="barcode-outline" size={14} color="#000" />
+        <Ionicons name="barcode-outline" size={14} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
@@ -275,10 +326,10 @@ const HistoryScreen = () => {
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
 
       {/* Header */}
-      <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(250,250,245,0.95)', borderBottomColor: theme.headerBorder }]}>
+      <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(251,251,249,0.92)', borderBottomColor: theme.headerBorder }]}>
         <View style={s.headerLeft}>
           <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
-          <Text style={s.headerTitle}>HealthySnap</Text>
+          <Text style={s.headerTitle}>Vee</Text>
         </View>
         <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="notifications-outline" size={22} color="#067A4F" />
@@ -380,7 +431,7 @@ const s = StyleSheet.create({
   searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 14,
+    borderRadius: 24,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 11,
@@ -440,10 +491,10 @@ const s = StyleSheet.create({
     marginBottom: 12,
     gap: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+    elevation: 2,
   },
   imgWrap: {
     width: 64,
@@ -457,21 +508,13 @@ const s = StyleSheet.create({
   },
   img: { width: 64, height: 64 },
   rowInfo: { flex: 1, gap: 4 },
-  rowName: { fontSize: 14, fontWeight: '600', lineHeight: 19, color: '#1a1c19' },
+  rowName: { fontSize: 14, fontWeight: '600', lineHeight: 19, color: '#171717' },
   rowMeta: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  rowType: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: '#707a6c' },
-  rowDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#bfcaba' },
-  rowDate: { fontSize: 11, fontWeight: '400', color: '#707a6c' },
+  rowType: { fontSize: 10, fontWeight: '700', letterSpacing: 1.2, color: '#737373' },
+  rowDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#A3A3A3' },
+  rowDate: { fontSize: 11, fontWeight: '400', color: '#737373' },
   rowRight: { alignItems: 'center', gap: 8, flexShrink: 0 },
-  scorePill: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scoreNum: { fontSize: 15, fontWeight: '800' },
+  trophyBtn: { padding: 2, marginBottom: 4 },
   trashBtn: { padding: 2 },
 
   // ── Empty ────────────────────────────────────────────
@@ -488,14 +531,14 @@ const s = StyleSheet.create({
   scanNowBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#067A4F',
     paddingVertical: 14,
     paddingHorizontal: 28,
-    borderRadius: 14,
+    borderRadius: 999,
     gap: 8,
     marginTop: 8,
   },
-  scanNowText: { fontSize: 11, fontWeight: '700', color: '#000000', letterSpacing: 2 },
+  scanNowText: { fontSize: 11, fontWeight: '700', color: '#FFFFFF', letterSpacing: 2 },
 
   // ── Premium Gate ─────────────────────────────────────
   gateWrap: {

@@ -1,0 +1,6 @@
+name = "vee-turso-proxy"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+[vars]
+TURSO_URL = "https://vee-2-samis187s.aws-us-east-2.turso.io"

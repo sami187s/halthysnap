@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Food Photo Results Screen
  * Displays AI recognition results and nutrition analysis for photographed food
  */
@@ -285,14 +285,14 @@ const FoodPhotoResultsScreen = ({ route }) => {
           <View style={styles.foodPreviewCard}>
             <Image source={{ uri: imageUri }} style={styles.foodPreviewImage} />
             <View style={styles.foodPreviewText}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={20} color="#067A4F" />
               <Text style={styles.foodPreviewName}>{recognizedFoodName}</Text>
             </View>
           </View>
 
           {/* Question card */}
           <View style={styles.questionCard}>
-            <Ionicons name="help-circle" size={32} color="#4CAF50" />
+            <Ionicons name="help-circle" size={32} color="#067A4F" />
             <Text style={styles.questionText}>{currentQuestion.question}</Text>
             
             {/* Answer options */}
@@ -336,7 +336,7 @@ const FoodPhotoResultsScreen = ({ route }) => {
         )}
 
         <View style={styles.inputContainer}>
-          <Ionicons name="restaurant" size={60} color="#4CAF50" />
+          <Ionicons name="restaurant" size={60} color="#067A4F" />
           <Text style={styles.inputTitle}>What food is this?</Text>
           <Text style={styles.inputSubtext}>
             Enter the name of the food (e.g., burger, salad, pasta)
@@ -396,7 +396,7 @@ const FoodPhotoResultsScreen = ({ route }) => {
           {imageUri && (
             <Image source={{ uri: imageUri }} style={styles.loadingImage} />
           )}
-          <ActivityIndicator size="large" color="#4CAF50" style={styles.loader} />
+          <ActivityIndicator size="large" color="#067A4F" style={styles.loader} />
           <Text style={styles.loadingText}>
             {analyzing ? '🤖 AI is analyzing your food...' : 'Getting nutrition data...'}
           </Text>
@@ -433,7 +433,7 @@ const FoodPhotoResultsScreen = ({ route }) => {
       <ScreenWrapper>
         <ScreenHeader title="Food Analysis" onBack={handleGoHome} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#4CAF50" />
+          <ActivityIndicator size="large" color="#067A4F" />
           <Text style={styles.loadingText}>Preparing analysis...</Text>
         </View>
       </ScreenWrapper>
@@ -456,7 +456,7 @@ const FoodPhotoResultsScreen = ({ route }) => {
         {/* Recognition Result */}
         <View style={styles.recognitionCard}>
           <View style={styles.recognitionHeader}>
-            <Ionicons name="restaurant" size={28} color="#4CAF50" />
+            <Ionicons name="restaurant" size={28} color="#067A4F" />
             <View style={styles.recognitionTextContainer}>
               <Text style={styles.recognitionLabel}>Food Item:</Text>
               <Text style={styles.recognitionFoodName}>{foodData?.foodName || 'Unknown Food'}</Text>
@@ -466,7 +466,7 @@ const FoodPhotoResultsScreen = ({ route }) => {
             style={styles.editButton}
             onPress={promptUserForFoodName}
           >
-            <Ionicons name="create-outline" size={16} color="#4CAF50" />
+            <Ionicons name="create-outline" size={16} color="#067A4F" />
             <Text style={styles.editButtonText}>Change Food Name</Text>
           </TouchableOpacity>
         </View>
@@ -503,7 +503,7 @@ const FoodPhotoResultsScreen = ({ route }) => {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButtonOutline} onPress={handleGoHome}>
-            <Ionicons name="home" size={20} color="#4CAF50" />
+            <Ionicons name="home" size={20} color="#067A4F" />
             <Text style={styles.secondaryButtonTextOutline}>Go Home</Text>
           </TouchableOpacity>
         </View>
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 18,
-    color: '#1B5E20',
+    color: '#067A4F',
     fontWeight: '600',
     marginBottom: 8,
     textAlign: 'center'
@@ -558,7 +558,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginTop: 20,
     marginBottom: 10
   },
@@ -569,7 +569,7 @@ const styles = StyleSheet.create({
     marginBottom: 30
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingVertical: 12,
     paddingHorizontal: 30,
     borderRadius: 25,
@@ -599,7 +599,7 @@ const styles = StyleSheet.create({
   inputTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginTop: 20,
     marginBottom: 8,
     textAlign: 'center'
@@ -613,7 +613,7 @@ const styles = StyleSheet.create({
   foodInput: {
     width: '100%',
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
     borderRadius: 16,
     padding: 14,
     fontSize: 16,
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
   },
   analyzeButton: {
     flex: 1,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     padding: 14,
     borderRadius: 16,
     marginLeft: 8,
@@ -695,7 +695,7 @@ const styles = StyleSheet.create({
   recognitionFoodName: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     textTransform: 'capitalize'
   },
   editButton: {
@@ -703,20 +703,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     padding: 10,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E5F2EC',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#4CAF50'
+    borderColor: '#067A4F'
   },
   editButtonText: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#067A4F',
     fontWeight: '600',
     marginLeft: 6
   },
   recognitionConfidence: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#067A4F',
     fontWeight: '600'
   },
   estimatedBadge: {
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginBottom: 8
   },
   nutritionSubtitle: {
@@ -817,16 +817,16 @@ const styles = StyleSheet.create({
   },
   nutritionLabel: {
     fontSize: 15,
-    color: '#1B5E20',
+    color: '#067A4F',
     marginLeft: 10
   },
   nutritionValue: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#1B5E20'
+    color: '#067A4F'
   },
   positiveValue: {
-    color: '#4CAF50'
+    color: '#067A4F'
   },
   negativeValue: {
     color: '#F44336'
@@ -851,12 +851,12 @@ const styles = StyleSheet.create({
   analysisHeader: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginBottom: 8
   },
   analysisPoint: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#067A4F',
     lineHeight: 22,
     marginLeft: 8
   },
@@ -873,7 +873,7 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   primaryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -909,10 +909,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 25,
     borderWidth: 2,
-    borderColor: '#4CAF50'
+    borderColor: '#067A4F'
   },
   secondaryButtonTextOutline: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 8
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderRadius: 3
   },
   progressText: {
@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
     padding: 20
   },
   foodPreviewCard: {
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E5F2EC',
     borderRadius: 16,
     padding: 12,
     marginBottom: 24,
@@ -966,7 +966,7 @@ const styles = StyleSheet.create({
   foodPreviewName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginLeft: 8,
     textTransform: 'capitalize'
   },
@@ -985,7 +985,7 @@ const styles = StyleSheet.create({
   questionText: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     textAlign: 'center',
     marginTop: 12,
     marginBottom: 24
@@ -1009,7 +1009,7 @@ const styles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#1B5E20',
+    color: '#067A4F',
     flex: 1
   },
   whyAskCard: {

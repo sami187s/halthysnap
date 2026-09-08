@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#067A4F',
     fontWeight: '600',
   },
   title: {
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
   },
   premiumPlanCard: {
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
     position: 'relative',
   },
   popularBadge: {
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   planPrice: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   planPeriod: {
     fontSize: 16,
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
   },
   featureTextPremium: {
     fontSize: 14,
-    color: '#4CAF50',
+    color: '#067A4F',
     marginBottom: 8,
     lineHeight: 20,
     fontWeight: '500',
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#6c757d',
   },
   premiumButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
   },
   activePlan: {
     backgroundColor: '#28a745',

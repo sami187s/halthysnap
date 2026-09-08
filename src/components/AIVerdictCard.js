@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   tagLabelGood: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#067A4F',
     marginRight: 8,
     minWidth: 110,
   },

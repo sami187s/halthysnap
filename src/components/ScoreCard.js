@@ -1,9 +1,9 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 
 // Helper functions for scoring and colors
 const getScoreColor = (score) => {
-  if (score >= 70) return '#4CAF50';      // Excellent - Green
+  if (score >= 70) return '#067A4F';      // Excellent - Green
   if (score >= 50) return '#FFBB33';      // Good - Orange  
   if (score >= 25) return '#FF8800';      // Poor - Dark Orange
   return '#FF4444';                       // Very Poor - Red
@@ -64,7 +64,7 @@ const ScoreCard = ({ analysis }) => {
           <View style={styles.breakdownRow}>
             <Text style={styles.breakdownLabel}>Confidence:</Text>
             <Text style={[styles.breakdownValue, { 
-              color: analysis.scoreBreakdown.confidence === 'High' ? '#4CAF50' : 
+              color: analysis.scoreBreakdown.confidence === 'High' ? '#067A4F' : 
                      analysis.scoreBreakdown.confidence === 'Medium' ? '#FF9800' : '#F44336' 
             }]}>
               {analysis.scoreBreakdown.confidence}

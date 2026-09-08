@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   View,
   Text,
@@ -65,9 +65,9 @@ export default function PremiumFeaturesScreen({ navigation }) {
     { icon: 'sparkles', text: 'AI ingredient analysis' },
     { icon: 'shield-checkmark', text: 'Detect hidden dangers' },
     { icon: 'bulb', text: 'Smart recommendations' },
-    { icon: 'chatbubble-ellipses', text: 'AI chatbot assistant' },
+    { icon: 'chatbubble-ellipses', text: 'AI chatbot assistant', comingSoon: true },
     { icon: 'time', text: 'History & saved products' },
-    { icon: 'rocket', text: 'New features coming soon' },
+    { icon: 'rocket', text: 'New features', comingSoon: true },
   ];
 
   return (
@@ -84,7 +84,7 @@ export default function PremiumFeaturesScreen({ navigation }) {
         {/* Status Card */}
         <View style={styles.statusCard}>
           <View style={styles.statusIconWrap}>
-            <Ionicons name="diamond" size={36} color="#2E7D32" />
+            <Ionicons name="diamond" size={36} color="#067A4F" />
           </View>
           <Text style={styles.statusTitle}>Premium Active</Text>
           <Text style={styles.statusSubtitle}>You have unlimited access to all features</Text>
@@ -96,10 +96,16 @@ export default function PremiumFeaturesScreen({ navigation }) {
           {premiumFeatures.map((item, i) => (
             <View key={i} style={styles.featureRow}>
               <View style={styles.featureIconWrap}>
-                <Ionicons name={item.icon} size={18} color="#2E7D32" />
+                <Ionicons name={item.icon} size={18} color={item.comingSoon ? '#9E9E9E' : '#067A4F'} />
               </View>
-              <Text style={styles.featureRowText}>{item.text}</Text>
-              <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+              <Text style={[styles.featureRowText, item.comingSoon && { color: '#9E9E9E' }]}>{item.text}</Text>
+              {item.comingSoon ? (
+                <View style={{ backgroundColor: '#F0F0F0', borderRadius: 8, paddingHorizontal: 7, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#9E9E9E', letterSpacing: 0.5 }}>COMING SOON</Text>
+                </View>
+              ) : (
+                <Ionicons name="checkmark-circle" size={18} color="#067A4F" />
+              )}
             </View>
           ))}
         </View>
@@ -122,7 +128,7 @@ export default function PremiumFeaturesScreen({ navigation }) {
           onPress={handleManageSubscription}
           activeOpacity={0.85}
         >
-          <Ionicons name="settings-outline" size={18} color="#2E7D32" />
+          <Ionicons name="settings-outline" size={18} color="#067A4F" />
           <Text style={styles.outlineBtnText}>Manage Subscription</Text>
         </TouchableOpacity>
 
@@ -132,7 +138,7 @@ export default function PremiumFeaturesScreen({ navigation }) {
           onPress={refreshSubscription}
           activeOpacity={0.85}
         >
-          <Ionicons name="refresh-outline" size={18} color="#2E7D32" />
+          <Ionicons name="refresh-outline" size={18} color="#067A4F" />
           <Text style={styles.outlineBtnText}>Refresh Status</Text>
         </TouchableOpacity>
 
@@ -148,7 +154,7 @@ export default function PremiumFeaturesScreen({ navigation }) {
 
         {/* Info Pill */}
         <View style={styles.infoPill}>
-          <Ionicons name="information-circle" size={18} color="#2E7D32" />
+          <Ionicons name="information-circle" size={18} color="#067A4F" />
           <Text style={styles.infoPillText}>
             Your subscription is active. Enjoy unlimited scans and advanced features!
           </Text>
@@ -188,17 +194,17 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E5F2EC',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,
     borderWidth: 2,
-    borderColor: '#A5D6A7',
+    borderColor: '#96C9B9',
   },
   statusTitle: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginBottom: 6,
   },
   statusSubtitle: {
@@ -225,7 +231,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginBottom: 16,
     letterSpacing: 0.3,
   },
@@ -240,7 +246,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E5F2EC',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 14,
@@ -256,13 +262,13 @@ const styles = StyleSheet.create({
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1B7D36',
+    backgroundColor: '#067A4F',
     borderRadius: 28,
     paddingVertical: 18,
     paddingLeft: 28,
     paddingRight: 16,
     marginBottom: 12,
-    shadowColor: '#1B5E20',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 14,
@@ -296,7 +302,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#A5D6A7',
+    borderColor: '#96C9B9',
     gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -307,7 +313,7 @@ const styles = StyleSheet.create({
   outlineBtnText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#067A4F',
   },
 
   /* Cancel Button */
@@ -341,13 +347,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#A5D6A7',
+    borderColor: '#96C9B9',
     gap: 10,
   },
   infoPillText: {
     flex: 1,
     fontSize: 13,
-    color: '#2E7D32',
+    color: '#067A4F',
     fontWeight: '500',
     lineHeight: 19,
   },

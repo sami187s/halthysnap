@@ -1,4 +1,4 @@
-import React, { forwardRef } from 'react';
+﻿import React, { forwardRef } from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,7 +21,7 @@ const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
  */
 const getGradientForScore = (score) => {
   if (score >= 70) {
-    return ['#1B5E20', '#2E7D32', '#388E3C']; // deep green
+    return ['#067A4F', '#067A4F', '#067A4F']; // deep green
   }
   if (score >= 40) {
     return ['#E65100', '#F57C00', '#FF9800']; // amber / orange

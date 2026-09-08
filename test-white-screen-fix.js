@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test White Screen Fix
  * This test verifies that our CosmeticResultsScreen fixes work properly
  */
@@ -34,8 +34,8 @@ function getScoreGrade(score) {
 }
 
 function getScoreColor(score) {
-  if (score >= 90) return '#1B5E20'; // Excellent - Very Dark Green
-  if (score >= 75) return '#4CAF50'; // Good - Green
+  if (score >= 90) return '#067A4F'; // Excellent - Very Dark Green
+  if (score >= 75) return '#067A4F'; // Good - Green
   if (score >= 55) return '#FF9800'; // Average - Orange
   if (score >= 35) return '#F57F17'; // Poor - Dark Orange
   return '#D32F2F'; // Very Poor - Red

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   View,
   Text,
@@ -94,21 +94,21 @@ const ProductNotFoundScreen = ({ route, navigation }) => {
           <Text style={styles.suggestionsTitle}>What you can do:</Text>
           
           <View style={styles.suggestionItem}>
-            <Ionicons name="search" size={20} color="#4CAF50" />
+            <Ionicons name="search" size={20} color="#067A4F" />
             <Text style={styles.suggestionText}>
               Search manually for the product name
             </Text>
           </View>
           
           <View style={styles.suggestionItem}>
-            <Ionicons name="camera" size={20} color="#4CAF50" />
+            <Ionicons name="camera" size={20} color="#067A4F" />
             <Text style={styles.suggestionText}>
               Try scanning the barcode again
             </Text>
           </View>
           
           <View style={styles.suggestionItem}>
-            <Ionicons name="information-circle" size={20} color="#4CAF50" />
+            <Ionicons name="information-circle" size={20} color="#067A4F" />
             <Text style={styles.suggestionText}>
               {alternativeText}
             </Text>
@@ -130,7 +130,7 @@ const ProductNotFoundScreen = ({ route, navigation }) => {
           style={[styles.button, styles.tryAgainButton]} 
           onPress={handleTryAgain}
         >
-          <Ionicons name="camera" size={20} color="#4CAF50" style={styles.buttonIcon} />
+          <Ionicons name="camera" size={20} color="#067A4F" style={styles.buttonIcon} />
           <Text style={styles.tryAgainButtonText}>Scan Again</Text>
         </TouchableOpacity>
       </View>
@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   mainTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#1B5E20',
+    color: '#067A4F',
     textAlign: 'center',
     marginBottom: 10,
   },
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
   barcodeText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1B5E20',
+    color: '#067A4F',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
   },
   growthContainer: {
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   suggestionsTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#1B5E20',
+    color: '#067A4F',
     marginBottom: 15,
   },
   suggestionItem: {
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   searchButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
   },
   searchButtonText: {
     color: '#fff',
@@ -291,10 +291,10 @@ const styles = StyleSheet.create({
   tryAgainButton: {
     backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
   },
   tryAgainButtonText: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: 16,
     fontWeight: '600',
   },

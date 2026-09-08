@@ -1,4 +1,4 @@
-// Scan Limit Banner Component
+﻿// Scan Limit Banner Component
 // Shows remaining scans for free users and prompts for upgrade
 
 import React from 'react';
@@ -34,9 +34,9 @@ const ScanLimitBanner = ({ navigation, onScanAttempt }) => {
         'You\'ve used all your free scans for today. Upgrade to VEE Premium for unlimited scans!',
         [
           { text: 'Maybe Later', style: 'cancel' },
-          { 
-            text: 'Upgrade Now', 
-            onPress: () => navigation.navigate('Subscription'),
+          {
+            text: 'Upgrade Now',
+            onPress: () => navigation.navigate('Subscription', { reason: 'limit' }),
             style: 'default'
           }
         ]
@@ -84,7 +84,7 @@ const ScanLimitBanner = ({ navigation, onScanAttempt }) => {
   const getScansColor = () => {
     if (remainingScans === 0) return '#F44336'; // Red
     if (remainingScans === 1) return '#FF9800'; // Orange
-    return '#4CAF50'; // Green
+    return '#067A4F'; // Green
   };
 
   const getScansMessage = () => {
@@ -140,9 +140,9 @@ export const ScanButton = ({ navigation, onPress, disabled }) => {
         'You\'ve used all your free scans for today. Upgrade to VEE Premium for unlimited scans!',
         [
           { text: 'Maybe Later', style: 'cancel' },
-          { 
-            text: 'Upgrade Now', 
-            onPress: () => navigation.navigate('Subscription')
+          {
+            text: 'Upgrade Now',
+            onPress: () => navigation.navigate('Subscription', { reason: 'limit' })
           }
         ]
       );
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   scanButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     padding: 20,
     borderRadius: 50,
     flexDirection: 'row',
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginHorizontal: 20,
     marginVertical: 10,
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 5,

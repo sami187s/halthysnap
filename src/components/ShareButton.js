@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+﻿import React, { useEffect, useRef, useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import { captureRef } from 'react-native-view-shot';
 import * as FileSystem from 'expo-file-system';
 import ShareCardGenerator from './ShareCardGenerator';
 
-const APP_NAME = 'HealthyScan';
+const APP_NAME = 'Vee';
 
 /**
  * ShareButton
@@ -142,7 +142,7 @@ const ShareButton = ({
     }
   }, [capturing, productName]);
 
-  const brandGreen = '#2E7D32';
+  const brandGreen = '#067A4F';
 
   return (
     <>

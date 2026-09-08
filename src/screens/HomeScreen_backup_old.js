@@ -43,7 +43,7 @@ try {
         Camera not available on this device
       </Text>
       <TouchableOpacity
-        style={{ backgroundColor: '#4CAF50', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25 }}
+        style={{ backgroundColor: '#067A4F', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25 }}
         onPress={onClose}
       >
         <Text style={{ color: '#fff', fontSize: 16 }}>Close</Text>
@@ -336,8 +336,8 @@ const HomeScreen = ({ navigation, route }) => {
     return (
       <View style={styles.loadingScreen}>
         <Svg width={50} height={50} viewBox="0 0 50 50">
-          <Path d="M25 5C18 8 10 18 10 28C10 38 18 45 25 45C32 45 40 38 40 28C40 18 32 8 25 5Z" fill="#2E7D32" />
-          <Path d="M18 10C13 16 10 24 13 32" stroke="#4CAF50" strokeWidth={2.5} fill="none" strokeLinecap="round" />
+          <Path d="M25 5C18 8 10 18 10 28C10 38 18 45 25 45C32 45 40 38 40 28C40 18 32 8 25 5Z" fill="#067A4F" />
+          <Path d="M18 10C13 16 10 24 13 32" stroke="#067A4F" strokeWidth={2.5} fill="none" strokeLinecap="round" />
         </Svg>
         <Text style={styles.loadingTitle}>HealthyScan</Text>
         <Text style={styles.loadingSubtext}>Loading...</Text>
@@ -395,7 +395,7 @@ const HomeScreen = ({ navigation, route }) => {
               </View>
               {isPremium && (
                 <View style={hs.headerProDot}>
-                  <Ionicons name="checkmark-circle" size={12} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={12} color="#067A4F" />
                 </View>
               )}
             </TouchableOpacity>
@@ -435,8 +435,8 @@ const HomeScreen = ({ navigation, route }) => {
               accessibilityLabel="Scan a food product"
             >
               <View style={hs.scanBtnLeft}>
-                <View style={[hs.scanIcon, { backgroundColor: '#E8F5E9' }]}>
-                  <Ionicons name="scan-outline" size={22} color="#4CAF50" />
+                <View style={[hs.scanIcon, { backgroundColor: '#E5F2EC' }]}>
+                  <Ionicons name="scan-outline" size={22} color="#067A4F" />
                 </View>
                 <View>
                   <Text style={hs.scanBtnTitle}>Scan a Food</Text>
@@ -477,7 +477,7 @@ const HomeScreen = ({ navigation, route }) => {
                 <Text style={hs.statLabel}>Products{'\n'}Scanned</Text>
               </View>
               <View style={hs.statCard}>
-                <Text style={[hs.statNumber, { color: averageScore >= 70 ? '#4CAF50' : averageScore >= 40 ? '#FF9800' : '#E05252' }]}>
+                <Text style={[hs.statNumber, { color: averageScore >= 70 ? '#067A4F' : averageScore >= 40 ? '#FF9800' : '#E05252' }]}>
                   {averageScore}
                 </Text>
                 <Text style={hs.statLabel}>Average{'\n'}Score</Text>
@@ -487,7 +487,7 @@ const HomeScreen = ({ navigation, route }) => {
                 onPress={() => navigation.navigate('Search')}
                 activeOpacity={0.7}
               >
-                <Ionicons name="search-outline" size={24} color="#4CAF50" />
+                <Ionicons name="search-outline" size={24} color="#067A4F" />
                 <Text style={hs.statLabel}>Search{'\n'}Products</Text>
               </TouchableOpacity>
             </View>
@@ -503,7 +503,7 @@ const HomeScreen = ({ navigation, route }) => {
                 </TouchableOpacity>
               </View>
               {recentScans.slice(0, 3).map((item, idx) => {
-                const itemScoreColor = (item.score || 0) >= 70 ? '#4CAF50' : (item.score || 0) >= 40 ? '#FF9800' : '#E05252';
+                const itemScoreColor = (item.score || 0) >= 70 ? '#067A4F' : (item.score || 0) >= 40 ? '#FF9800' : '#E05252';
                 return (
                   <TouchableOpacity
                     key={idx}
@@ -562,7 +562,7 @@ const HomeScreen = ({ navigation, route }) => {
           <Animated.View style={[hs.modalWrap, { transform: [{ scale: modalScale }] }]}>
             <View style={hs.modalBody}>
               <View style={hs.modalIcon}>
-                <Ionicons name="diamond" size={36} color="#4CAF50" />
+                <Ionicons name="diamond" size={36} color="#067A4F" />
               </View>
               <Text style={hs.modalTitle}>Daily Limit Reached</Text>
               <Text style={hs.modalMsg}>
@@ -573,7 +573,7 @@ const HomeScreen = ({ navigation, route }) => {
               <View style={hs.modalFeatures}>
                 {['Unlimited AI Analysis', 'Advanced Health Insights', 'AI Ingredient Expert'].map((f) => (
                   <View key={f} style={hs.modalFeatureRow}>
-                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                    <Ionicons name="checkmark-circle" size={16} color="#067A4F" />
                     <Text style={hs.modalFeatureLabel}>{f}</Text>
                   </View>
                 ))}
@@ -818,7 +818,7 @@ const hs = StyleSheet.create({
   seeAllText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   recentItem: {
     flexDirection: 'row',
@@ -937,7 +937,7 @@ const hs = StyleSheet.create({
   },
   modalUpgradeBtn: {
     width: '100%',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderRadius: 14,
     paddingVertical: 15,
     alignItems: 'center',
@@ -967,7 +967,7 @@ const hs = StyleSheet.create({
   },
   modalLegalPrice: { fontSize: 12, color: '#999', marginBottom: 4 },
   modalLegalRow: { flexDirection: 'row', alignItems: 'center' },
-  modalLegalLink: { fontSize: 11, color: '#4CAF50' },
+  modalLegalLink: { fontSize: 11, color: '#067A4F' },
   modalLegalDot: { fontSize: 11, color: '#CCC', marginHorizontal: 4 },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -62,7 +62,7 @@ const TestSubscriptionScreenExpoGo = ({ navigation }) => {
       <View style={styles.content}>
         {/* Logo */}
         <View style={styles.logoContainer}>
-          <Ionicons name="leaf" size={60} color="#4CAF50" />
+          <Ionicons name="leaf" size={60} color="#067A4F" />
         </View>
 
         {/* Title */}
@@ -72,22 +72,22 @@ const TestSubscriptionScreenExpoGo = ({ navigation }) => {
         {/* Features */}
         <View style={styles.featuresContainer}>
           <View style={styles.feature}>
-            <Ionicons name="infinite" size={24} color="#4CAF50" />
+            <Ionicons name="infinite" size={24} color="#067A4F" />
             <Text style={styles.featureText}>Unlimited product scans</Text>
           </View>
           
           <View style={styles.feature}>
-            <Ionicons name="analytics" size={24} color="#4CAF50" />
+            <Ionicons name="analytics" size={24} color="#067A4F" />
             <Text style={styles.featureText}>Advanced ingredient analysis</Text>
           </View>
           
           <View style={styles.feature}>
-            <Ionicons name="shield-checkmark" size={24} color="#4CAF50" />
+            <Ionicons name="shield-checkmark" size={24} color="#067A4F" />
             <Text style={styles.featureText}>Health risk assessments</Text>
           </View>
           
           <View style={styles.feature}>
-            <Ionicons name="trending-up" size={24} color="#4CAF50" />
+            <Ionicons name="trending-up" size={24} color="#067A4F" />
             <Text style={styles.featureText}>Detailed nutrition insights</Text>
           </View>
         </View>
@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 36,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   pricePeriod: {
     fontSize: 16,
@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   purchaseButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   restoreButtonText: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: 16,
     fontWeight: '500',
   },

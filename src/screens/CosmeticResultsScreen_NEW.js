@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -110,7 +110,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   };
 
   const getScoreColor = (score) => {
-    if (score >= 70) return '#4CAF50'; // Green
+    if (score >= 70) return '#067A4F'; // Green
     if (score >= 40) return '#FF9800'; // Orange
     return '#F44336'; // Red
   };
@@ -145,14 +145,14 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       switch(existingAnalysis.riskLevel) {
         case 'excellent':
           status = 'EXCELLENT';
-          color = '#1B5E20';
-          textColor = '#1B5E20';
+          color = '#067A4F';
+          textColor = '#067A4F';
           reason = existingAnalysis.description;
           break;
         case 'low':
           status = 'GOOD';
-          color = '#4CAF50';
-          textColor = '#2E7D32';
+          color = '#067A4F';
+          textColor = '#067A4F';
           reason = existingAnalysis.description;
           break;
         case 'moderate':
@@ -198,8 +198,8 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     if (cosmeticGoodIngredients.some(good => lowerIngredient.includes(good))) {
       return {
         status: 'GOOD',
-        color: '#4CAF50',
-        textColor: '#2E7D32',
+        color: '#067A4F',
+        textColor: '#067A4F',
         reason: 'Generally safe cosmetic ingredient'
       };
     } else if (cosmeticBadIngredients.some(bad => lowerIngredient.includes(bad))) {
@@ -267,7 +267,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
 
   return (
     <Animated.View style={[styles.container, { opacity: containerFade }]}>
-      <StatusBar barStyle="light-content" backgroundColor="#4CAF50" />
+      <StatusBar barStyle="light-content" backgroundColor="#067A4F" />
       
       {/* Header */}
       <View style={[styles.header, { paddingTop: safeAreaInsets.top + 12 }]}>
@@ -331,13 +331,13 @@ export default function CosmeticResultsScreen({ route, navigation }) {
               <View style={styles.yukaIngredientCounts}>
                 <View style={styles.countsRow}>
                   <View style={styles.countItem}>
-                    <View style={[styles.countDot, { backgroundColor: '#1B5E20' }]} />
+                    <View style={[styles.countDot, { backgroundColor: '#067A4F' }]} />
                     <Text style={styles.countText}>
                       {analysis.excellentCount || 0} Excellent
                     </Text>
                   </View>
                   <View style={styles.countItem}>
-                    <View style={[styles.countDot, { backgroundColor: '#4CAF50' }]} />
+                    <View style={[styles.countDot, { backgroundColor: '#067A4F' }]} />
                     <Text style={styles.countText}>
                       {analysis.goodCount || analysis.goodIngredients?.length || 0} Good
                     </Text>
@@ -364,7 +364,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
             <View style={styles.analysisCard}>
               <View style={styles.sectionHeaderFixed}>
                 <View style={styles.sectionTitleRow}>
-                  <Ionicons name="list" size={24} color="#4CAF50" />
+                  <Ionicons name="list" size={24} color="#067A4F" />
                   <Text style={styles.sectionTitle}>All Ingredients ({analysis.totalIngredients || 0})</Text>
                 </View>
               </View>
@@ -403,11 +403,11 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                 <View style={styles.ingredientLegend}>
                   <View style={styles.legendRow}>
                     <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: '#1B5E20' }]} />
+                      <View style={[styles.legendDot, { backgroundColor: '#067A4F' }]} />
                       <Text style={styles.legendText}>Excellent</Text>
                     </View>
                     <View style={styles.legendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
+                      <View style={[styles.legendDot, { backgroundColor: '#067A4F' }]} />
                       <Text style={styles.legendText}>Good</Text>
                     </View>
                     <View style={styles.legendItem}>
@@ -528,7 +528,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
             </TouchableOpacity>
             
             <TouchableOpacity style={styles.secondaryButton} onPress={handleGoBack}>
-              <Ionicons name="arrow-back" size={20} color="#4CAF50" />
+              <Ionicons name="arrow-back" size={20} color="#067A4F" />
               <Text style={styles.secondaryButtonText}>Back to Scanner</Text>
             </TouchableOpacity>
           </View>
@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -875,7 +875,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
@@ -894,12 +894,12 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
   },
   secondaryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginLeft: 8,
   },
   
@@ -923,7 +923,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,

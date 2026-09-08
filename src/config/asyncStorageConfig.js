@@ -31,6 +31,10 @@ export const STORAGE_KEYS = {
   
   // Cache
   LAST_SUBSCRIPTION_CHECK: 'lastSubscriptionCheck',
+
+  // Chatbot access gating
+  CHATBOT_ACCESS: 'chatbotAccess',           // 'enabled' | 'coming_soon'
+  CHATBOT_ACCESS_CHECKED: 'chatbotAccessChecked', // 'true' once migration ran
 };
 
 /**

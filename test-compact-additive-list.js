@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Script: Compact Additive List at Bottom
  * This script verifies that both screens now have a simple additive list at the bottom
  */
@@ -63,8 +63,8 @@ implementationChecks.forEach(check => {
 
 // Test 3: Check Color Coding
 const colorCodes = [
-  '#2E7D32', // Dark green for excellent
-  '#4CAF50', // Green for good  
+  '#067A4F', // Dark green for excellent
+  '#067A4F', // Green for good  
   '#FF9800', // Orange for moderate
   '#F44336'  // Red for poor
 ];

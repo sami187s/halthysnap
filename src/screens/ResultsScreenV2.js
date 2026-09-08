@@ -1,12 +1,13 @@
 ﻿import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, ScrollView, FlatList, TouchableOpacity,
-  StyleSheet, Animated, Dimensions, StatusBar,
-  Image, ActivityIndicator, Share, Alert,
+  StyleSheet, Animated, Easing, Dimensions, StatusBar,
+  Image, ActivityIndicator, Alert, Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { fetchProductByBarcode } from '../services/reliableAPI';
 import { fetchAlternativesByCategory, updateProductImageInTurso, saveCuratedProduct } from '../services/tursoDB';
@@ -14,13 +15,31 @@ import { analyzeIngredients, getProductTypeFromCategories } from '../utils/enhan
 import { calculateHealthScore } from '../utils/enhancedScoring';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import { saveToHistory as saveToHistoryUtil } from '../utils/historyManager';
+import { checkAndConsume } from '../utils/scanQuota';
+import { isProductSaved, toggleSavedProduct } from '../utils/curatedProducts';
 import ProductAIChat from '../components/ProductAIChat';
+import ShareScoreSheet from '../components/ShareScoreSheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFreeRecommendationUsage, useFreeRecommendation } from '../utils/dailyReset';
 import { getIngredientInfo, getAdditiveInfo } from '../services/usdaAPI';
+import { AI_CHAT_ENABLED } from '../config/featureFlags';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
+
+// Wraps a touchable in a spring scale-down (0.98) for tap feedback.
+const TapScale = ({ children, style, onPress, ...rest }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn = () => Animated.spring(scale, { toValue: 0.98, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 6 }).start();
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPressIn={pressIn} onPressOut={pressOut} onPress={onPress} {...rest}>
+      <Animated.View style={[style, { transform: [{ scale }] }]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 // Smart hero image:
 // 1. Shows stored URL immediately
@@ -117,48 +136,58 @@ const AltImg = React.memo(({ uri, barcode, imgStyle, placeholderStyle }) => {
   );
 });
 
-// ── Light Wellness Palette ──────────────────────────────────────────
-const BG             = '#FBFBF9';
-const SURFACE        = 'rgba(251,251,249,0.92)';
+// ── ScanGreen Palette ────────────────────────────────────────────────
+const BG             = '#FFFFFF';
 const SURFACE_LOW    = '#FFFFFF';
 const SURFACE_HIGH   = '#F5F5F1';
 const OUTLINE        = '#D9D9D4';
 const ON_SURFACE     = '#171717';
 const ON_SURFACE_VAR = '#737373';
 const WHITE          = '#FFFFFF';
-const PRIMARY        = '#067A4F';
-const GOOD_C         = '#84CC16';
-const ERROR_C        = '#EF4444';
-const WARNING_C      = '#F59E0B';
+const PRIMARY        = '#27a567';
+const ERROR_C        = '#e74c3c';
+const WARNING_C      = '#f5a623';
+const NEUTRAL_100    = '#f5f5f5';
+const NEUTRAL_300    = '#d4d4d4';
+const NEUTRAL_400    = '#a3a3a3';
+const NEUTRAL_600    = '#525252';
+const NEUTRAL_800    = '#262626';
+const TRACK_BG       = '#f1f1f1';
+const AMBER_600      = '#d97706';
+const PRIMARY_TINT   = 'rgba(39,165,103,0.08)';
+const AMBER_TINT     = 'rgba(245,166,35,0.10)';
+const RED_TINT       = 'rgba(231,76,60,0.10)';
+
+// Ingredient "function" values that read as additives (preservatives, dyes,
+// emulsifiers, etc.) rather than natural/beneficial food ingredients.
+const ADDITIVE_FUNCTIONS = new Set([
+  'preservative', 'surfactant', 'fragrance', 'colorant', 'emulsifier',
+  'silicone', 'ph_adjuster', 'chelating', 'thickener', 'stabilizer',
+]);
 
 // ── Gauge constants ─────────────────────────────────────────────────
-const GAUGE_R    = 72;
+const GAUGE_R    = 52;
 const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 
 // ── Helpers ─────────────────────────────────────────────────────────
-// Purely-style 4-band score scale — aligned with ScoreRing.getScoreBand
-// so score colors agree across every screen.
+// ScanGreen 3-band score scale: Good / Fair / Poor.
 const getScoreColor = (sc) => {
   if (sc >= 75) return PRIMARY;
-  if (sc >= 50) return GOOD_C;
-  if (sc >= 25) return WARNING_C;
+  if (sc >= 50) return WARNING_C;
   return ERROR_C;
 };
 
 const getVerdict = (sc) => {
-  if (sc >= 85) return 'Excellent';
-  if (sc >= 70) return 'Good';
-  if (sc >= 45) return 'Moderate';
-  if (sc >= 30) return 'Poor';
-  return 'Very Poor';
+  if (sc >= 75) return 'Good';
+  if (sc >= 50) return 'Fair';
+  return 'Poor';
 };
 
-const getRatingLabel = (sc) => {
-  if (sc >= 85) return 'EXCELLENT HEALTH RATING';
-  if (sc >= 70) return 'GOOD HEALTH RATING';
-  if (sc >= 45) return 'MODERATE HEALTH RATING';
-  if (sc >= 30) return 'POOR HEALTH RATING';
-  return 'VERY POOR HEALTH RATING';
+// Additive health verdict → low / moderate / high risk display.
+const riskTier = (healthVerdict) => {
+  if (healthVerdict === 'good')  return { label: 'Low risk',    color: PRIMARY,   bg: PRIMARY_TINT, icon: 'checkmark-circle' };
+  if (healthVerdict === 'avoid') return { label: 'Poor',        color: ERROR_C,   bg: RED_TINT,     icon: 'alert-circle' };
+  return                                { label: 'Moderate risk', color: WARNING_C, bg: AMBER_TINT,   icon: 'warning' };
 };
 
 const getNutVal = (nutriments, primary, fallbacks) => {
@@ -171,26 +200,26 @@ const getNutVal = (nutriments, primary, fallbacks) => {
 };
 
 // ── Score Gauge ─────────────────────────────────────────────────────
-const ScoreGauge = ({ score, scoreColor }) => {
+const ScoreGauge = ({ score, scoreColor, verdict }) => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 1100, useNativeDriver: false }).start();
+    Animated.timing(anim, { toValue: 1, duration: 1000, useNativeDriver: false }).start();
   }, [score]);
   const dashOffset = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [GAUGE_CIRC, GAUGE_CIRC - (GAUGE_CIRC * score) / 100],
   });
-  const SIZE = 190;
+  const SIZE = 120;
   const CX   = SIZE / 2;
   return (
     <View style={g.container}>
       {/* White circle background so gauge is readable over any image */}
       <View style={g.gaugeBg} />
       <Svg width={SIZE} height={SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={OUTLINE} strokeWidth={9} fill="transparent" />
+        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={TRACK_BG} strokeWidth={10} fill="transparent" />
         <AnimatedSvgCircle
           cx={CX} cy={CX} r={GAUGE_R}
-          stroke={scoreColor} strokeWidth={9}
+          stroke={scoreColor} strokeWidth={10}
           fill="transparent"
           strokeDasharray={GAUGE_CIRC}
           strokeDashoffset={dashOffset}
@@ -199,7 +228,7 @@ const ScoreGauge = ({ score, scoreColor }) => {
       </Svg>
       <View style={g.center}>
         <Text style={[g.scoreNum, { color: scoreColor }]}>{score}</Text>
-        <Text style={g.scoreDenom}>/100</Text>
+        <Text style={[g.scoreVerdict, { color: scoreColor }]}>{verdict}</Text>
       </View>
     </View>
   );
@@ -230,6 +259,9 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   const [freeRecUsage, setFreeRecUsage]       = useState({ used: 0, remaining: 2, total: 2 });
   const [showAllIngredients, setShowAllIngredients] = useState(false);
   const [showWhyScore, setShowWhyScore] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState('nutrients'); // 'nutrients' | 'ingredients' | 'additives'
   const [fetchingIngredients, setFetchingIngredients] = useState(false);
   const [expandedIngredient, setExpandedIngredient] = useState(null);
   const [usdaCache, setUsdaCache]                   = useState({});
@@ -237,6 +269,8 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   const [selectedAdditive, setSelectedAdditive]     = useState(null);
   const [additiveInfo, setAdditiveInfo]             = useState(null);
   const [additiveLoading, setAdditiveLoading]       = useState(false);
+  const [additivesMap, setAdditivesMap]             = useState({});
+  const additivesRequested = useRef(new Set());
   const [realAlternatives, setRealAlternatives]       = useState([]);
   const [altsLoading, setAltsLoading]                 = useState(false);
   const [isInBest, setIsInBest]                       = useState(false);
@@ -263,6 +297,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
         image: product.image_url || product.image || null,
         productType: 'food',
         ingredients: product.ingredients_text || '',
+        savedAt: Date.now(),
       };
       // Save to Turso DB — visible to ALL users instantly
       await saveCuratedProduct(entry);
@@ -284,6 +319,19 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   const safeAreaInsets = useSafeAreaInsetsWithFallback();
   const fadeAnim   = useRef(new Animated.Value(0)).current;
   const shareAnim  = useRef(new Animated.Value(1)).current;
+  const ingSheetY  = useRef(new Animated.Value(420)).current;
+  const whySheetY  = useRef(new Animated.Value(420)).current;
+  const additiveSheetY = useRef(new Animated.Value(420)).current;
+
+  // Staggered entrance for hero / score / why-card / tabs
+  const stagger1 = useRef(new Animated.Value(0)).current;
+  const stagger2 = useRef(new Animated.Value(0)).current;
+  const stagger3 = useRef(new Animated.Value(0)).current;
+  const stagger4 = useRef(new Animated.Value(0)).current;
+  const staggerStyle = (v) => ({
+    opacity: v,
+    transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) }],
+  });
 
   // Bounce share button 5 times total, every 5 seconds, then stop
   useEffect(() => {
@@ -341,6 +389,12 @@ const ResultsScreenV2 = ({ route, navigation }) => {
         navigation.replace('CosmeticResults', { barcode, product: prod });
         return;
       }
+      // Free-tier daily scan quota — a found product counts; block at the limit.
+      const quota = await checkAndConsume('food', prod.code || prod._id || barcode);
+      if (quota.blocked) {
+        navigation.replace('Subscription', { reason: 'limit' });
+        return;
+      }
       const analysisResult = analyzeIngredients(prod.ingredients_text || '', productType);
       setProduct(prod);
       setAnalysis(analysisResult);
@@ -349,12 +403,14 @@ const ResultsScreenV2 = ({ route, navigation }) => {
       saveToHistoryUtil({
         barcode: prod.code || prod._id || barcode,
         productName: prod.product_name || prod.productName || 'Unknown Product',
+        brand: prod.brands || '',
         productImage: prod.image_url || prod.image_front_url || null,
         productType: 'food',
         score: healthScore?.score || analysisResult?.score || 0,
         ingredients: prod.ingredients_text || '',
         source: prod.source || 'Open Food Facts',
       });
+      isProductSaved(prod.code || prod._id || barcode).then(setIsSaved);
     } catch (err) {
       setError(err.message || 'Failed to fetch product');
     } finally {
@@ -469,6 +525,13 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   useEffect(() => {
     if (!loading && product && analysis) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+      const easing = Easing.bezier(0.22, 1, 0.36, 1);
+      Animated.parallel([
+        Animated.timing(stagger1, { toValue: 1, duration: 400, delay: 100, easing, useNativeDriver: true }),
+        Animated.timing(stagger2, { toValue: 1, duration: 400, delay: 200, easing, useNativeDriver: true }),
+        Animated.timing(stagger3, { toValue: 1, duration: 400, delay: 300, easing, useNativeDriver: true }),
+        Animated.timing(stagger4, { toValue: 1, duration: 400, delay: 400, easing, useNativeDriver: true }),
+      ]).start();
     }
   }, [loading, product, analysis]);
 
@@ -498,7 +561,6 @@ const ResultsScreenV2 = ({ route, navigation }) => {
 
   const handleIngredientTap = async (ing) => {
     const key = (ing.name || '').toLowerCase().trim();
-    if (expandedIngredient === key) { setExpandedIngredient(null); return; }
     setExpandedIngredient(key);
     if (usdaCache[key]) return;
     setUsdaLoading(key);
@@ -512,9 +574,42 @@ const ResultsScreenV2 = ({ route, navigation }) => {
     }
   };
 
+  useEffect(() => {
+    if (expandedIngredient) {
+      ingSheetY.setValue(420);
+      Animated.spring(ingSheetY, { toValue: 0, damping: 30, stiffness: 300, useNativeDriver: true }).start();
+    }
+  }, [expandedIngredient]);
+
+  const closeIngredientSheet = () => {
+    Animated.timing(ingSheetY, { toValue: 420, duration: 200, useNativeDriver: true }).start(() => {
+      setExpandedIngredient(null);
+    });
+  };
+
+  const openWhySheet = () => {
+    setShowWhyScore(true);
+    whySheetY.setValue(420);
+    Animated.spring(whySheetY, { toValue: 0, damping: 30, stiffness: 300, useNativeDriver: true }).start();
+  };
+
+  const closeWhySheet = () => {
+    Animated.timing(whySheetY, { toValue: 420, duration: 200, useNativeDriver: true }).start(() => {
+      setShowWhyScore(false);
+    });
+  };
+
   const handleAdditiveTap = async (code) => {
-    if (selectedAdditive === code) { setSelectedAdditive(null); setAdditiveInfo(null); return; }
     setSelectedAdditive(code);
+    additiveSheetY.setValue(420);
+    Animated.spring(additiveSheetY, { toValue: 0, damping: 30, stiffness: 300, useNativeDriver: true }).start();
+
+    const cached = additivesMap[code];
+    if (cached && !cached.loading && cached.info) {
+      setAdditiveInfo(cached.info);
+      setAdditiveLoading(false);
+      return;
+    }
     setAdditiveInfo(null);
     setAdditiveLoading(true);
     try {
@@ -526,6 +621,26 @@ const ResultsScreenV2 = ({ route, navigation }) => {
       setAdditiveLoading(false);
     }
   };
+
+  const closeAdditiveSheet = () => {
+    Animated.timing(additiveSheetY, { toValue: 420, duration: 200, useNativeDriver: true }).start(() => {
+      setSelectedAdditive(null);
+    });
+  };
+
+  // Eagerly fetch every additive's info once the Additives tab is opened, so
+  // each card can show its real risk level + description without a tap.
+  useEffect(() => {
+    if (activeTab !== 'additives' || additiveCodes.length === 0) return;
+    additiveCodes.forEach((code) => {
+      if (additivesRequested.current.has(code)) return;
+      additivesRequested.current.add(code);
+      setAdditivesMap(prev => ({ ...prev, [code]: { loading: true, info: null } }));
+      getAdditiveInfo(code)
+        .then(info => setAdditivesMap(prev => ({ ...prev, [code]: { loading: false, info } })))
+        .catch(() => setAdditivesMap(prev => ({ ...prev, [code]: { loading: false, info: null } })));
+    });
+  }, [activeTab, product?.additives_tags]);
 
   // ── Loading / Error ──────────────────────────────────────────────
   if (loading) {
@@ -556,13 +671,20 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   const productName = product.product_name || product.name || 'Unknown Product';
   const brandName   = product.brands || '';
 
-  const handleShare = async () => {
-    try {
-      const appLink = 'https://apps.apple.com/app/healthyscan/id6743047098';
-      const productName = product.product_name || 'this product';
-      const message = `I just scanned ${productName} on HealthyScan and it scored ${score}/100! 🔍\n\nDownload HealthyScan to check what's really in your food and beauty products:\n${appLink}`;
-      await Share.share({ message, url: appLink });
-    } catch (e) { /* ignore */ }
+  const handleShare = () => setShowShareSheet(true);
+
+  const handleToggleSave = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const newState = await toggleSavedProduct({
+      barcode: product.code || product._id || barcode,
+      name: productName,
+      brand: brandName,
+      image: product.image_url || product.image_front_url || null,
+      productType: 'food',
+      score,
+      ingredients: product.ingredients_text || '',
+    });
+    if (newState !== null) setIsSaved(newState);
   };
 
   // Nutrition grid (up to 3x2)
@@ -576,6 +698,17 @@ const ResultsScreenV2 = ({ route, navigation }) => {
     { label: 'Fiber',    value: getNutVal(nutriments, 'fiber_100g', ['fiber', 'fibre']),                   unit: 'g',    dv: 28,   icon: 'leaf-outline',    type: 'maximize' },
     { label: 'Carbs',    value: getNutVal(nutriments, 'carbohydrates_100g', ['carbohydrates']),             unit: 'g',    dv: 300,  icon: 'grid-outline',    type: 'neutral'  },
   ].filter(r => r.value != null && r.value > 0);
+
+  // Dot color for the Nutrients list — only Sugar/Salt/Fat/Protein have defined
+  // health thresholds; everything else (Energy, Fiber, Carbs, Sat. Fat) is gray.
+  const nutrientDotColor = (label, value) => {
+    if (value == null) return NEUTRAL_300;
+    if (label === 'Sugar')   return value <= 3  ? PRIMARY : value >= 10 ? ERROR_C : WARNING_C;
+    if (label === 'Salt')    return value <= 0.3 ? PRIMARY : value >= 1.5 ? ERROR_C : WARNING_C;
+    if (label === 'Fat')     return value < 3   ? PRIMARY : value >= 17 ? ERROR_C : WARNING_C;
+    if (label === 'Protein') return value >= 10 ? PRIMARY : value < 5  ? ERROR_C : WARNING_C;
+    return NEUTRAL_300;
+  };
 
   // Ingredients
   const analyzedList = analysis?.analyzedIngredients || [];
@@ -603,101 +736,22 @@ const ResultsScreenV2 = ({ route, navigation }) => {
     ...unknownIngs.map(i => ({ ...i, _t: 'unknown' })),
   ];
   const displayed = allIngredients;
+  const activeIngredient = expandedIngredient
+    ? displayed.find(i => (i.name || '').toLowerCase().trim() === expandedIngredient)
+    : null;
+
+  const additiveCodes = (product?.additives_tags || [])
+    .map(t => {
+      const m = t.match(/e(\d{3,4}[a-z]?)/i);
+      return m ? `E${m[1].toUpperCase()}` : t.replace(/^en:/i, '').toUpperCase();
+    })
+    .filter(Boolean);
 
   const ingStyle = (_t) => {
     if (_t === 'good')     return { icon: 'leaf',    color: PRIMARY,   bg: 'rgba(6,122,79,0.08)',  tag: 'GOOD'     };
     if (_t === 'bad')      return { icon: 'close',   color: ERROR_C,   bg: 'rgba(186,26,26,0.08)',  tag: 'CONCERN'  };
     return                        { icon: 'ellipse', color: WARNING_C, bg: 'rgba(217,119,6,0.08)',  tag: 'MODERATE' };
   };
-
-  // ── Ingredient icon — filled icons, never plain circles ──────
-  const getIngIcon = (func, name) => {
-    const n = (((func || '') + ' ' + (name || '')).toLowerCase());
-    // Water / hydration
-    if (n.includes('water') || n.includes('aqua') || n.includes('eau'))               return 'water';
-    // Sugars & sweeteners (honeycomb / sweet)
-    if (n.includes('sugar') || n.includes('sucre') || n.includes('glucose') ||
-        n.includes('fructose') || n.includes('sucrose') || n.includes('dextrose') ||
-        n.includes('maltose') || n.includes('syrup') || n.includes('sirop') ||
-        n.includes('sweetener') || n.includes('miel') || n.includes('honey'))         return 'cafe';
-    // Colors & dyes
-    if (n.includes('color') || n.includes('colour') || n.includes('dye') ||
-        n.includes('colorant') || n.includes('pigment') || n.includes('caramel color')) return 'color-palette';
-    // Preservatives & antioxidants
-    if (n.includes('preserv') || n.includes('sorbate') || n.includes('benzoate') ||
-        n.includes('nitrate') || n.includes('nitrite') || n.includes('sulfite') ||
-        n.includes('bht') || n.includes('bha') || n.includes('tbhq') ||
-        n.includes('antioxidant') || n.includes('conservateur'))                       return 'shield-checkmark';
-    // Acids & regulators
-    if (n.includes('acid') || n.includes('acidity') || n.includes('citrate') ||
-        n.includes('phosphat') || n.includes('carbonate') || n.includes('tartrate'))   return 'flask';
-    // Flavors & aromas
-    if (n.includes('flavor') || n.includes('flavour') || n.includes('aroma') ||
-        n.includes('arôme') || n.includes('arome') || n.includes('spice') ||
-        n.includes('vanilla') || n.includes('vanille'))                                return 'sparkles';
-    // Emulsifiers & thickeners
-    if (n.includes('emulsif') || n.includes('lecithin') || n.includes('stabiliz') ||
-        n.includes('thicken') || n.includes('gum') || n.includes('pectin') ||
-        n.includes('starch') || n.includes('amidon') || n.includes('cellulose'))       return 'layers';
-    // Vitamins & minerals
-    if (n.includes('vitamin') || n.includes('mineral') || n.includes('zinc') ||
-        n.includes('calcium') || n.includes('magnesium') || n.includes('niacin') ||
-        n.includes('riboflavin') || n.includes('thiamin') || n.includes('iron'))       return 'medical';
-    // Oils & fats
-    if (n.includes('fat') || n.includes('oil') || n.includes('butter') ||
-        n.includes('beurre') || n.includes('palm') || n.includes('coconut') ||
-        n.includes('canola') || n.includes('sunflower') || n.includes('olive') ||
-        n.includes('huile') || n.includes('graisse') || n.includes('lipid'))           return 'drop';
-    // Salt & minerals
-    if (n.includes('salt') || n.includes('sodium') || n.includes('potassium') ||
-        n.includes('chloride') || n.includes('sel'))                                   return 'analytics';
-    // Protein / fitness
-    if (n.includes('protein') || n.includes('whey') || n.includes('casein') ||
-        n.includes('gluten') || n.includes('soy') || n.includes('soja'))               return 'barbell';
-    // Dairy & eggs
-    if (n.includes('milk') || n.includes('cream') || n.includes('dairy') ||
-        n.includes('cheese') || n.includes('yogurt') || n.includes('lait') ||
-        n.includes('crème') || n.includes('fromage') || n.includes('yaourt') ||
-        n.includes('oeuf') || n.includes('egg'))                                       return 'egg';
-    // Alcohol
-    if (n.includes('alcohol') || n.includes('ethanol'))                                return 'wine';
-    // Coffee & cocoa
-    if (n.includes('coffee') || n.includes('cocoa') || n.includes('chocolate') ||
-        n.includes('cacao') || n.includes('chocolat'))                                 return 'cafe';
-    // Grains & flour
-    if (n.includes('grain') || n.includes('wheat') || n.includes('flour') ||
-        n.includes('rice') || n.includes('corn') || n.includes('oat') ||
-        n.includes('farine') || n.includes('blé') || n.includes('riz') ||
-        n.includes('céréale') || n.includes('avoine'))                                 return 'grid';
-    // Fruits & berries
-    if (n.includes('fruit') || n.includes('berry') || n.includes('citrus') ||
-        n.includes('lemon') || n.includes('orange') || n.includes('cherry') ||
-        n.includes('citron') || n.includes('pomme') || n.includes('fraise'))           return 'nutrition';
-    // Caffeine & stimulants
-    if (n.includes('caffeine') || n.includes('taurine') || n.includes('guarana'))      return 'flash';
-    // Herbs, botanicals, natural & organic
-    if (n.includes('herb') || n.includes('plant') || n.includes('organic') ||
-        n.includes('natural') || n.includes('botanical') || n.includes('extract') ||
-        n.includes('fleur') || n.includes('flower'))                                   return 'leaf';
-    // Default — nutrition apple, much better than a circle
-    return 'nutrition';
-  };
-
-  const ingCard = (ing) => {
-    const t = ing._t;
-    const color = t === 'good' ? '#067A4F' : t === 'bad' ? '#ef4444' : t === 'moderate' ? '#eab308' : '#9ca3af';
-    const bg    = t === 'good' ? '#dcfce7' : t === 'bad' ? '#fee2e2' : t === 'moderate' ? '#fef9c3' : '#f3f4f6';
-    const tag   = t === 'good' ? 'GOOD'   : t === 'bad' ? 'AVOID'   : t === 'moderate' ? 'MODERATE' : '?';
-    const icon     = getIngIcon(ing.function, ing.name);
-    const func     = ing.function && ing.function !== 'unknown' ? ing.function : '';
-    const desc     = func ? func.charAt(0).toUpperCase() + func.slice(1) : '';
-    return { color, bg, tag, icon, desc };
-  };
-
-  const verdictDesc =
-    score >= 70 ? 'This product has a healthy nutritional profile with beneficial ingredients.'
-    : score >= 40 ? 'This product is moderately healthy. Some ingredients may need attention.'
-    : 'This product contains ingredients that may negatively impact your health.';
 
   // ── Alternatives ─────────────────────────────────────────────
   const altsData = realAlternatives;
@@ -707,205 +761,131 @@ const ResultsScreenV2 = ({ route, navigation }) => {
   // ═════════════════════════════════════════════════════════════════
   return (
     <View style={{ flex: 1, backgroundColor: BG }}>
-      <StatusBar barStyle="dark-content" backgroundColor={BG} />
-
-      {/* ── FIXED HEADER ─────────────────────────────────────────── */}
-      <View style={[st.header, { paddingTop: safeAreaInsets.top + 8 }]}>
-        <View style={st.headerLeft}>
-          <TouchableOpacity
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleGoBack(); }}
-            style={st.iconBtn}
-          >
-            <Ionicons name="arrow-back" size={22} color={PRIMARY} />
-          </TouchableOpacity>
-          <Text style={st.headerTitle}>Scan Results</Text>
-        </View>
-        <View style={st.headerRight}>
-          <Animated.View style={{ transform: [{ scale: shareAnim }] }}>
-            <TouchableOpacity onPress={handleShare} style={st.iconBtn}>
-              <Ionicons name="share-outline" size={22} color={ON_SURFACE_VAR} />
-            </TouchableOpacity>
-          </Animated.View>
-          <View style={st.avatarCircle}>
-            <Ionicons name="person" size={14} color={PRIMARY} />
-          </View>
-        </View>
-      </View>
+      <StatusBar barStyle="light-content" backgroundColor="transparent" translucent />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: safeAreaInsets.top + 56, paddingBottom: safeAreaInsets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 100 }}
       >
         <Animated.View style={{ opacity: fadeAnim }}>
 
-          {/* ── HERO: Product Image with centered Gauge ───────────── */}
-          <View style={st.heroContainer}>
-            <HeroImage
-              imageUrl={product.image_url}
-              barcode={product.barcode || product.code || barcode}
-              imgStyle={st.heroImage}
-            />
-            {/* Light scrim to make gauge readable */}
-            <View style={st.heroScrim} />
-            {/* Gauge centered in hero */}
-            <View style={st.gaugeCenterWrap}>
-              <ScoreGauge score={score} scoreColor={scoreColor} />
-            </View>
-          </View>
-
-          {/* ── PRODUCT SUMMARY ──────────────────────────────────── */}
-          <View style={st.summarySection}>
-            <Text style={[st.ratingLabel, { color: scoreColor }]}>{getRatingLabel(score)}</Text>
-            <Text style={st.productNameText} numberOfLines={2}>{productName}</Text>
-          </View>
-
-          {/* ── WHY THIS SCORE toggle ────────────────────────────── */}
-          <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
-            <TouchableOpacity
-              style={st.whyBtn}
-              onPress={() => setShowWhyScore(prev => !prev)}
-            >
-              <Text style={st.whyBtnText}>
-                {showWhyScore ? 'Hide breakdown' : 'Why this score?'}
-              </Text>
-              <Ionicons
-                name={showWhyScore ? 'chevron-up' : 'chevron-down'}
-                size={14} color={PRIMARY} style={{ marginLeft: 6 }}
+          {/* ── HERO: Product Image with brand/name overlay ───────── */}
+          <Animated.View style={staggerStyle(stagger1)}>
+            <View style={st.heroContainer}>
+              <HeroImage
+                imageUrl={product.image_url}
+                barcode={product.barcode || product.code || barcode}
+                imgStyle={st.heroImage}
               />
+              {/* Gradient: dark at bottom (text legibility) → clear → subtle dark at top (back-button contrast) */}
+              <LinearGradient
+                colors={['rgba(0,0,0,0.10)', 'transparent', 'rgba(0,0,0,0.35)']}
+                locations={[0, 0.45, 1]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              {/* Brand + product name overlay */}
+              <View style={st.heroTextWrap}>
+                {!!brandName && <Text style={st.heroBrand} numberOfLines={1}>{brandName}</Text>}
+                <Text style={st.heroName} numberOfLines={1}>{productName}</Text>
+              </View>
+            </View>
+          </Animated.View>
+
+          {/* ── FLOATING NAV BUTTONS (over hero) ──────────────────── */}
+          <View style={[st.floatingNav, { top: safeAreaInsets.top + 8 }]} pointerEvents="box-none">
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleGoBack(); }}
+              style={st.floatingBtn}
+            >
+              <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+              <Ionicons name="arrow-back" size={20} color={NEUTRAL_800} />
             </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Animated.View style={{ transform: [{ scale: shareAnim }] }}>
+                <TouchableOpacity onPress={handleShare} style={st.floatingBtn}>
+                  <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+                  <Ionicons name="share-social-outline" size={19} color={NEUTRAL_800} />
+                </TouchableOpacity>
+              </Animated.View>
+              <TouchableOpacity onPress={handleToggleSave} style={st.floatingBtn}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={19} color={NEUTRAL_800} />
+              </TouchableOpacity>
+            </View>
           </View>
 
-          {/* ── WHY THIS SCORE BREAKDOWN ──────────────────────────── */}
-          {showWhyScore && enhancedHealthScore && (
-            <View style={st.whySection}>
-              {/* Score component bars */}
-              {enhancedHealthScore.breakdown && (
-                <View style={st.whyBarsWrap}>
-                  {[
-                    { label: 'NUTRITION',   value: enhancedHealthScore.breakdown.nutritionScore,   weight: '55%' },
-                    { label: 'INGREDIENTS', value: enhancedHealthScore.breakdown.ingredientScore,  weight: '30%' },
-                    { label: 'PROCESSING',  value: enhancedHealthScore.breakdown.processingScore,  weight: '10%' },
-                    { label: 'BONUS',       value: enhancedHealthScore.breakdown.positiveBonus,    weight: '5%'  },
-                  ].map((row) => {
-                    const barColor = row.value >= 70 ? PRIMARY : row.value >= 40 ? WARNING_C : ERROR_C;
-                    return (
-                      <View key={row.label} style={st.whyBarRow}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <Text style={st.whyBarLabel}>{row.label}</Text>
-                          <Text style={[st.whyBarLabel, { color: barColor }]}>{Math.round(row.value ?? 0)}/100 · {row.weight}</Text>
-                        </View>
-                        <View style={st.whyBarTrack}>
-                          <View style={[st.whyBarFill, { width: `${Math.round(row.value ?? 0)}%`, backgroundColor: barColor }]} />
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-              {/* Reason pills */}
-              {(enhancedHealthScore.scoreReasons || []).length > 0 && (
-                <View style={st.whyReasonsList}>
-                  {enhancedHealthScore.scoreReasons.slice(0, 8).map((r, idx) => {
-                    const isPenalty = r.type === 'penalty' || (r.impact && r.impact < 0);
-                    const isBonus   = r.type === 'bonus'   || (r.impact && r.impact > 0);
-                    const pillColor = isPenalty ? ERROR_C : isBonus ? PRIMARY : WARNING_C;
-                    const pillBg    = isPenalty ? 'rgba(186,26,26,0.08)' : isBonus ? 'rgba(6,122,79,0.08)' : 'rgba(217,119,6,0.08)';
-                    const pillIcon  = isPenalty ? 'remove-circle-outline' : isBonus ? 'checkmark-circle-outline' : 'information-circle-outline';
-                    const impactStr = r.impact != null
-                      ? (r.impact > 0 ? `+${r.impact}` : String(r.impact === 'cap' ? '⚠ cap' : r.impact))
-                      : '';
-                    return (
-                      <View key={idx} style={[st.whyPill, { backgroundColor: pillBg, borderColor: pillColor + '40' }]}>
-                        <Ionicons name={pillIcon} size={13} color={pillColor} style={{ marginRight: 6 }} />
-                        <Text style={[st.whyPillText, { color: ON_SURFACE_VAR }]}>{r.text}</Text>
-                        {impactStr ? (
-                          <Text style={[st.whyPillImpact, { color: pillColor }]}>{impactStr}</Text>
-                        ) : null}
-                      </View>
-                    );
-                  })}
-                </View>
-              )}
-              {enhancedHealthScore.breakdown?.cappedByHarmfulIngredients && (
-                <View style={[st.whyPill, { backgroundColor: 'rgba(186,26,26,0.08)', borderColor: ERROR_C, marginTop: 4 }]}>
-                  <Ionicons name="warning-outline" size={13} color={ERROR_C} style={{ marginRight: 6 }} />
-                  <Text style={[st.whyPillText, { color: ERROR_C }]}>Score capped at 49 — harmful ingredient detected</Text>
-                </View>
-              )}
+          {/* ── SCORE RING (overlaps hero / content boundary) ─────── */}
+          <Animated.View style={staggerStyle(stagger2)}>
+            <View style={st.gaugeOverlapWrap}>
+              <ScoreGauge score={score} scoreColor={scoreColor} verdict={verdict} />
             </View>
-          )}
+            <Text style={st.scoreCaption}>Health score · /100</Text>
+          </Animated.View>
 
-          {/* ── VERDICT BADGE — hidden, merged into summarySection above ── */}
+          {/* ── WHY THIS SCORE card ───────────────────────────────── */}
+          <Animated.View style={[{ paddingHorizontal: 20, marginBottom: 20 }, staggerStyle(stagger3)]}>
+            <TapScale style={st.whyCard} onPress={openWhySheet}>
+              <View style={st.whyCardIcon}>
+                <Ionicons name="information-circle" size={16} color={PRIMARY} />
+              </View>
+              <Text style={st.whyCardText}>Why this score?</Text>
+              <Ionicons name="chevron-forward" size={17} color={NEUTRAL_300} />
+            </TapScale>
+          </Animated.View>
 
-          {/* ── NUTRITION BENTO GRID ──────────────────────────────── */}
-          {nutGrid.length === 0 && (
+          {/* ── SEGMENTED TABS: Nutrients / Ingredients / Additives ── */}
+          <Animated.View style={[{ paddingHorizontal: 20, marginBottom: 20 }, staggerStyle(stagger4)]}>
+            <View style={st.tabBar}>
+              {[
+                { key: 'nutrients',   label: 'Nutrients',   icon: 'bar-chart' },
+                { key: 'ingredients', label: 'Ingredients', icon: 'leaf' },
+                { key: 'additives',   label: 'Additives',   icon: 'flask' },
+              ].map(tab => {
+                const active = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[st.tabBtn, active && st.tabBtnActive]}
+                    activeOpacity={0.8}
+                    onPress={() => { Haptics.selectionAsync(); setActiveTab(tab.key); }}
+                  >
+                    <Ionicons name={tab.icon} size={14} color={active ? PRIMARY : ON_SURFACE_VAR} style={{ marginRight: 6 }} />
+                    <Text style={[st.tabBtnText, active && st.tabBtnTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </Animated.View>
+
+          {/* ── NUTRIENTS TAB ─────────────────────────────────────── */}
+          {activeTab === 'nutrients' && nutGrid.length === 0 && (
             <View style={st.noNutBox}>
               <Ionicons name="information-circle-outline" size={18} color={OUTLINE} />
               <Text style={st.noNutText}>No nutrition data available for this product</Text>
             </View>
           )}
-          {nutGrid.length > 0 && (
+          {activeTab === 'nutrients' && nutGrid.length > 0 && (
             <View style={st.nutSection}>
-              <View style={st.sectionHeader}>
-                <Text style={st.sectionTitle}>Nutritional Profile</Text>
-                <Text style={st.viewLabels}>VIEW LABELS</Text>
-              </View>
-              <View style={st.bentoGrid}>
-                {(() => {
-                  const rows = [];
-                  for (let i = 0; i < nutGrid.length; i += 2) rows.push(nutGrid.slice(i, i + 2));
-                  return rows.map((pair, rowIdx) => (
-                    <View key={rowIdx} style={[st.bentoRow, rowIdx > 0 && { marginTop: 12 }]}>
-                      {pair.map((item, colIdx) => {
-                        const frac = Math.min(item.value / item.dv, 1);
-                        const pct  = Math.round(frac * 100);
-                        const isHighRisk = (item.label === 'Sugar' && item.value > 12) || (item.label === 'Sat. Fat' && item.value > 5) || (item.label === 'Salt' && item.value > 1.5);
-                        let rating, ratingColor, ratingBg;
-                        if (isHighRisk || (item.type === 'minimize' && pct > 30)) {
-                          rating = 'HIGH';     ratingColor = '#ef4444'; ratingBg = '#fee2e2';
-                        } else if (item.type === 'minimize') {
-                          if (pct > 10) { rating = 'OK';   ratingColor = '#eab308'; ratingBg = '#fef9c3'; }
-                          else          { rating = 'LOW';  ratingColor = '#067A4F'; ratingBg = '#dcfce7'; }
-                        } else if (item.type === 'maximize') {
-                          if (pct >= 30) { rating = 'GOOD';    ratingColor = '#067A4F'; ratingBg = '#dcfce7'; }
-                          else if (pct >= 10) { rating = 'AVERAGE'; ratingColor = '#eab308'; ratingBg = '#fef9c3'; }
-                          else           { rating = 'LOW';     ratingColor = '#eab308'; ratingBg = '#fef9c3'; }
-                        } else {
-                          rating = 'GOOD'; ratingColor = '#067A4F'; ratingBg = '#dcfce7';
-                        }
-                        return (
-                          <View key={colIdx} style={[st.bentoCell, colIdx === 1 && { marginLeft: 12 }]}>
-                            {/* Icon (top-left) + Badge (top-right) */}
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 10 }}>
-                              <Ionicons name={item.icon} size={22} color={ratingColor} />
-                              <View style={[st.bentoCellBadge, { backgroundColor: ratingBg }]}>
-                                <Text style={[st.bentoCellBadgeText, { color: ratingColor }]}>{rating}</Text>
-                              </View>
-                            </View>
-                            {/* Nutrient name */}
-                            <Text style={st.bentoCellLabel} numberOfLines={1}>{item.label}</Text>
-                            {/* Progress bar + value in one row */}
-                            <View style={st.bentoBarRow}>
-                              <View style={st.bentoBar}>
-                                <View style={[st.bentoBarFill, { width: `${pct}%`, backgroundColor: ratingColor }]} />
-                              </View>
-                              <Text style={[st.bentoCellValue, { color: rating === 'HIGH' ? ERROR_C : ON_SURFACE_VAR }]} numberOfLines={1}>
-                                {item.value % 1 === 0 ? item.value : item.value.toFixed(1)}{item.unit === 'kcal' ? ' kcal' : item.unit}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                      {pair.length === 1 && <View style={{ flex: 1, marginLeft: 12 }} />}
+              <View style={{ gap: 8 }}>
+                {nutGrid.map((item, idx) => (
+                  <View key={idx} style={st.nutRow}>
+                    <View style={st.nutRowLeft}>
+                      <View style={[st.nutDot, { backgroundColor: nutrientDotColor(item.label, item.value) }]} />
+                      <Text style={st.nutRowLabel}>{item.label}</Text>
                     </View>
-                  ));
-                })()}
+                    <Text style={st.nutRowValue}>
+                      {item.value % 1 === 0 ? item.value : item.value.toFixed(1)}
+                      <Text style={st.nutRowUnit}> {item.unit}</Text>
+                    </Text>
+                  </View>
+                ))}
               </View>
             </View>
           )}
-
           {/* ── FETCHING INGREDIENTS HINT ────────────────────────── */}
-          {fetchingIngredients && displayed.length === 0 && (
+          {activeTab === 'ingredients' && fetchingIngredients && displayed.length === 0 && (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 28, paddingBottom: 20 }}>
               <ActivityIndicator size="small" color={PRIMARY} />
               <Text style={{ fontSize: 11, color: ON_SURFACE_VAR, letterSpacing: 1, fontWeight: '600' }}>Fetching ingredients...</Text>
@@ -913,105 +893,32 @@ const ResultsScreenV2 = ({ route, navigation }) => {
           )}
 
           {/* ── INGREDIENT BREAKDOWN ──────────────────────────────── */}
-          {displayed.length > 0 && (
+          {activeTab === 'ingredients' && displayed.length > 0 && (
             <View style={st.section}>
-              <View style={st.sectionHeader}>
-                <Text style={st.sectionTitle}>Ingredient Breakdown</Text>
-                <View style={st.ingCountBadge}>
-                  <Text style={st.ingCountText}>{displayed.length} ITEMS</Text>
-                </View>
-              </View>
-              <View style={{ gap: 8 }}>
+              <View style={st.ingListCard}>
                 {displayed.map((ing, idx) => {
-                  const s = ingCard(ing);
-                  const desc = ing.notes || ing.reason || s.desc || null;
-                  const key = (ing.name || '').toLowerCase().trim();
-                  const isExpanded = expandedIngredient === key;
-                  const isLoadingThis = usdaLoading === key;
-                  const usdaInfo = usdaCache[key];
+                  const isGood      = ing._t === 'good';
+                  const statusIcon  = isGood ? 'checkmark' : 'warning';
+                  const statusColor = isGood ? PRIMARY : WARNING_C;
+                  const statusBg    = isGood ? PRIMARY_TINT : AMBER_TINT;
                   return (
                     <TouchableOpacity
                       key={idx}
                       activeOpacity={0.75}
                       onPress={() => handleIngredientTap(ing)}
                     >
-                      <View style={[st.ingCard, { marginBottom: 0 }, isExpanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 }]}>
-                        <View style={[st.ingSquare, { backgroundColor: s.bg }]}>
-                          <Ionicons name={s.icon} size={20} color={s.color} />
+                      <View style={[st.ingRow, idx > 0 && st.ingRowDivider]}>
+                        <View style={[st.ingStatusCircle, { backgroundColor: statusBg }]}>
+                          <Ionicons name={statusIcon} size={13} color={statusColor} />
                         </View>
                         <View style={st.ingCardMeta}>
                           <Text style={st.ingCardName} numberOfLines={1}>{ing.name || 'Unknown'}</Text>
-                          {desc ? <Text style={st.ingCardDesc} numberOfLines={1}>{desc}</Text> : null}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={[st.ingBadge, { backgroundColor: s.bg, borderColor: s.color + '44' }]}>
-                            <Text style={[st.ingBadgeText, { color: s.color }]}>{s.tag}</Text>
-                          </View>
-                          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#8a9e87" />
+                          {ADDITIVE_FUNCTIONS.has((ing.function || '').toLowerCase()) && <Text style={st.ingTagText}>additive</Text>}
+                          <Ionicons name="chevron-forward" size={16} color={NEUTRAL_300} />
                         </View>
                       </View>
-
-                      {isExpanded && (
-                        <View style={st.ingDetailPanel}>
-                          {isLoadingThis ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <ActivityIndicator size="small" color="#067A4F" />
-                              <Text style={st.ingDetailLabel}>Looking up database...</Text>
-                            </View>
-                          ) : usdaInfo ? (
-                            <>
-                              {/* Verdict badge */}
-                              {usdaInfo.healthVerdict && (() => {
-                                const vMap = {
-                                  good:     { bg: 'rgba(6,122,79,0.12)',  text: '#067A4F', label: 'Generally Safe' },
-                                  moderate: { bg: 'rgba(217,119,6,0.12)',  text: '#d97706', label: 'Moderate' },
-                                  concern:  { bg: 'rgba(217,119,6,0.18)',  text: '#b45309', label: 'Use With Caution' },
-                                  avoid:    { bg: 'rgba(186,26,26,0.12)',  text: '#ba1a1a', label: 'Avoid' },
-                                };
-                                const vc = vMap[usdaInfo.healthVerdict] || vMap.moderate;
-                                return (
-                                  <View style={[st.ingVerdictBadge, { backgroundColor: vc.bg }]}>
-                                    <Text style={[st.ingVerdictText, { color: vc.text }]}>{vc.label}</Text>
-                                  </View>
-                                );
-                              })()}
-
-                              {/* What is it */}
-                              <View style={st.ingDetailRow}>
-                                <Ionicons name="information-circle-outline" size={16} color="#067A4F" />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={st.ingDetailLabel}>What is it?</Text>
-                                  <Text style={st.ingDetailText}>{usdaInfo.whatItIs}</Text>
-                                </View>
-                              </View>
-
-                              {/* What does it do */}
-                              <View style={[st.ingDetailRow, { marginTop: 10 }]}>
-                                <Ionicons name="flash-outline" size={16} color="#067A4F" />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={st.ingDetailLabel}>What does it do?</Text>
-                                  <Text style={st.ingDetailText}>{usdaInfo.whatItDoes}</Text>
-                                </View>
-                              </View>
-
-                              {/* WHO / JECFA */}
-                              {usdaInfo.whoSays ? (
-                                <View style={[st.ingDetailRow, { marginTop: 10 }]}>
-                                  <Ionicons name="globe-outline" size={16} color="#1565c0" />
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={[st.ingDetailLabel, { color: '#1565c0' }]}>WHO / JECFA</Text>
-                                    <Text style={st.ingDetailText}>{usdaInfo.whoSays}</Text>
-                                  </View>
-                                </View>
-                              ) : null}
-
-                              <Text style={st.ingDetailSource}>Source: {usdaInfo.source}</Text>
-                            </>
-                          ) : (
-                            <Text style={st.ingDetailText}>No information available for this ingredient.</Text>
-                          )}
-                        </View>
-                      )}
                     </TouchableOpacity>
                   );
                 })}
@@ -1020,9 +927,8 @@ const ResultsScreenV2 = ({ route, navigation }) => {
           )}
 
           {/* ── RAW INGREDIENTS FALLBACK (when analyzer has no data) ── */}
-          {displayed.length === 0 && product.ingredients_text && product.ingredients_text.length > 5 && (
+          {activeTab === 'ingredients' && displayed.length === 0 && product.ingredients_text && product.ingredients_text.length > 5 && (
             <View style={st.section}>
-              <Text style={st.sectionTitle}>INGREDIENTS</Text>
               <View style={[st.ingCard, { paddingVertical: 16 }]}>
                 <Text style={{ fontSize: 12, color: ON_SURFACE_VAR, lineHeight: 20 }}>
                   {product.ingredients_text}
@@ -1031,113 +937,63 @@ const ResultsScreenV2 = ({ route, navigation }) => {
             </View>
           )}
 
-          {/* ── ADDITIVES ─────────────────────────────────────────── */}
-          {(() => {
-            const additiveTags = product.additives_tags || [];
-            const formatted = additiveTags
-              .map(t => {
-                const m = t.match(/e(\d{3,4}[a-z]?)/i);
-                return m ? `E${m[1].toUpperCase()}` : t.replace(/^en:/i, '').toUpperCase();
-              })
-              .filter(Boolean);
-            if (formatted.length === 0) return null;
-            return (
-              <View style={[st.section, { paddingTop: 0 }]}>
-                <Text style={st.sectionTitle}>ADDITIVES ({formatted.length})</Text>
-                <Text style={{ fontSize: 11, color: ON_SURFACE_VAR, marginBottom: 10, marginTop: 2 }}>Tap any code to learn more</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {formatted.map((code, idx) => {
-                    const isActive = selectedAdditive === code;
-                    return (
-                      <TouchableOpacity
-                        key={idx}
-                        onPress={() => handleAdditiveTap(code)}
-                        activeOpacity={0.7}
-                        style={[st.additivePill, isActive && st.additivePillActive]}
-                      >
-                        <Text style={[st.additivePillText, isActive && st.additivePillTextActive]}>{code}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Additive info panel */}
-                {selectedAdditive && (
-                  <View style={st.additivePanel}>
-                    {additiveLoading ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <ActivityIndicator size="small" color="#067A4F" />
-                        <Text style={st.ingDetailLabel}>Looking up {selectedAdditive}...</Text>
-                      </View>
-                    ) : additiveInfo ? (
-                      <>
-                        {/* Header */}
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                          <View style={st.additivePanelCode}>
-                            <Text style={st.additivePanelCodeText}>{additiveInfo.code}</Text>
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: '700', color: '#1a1c19' }}>{additiveInfo.name}</Text>
-                            <Text style={{ fontSize: 11, color: '#8a9e87', marginTop: 1 }}>{additiveInfo.category}</Text>
-                          </View>
-                          {/* Verdict badge */}
-                          {(() => {
-                            const vMap = {
-                              good:     { bg: 'rgba(6,122,79,0.12)',  text: '#067A4F', label: 'Safe' },
-                              moderate: { bg: 'rgba(217,119,6,0.12)',  text: '#d97706', label: 'Moderate' },
-                              concern:  { bg: 'rgba(217,119,6,0.18)',  text: '#b45309', label: 'Caution' },
-                              avoid:    { bg: 'rgba(186,26,26,0.12)',  text: '#ba1a1a', label: 'Avoid' },
-                            };
-                            const vc = vMap[additiveInfo.healthVerdict] || vMap.moderate;
-                            return (
-                              <View style={[st.ingVerdictBadge, { backgroundColor: vc.bg, marginBottom: 0 }]}>
-                                <Text style={[st.ingVerdictText, { color: vc.text }]}>{vc.label}</Text>
-                              </View>
-                            );
-                          })()}
-                        </View>
-
-                        <View style={st.ingDetailRow}>
-                          <Ionicons name="information-circle-outline" size={16} color="#067A4F" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={st.ingDetailLabel}>What is it?</Text>
-                            <Text style={st.ingDetailText}>{additiveInfo.whatItIs}</Text>
-                          </View>
-                        </View>
-
-                        <View style={[st.ingDetailRow, { marginTop: 10 }]}>
-                          <Ionicons name="flash-outline" size={16} color="#067A4F" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={st.ingDetailLabel}>What does it do?</Text>
-                            <Text style={st.ingDetailText}>{additiveInfo.whatItDoes}</Text>
-                          </View>
-                        </View>
-
-                        <View style={[st.ingDetailRow, { marginTop: 10 }]}>
-                          <Ionicons name="globe-outline" size={16} color="#1565c0" />
-                          <View style={{ flex: 1 }}>
-                            <Text style={[st.ingDetailLabel, { color: '#1565c0' }]}>WHO / JECFA</Text>
-                            <Text style={st.ingDetailText}>{additiveInfo.whoSays}</Text>
-                          </View>
-                        </View>
-
-                        <Text style={st.ingDetailSource}>Source: {additiveInfo.source}</Text>
-                      </>
-                    ) : null}
-                  </View>
-                )}
-              </View>
-            );
-          })()}
-
-          {/* ── BETTER ALTERNATIVES ───────────────────────────────── */}
-          <View style={st.altSection}>
-            <View style={st.altHeader}>
-              <Text style={st.sectionTitle}>Better Alternatives</Text>
-              <TouchableOpacity>
-                <Text style={st.altViewAll}>VIEW ALL</Text>
-              </TouchableOpacity>
+          {/* ── NO INGREDIENT DATA AT ALL ──────────────────────────── */}
+          {activeTab === 'ingredients' && !fetchingIngredients && displayed.length === 0 &&
+            (!product.ingredients_text || product.ingredients_text.length <= 5) && (
+            <View style={st.emptyTabBox}>
+              <Text style={st.emptyTabText}>No ingredient list available.</Text>
             </View>
+          )}
+
+          {/* ── ADDITIVES ─────────────────────────────────────────── */}
+          {activeTab === 'additives' && additiveCodes.length === 0 && (
+            <View style={st.section}>
+              <View style={st.cleanBox}>
+                <Ionicons name="leaf" size={18} color={PRIMARY} />
+                <Text style={st.cleanBoxText}>No additives detected — clean product.</Text>
+              </View>
+            </View>
+          )}
+          {activeTab === 'additives' && additiveCodes.length > 0 && (
+            <View style={[st.section, { gap: 8 }]}>
+              {additiveCodes.map((code, idx) => {
+                const entry = additivesMap[code];
+                const isLoading = !entry || entry.loading;
+                const info = entry?.info;
+                const risk = riskTier(info?.healthVerdict);
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.75}
+                    onPress={() => handleAdditiveTap(code)}
+                  >
+                    <View style={st.additiveCard}>
+                      <View style={[st.additiveCardCircle, { backgroundColor: risk.bg }]}>
+                        {isLoading ? (
+                          <ActivityIndicator size="small" color={risk.color} />
+                        ) : (
+                          <Ionicons name={risk.icon} size={16} color={risk.color} />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={st.additiveCardName} numberOfLines={1}>{isLoading ? code : (info?.name || code)}</Text>
+                        <Text style={[st.additiveCardRisk, { color: risk.color }]}>
+                          {isLoading ? 'Loading…' : risk.label}
+                        </Text>
+                        {!isLoading && !!info?.whatItIs && (
+                          <Text style={st.additiveCardDesc} numberOfLines={2}>{info.whatItIs}</Text>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* ── BETTER CHOICES ────────────────────────────────────── */}
+          <View style={st.altSection}>
+            <Text style={st.altSectionLabel}>BETTER CHOICES</Text>
             {altsLoading && realAlternatives.length === 0 ? (
               <View style={{ paddingVertical: 28, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={PRIMARY} />
@@ -1153,38 +1009,25 @@ const ResultsScreenV2 = ({ route, navigation }) => {
                 keyExtractor={(_, i) => String(i)}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 20, gap: 12 }}
+                contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
                 renderItem={({ item }) => {
                   const altScoreColor = getScoreColor(item.score);
                   return (
                     <TouchableOpacity
                       style={st.altCard}
-                      activeOpacity={item.barcode ? 0.88 : 1}
+                      activeOpacity={item.barcode ? 0.85 : 1}
                       onPress={() => {
                         if (item.barcode) {
                           navigation.push('ResultsV2', { barcode: item.barcode });
                         }
                       }}
                     >
-                      {/* Square image inside card with score badge */}
                       <View style={st.altImgBox}>
                         <AltImg uri={item.image} barcode={item.barcode} imgStyle={st.altImg} placeholderStyle={st.altImgPlaceholder} />
-                        <View style={[st.altScorePill, { backgroundColor: altScoreColor }]}>
-                          <Text style={st.altScorePillText}>{item.score}/100</Text>
-                        </View>
                       </View>
-                      {/* Info */}
                       <Text style={st.altName} numberOfLines={1}>{item.name || ''}</Text>
                       <Text style={st.altBrand} numberOfLines={1}>{item.brand || ''}</Text>
-                      {item.barcode ? (
-                        <View style={st.altViewBtn}>
-                          <Text style={st.altViewBtnText}>VIEW ITEM</Text>
-                        </View>
-                      ) : (
-                        <View style={[st.altViewBtn, { opacity: 0.4 }]}>
-                          <Text style={st.altViewBtnText}>SUGGESTION</Text>
-                        </View>
-                      )}
+                      <Text style={[st.altScoreText, { color: altScoreColor }]}>{item.score}/100</Text>
                     </TouchableOpacity>
                   );
                 }}
@@ -1192,66 +1035,51 @@ const ResultsScreenV2 = ({ route, navigation }) => {
             )}
           </View>
 
-          {/* ── AURA AI CARD ──────────────────────────────────────── */}
-          <View style={st.aiCardWrap}>
-            <TouchableOpacity
-              style={st.aiCard}
-              activeOpacity={0.82}
-              onPress={async () => {
-                if (isPremium || hasAIAccess) {
-                  setShowAIChat(true);
-                } else if (freeRecUsage.remaining > 0) {
-                  const result = await useFreeRecommendation();
-                  if (result.success) { setFreeRecUsage(result.usage); setHasAIAccess(true); setShowAIChat(true); }
-                } else {
-                  navigation.navigate('Subscription', { returnTo: 'results', productName: product?.product_name });
-                }
-              }}
-            >
-              {/* Green sparkle icon */}
-              <View style={st.aiCardIcon}>
-                <Ionicons name="sparkles" size={22} color={PRIMARY} />
-              </View>
-              {/* Text */}
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
-                <Text style={st.aiCardSub}>Ask about these{`\n`}ingredients</Text>
-              </View>
-              {/* Connect */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={st.aiCardConnect}>ASK</Text>
-                <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
-              </View>
-            </TouchableOpacity>
-          </View>
+          {/* ── PRODUCT CODE ──────────────────────────────────────── */}
+          {!!(product.code || product.barcode || barcode) && (
+            <Text style={st.barcodeFooter}>{product.code || product.barcode || barcode}</Text>
+          )}
 
-          {/* ── SAVE TO HISTORY ──────────────────────────────────── */}
-          <View style={st.saveWrap}>
-            <TouchableOpacity
-              style={st.saveBtn}
-              activeOpacity={0.9}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                saveToHistoryUtil({
-                  barcode: product.code || product._id || barcode,
-                  productName: product.product_name || product.productName || 'Unknown Product',
-                  productImage: product.image_url || product.image_front_url || null,
-                  productType: 'food',
-                  score,
-                  ingredients: product.ingredients_text || '',
-                  source: product.source || 'Open Food Facts',
-                });
-              }}
-            >
-              <Text style={st.saveBtnText}>Save to History</Text>
-            </TouchableOpacity>
-          </View>
+          {/* ── AURA AI CARD ──────────────────────────────────────── */}
+          {AI_CHAT_ENABLED && (
+            <View style={st.aiCardWrap}>
+              <TouchableOpacity
+                style={st.aiCard}
+                activeOpacity={0.82}
+                onPress={async () => {
+                  if (isPremium || hasAIAccess) {
+                    setShowAIChat(true);
+                  } else if (freeRecUsage.remaining > 0) {
+                    const result = await useFreeRecommendation();
+                    if (result.success) { setFreeRecUsage(result.usage); setHasAIAccess(true); setShowAIChat(true); }
+                  } else {
+                    navigation.navigate('Subscription', { returnTo: 'results', productName: product?.product_name });
+                  }
+                }}
+              >
+                {/* Green sparkle icon */}
+                <View style={st.aiCardIcon}>
+                  <Ionicons name="sparkles" size={22} color={PRIMARY} />
+                </View>
+                {/* Text */}
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                  <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
+                  <Text style={st.aiCardSub}>Ask about these{`\n`}ingredients</Text>
+                </View>
+                {/* Connect */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={st.aiCardConnect}>ASK</Text>
+                  <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
 
         </Animated.View>
       </ScrollView>
 
       {/* ── AI Chat overlay ──────────────────────────────────────── */}
-      {showAIChat && product && (
+      {AI_CHAT_ENABLED && showAIChat && product && (
         <ProductAIChat
           product={product}
           analysis={analysis}
@@ -1260,6 +1088,224 @@ const ResultsScreenV2 = ({ route, navigation }) => {
           onClose={() => setShowAIChat(false)}
         />
       )}
+
+      {/* ── WHY THIS SCORE — bottom sheet ─────────────────────────── */}
+      <Modal
+        visible={showWhyScore}
+        transparent
+        animationType="none"
+        onRequestClose={closeWhySheet}
+      >
+        <TouchableOpacity style={st.ingSheetOverlay} activeOpacity={1} onPress={closeWhySheet}>
+          <Animated.View style={[st.ingSheet, { transform: [{ translateY: whySheetY }] }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={st.ingSheetHandle} />
+              <View style={st.ingSheetHeader}>
+                <Text style={st.ingSheetTitle}>Why this score</Text>
+                <TouchableOpacity style={st.ingSheetClose} onPress={closeWhySheet}>
+                  <Ionicons name="close" size={18} color={ON_SURFACE} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={st.ingSheetBody} showsVerticalScrollIndicator={false}>
+                {enhancedHealthScore?.breakdown && (
+                  <View style={st.whyBarsWrap}>
+                    {[
+                      { label: 'NUTRITION',   value: enhancedHealthScore.breakdown.nutritionScore,   weight: '55%' },
+                      { label: 'INGREDIENTS', value: enhancedHealthScore.breakdown.ingredientScore,  weight: '30%' },
+                      { label: 'PROCESSING',  value: enhancedHealthScore.breakdown.processingScore,  weight: '10%' },
+                      { label: 'BONUS',       value: enhancedHealthScore.breakdown.positiveBonus,    weight: '5%'  },
+                    ].map((row) => {
+                      const barColor = row.value >= 70 ? PRIMARY : row.value >= 40 ? WARNING_C : ERROR_C;
+                      return (
+                        <View key={row.label} style={st.whyBarRow}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <Text style={st.whyBarLabel}>{row.label}</Text>
+                            <Text style={[st.whyBarLabel, { color: barColor }]}>{Math.round(row.value ?? 0)}/100 · {row.weight}</Text>
+                          </View>
+                          <View style={st.whyBarTrack}>
+                            <View style={[st.whyBarFill, { width: `${Math.round(row.value ?? 0)}%`, backgroundColor: barColor }]} />
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+                {(enhancedHealthScore?.scoreReasons || []).length > 0 ? (
+                  <View style={st.whyDotList}>
+                    {enhancedHealthScore.scoreReasons.slice(0, 8).map((r, idx) => {
+                      const isPenalty = r.type === 'penalty' || (r.impact && r.impact < 0);
+                      const isBonus   = r.type === 'bonus'   || (r.impact && r.impact > 0);
+                      const dotColor  = isPenalty ? ERROR_C : isBonus ? PRIMARY : WARNING_C;
+                      return (
+                        <View key={idx} style={st.whyDotRow}>
+                          <View style={[st.whyDot, { backgroundColor: dotColor }]} />
+                          <Text style={st.whyDotText}>{r.text}</Text>
+                        </View>
+                      );
+                    })}
+                    {enhancedHealthScore?.breakdown?.cappedByHarmfulIngredients && (
+                      <View style={st.whyDotRow}>
+                        <View style={[st.whyDot, { backgroundColor: ERROR_C }]} />
+                        <Text style={st.whyDotText}>Score capped at 49 — harmful ingredient detected</Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <Text style={st.ingSheetText}>No detailed breakdown available for this product.</Text>
+                )}
+              </ScrollView>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── INGREDIENT DETAIL — bottom sheet ──────────────────────── */}
+      <Modal
+        visible={!!expandedIngredient}
+        transparent
+        animationType="none"
+        onRequestClose={closeIngredientSheet}
+      >
+        <TouchableOpacity style={st.ingSheetOverlay} activeOpacity={1} onPress={closeIngredientSheet}>
+          <Animated.View style={[st.ingSheet, { transform: [{ translateY: ingSheetY }] }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={st.ingSheetHandle} />
+              {activeIngredient && (() => {
+                const isGood = activeIngredient._t === 'good';
+                const pillBg = isGood ? PRIMARY_TINT : AMBER_TINT;
+                const pillColor = isGood ? PRIMARY : AMBER_600;
+                const pillLabel = isGood
+                  ? (activeIngredient.function && activeIngredient.function !== 'unknown' ? activeIngredient.function : 'natural')
+                  : 'additive';
+                const usdaInfo = usdaCache[expandedIngredient];
+                const isLoadingThis = usdaLoading === expandedIngredient;
+                return (
+                  <>
+                    <View style={st.ingSheetHeader}>
+                      <Text style={st.ingSheetTitle}>{activeIngredient.name || 'Unknown'}</Text>
+                      <TouchableOpacity style={st.ingSheetClose} onPress={closeIngredientSheet}>
+                        <Ionicons name="close" size={18} color={ON_SURFACE} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={[st.ingSheetPill, { backgroundColor: pillBg }]}>
+                      <Text style={[st.ingSheetPillText, { color: pillColor }]}>{pillLabel}</Text>
+                    </View>
+                    <ScrollView style={st.ingSheetBody} showsVerticalScrollIndicator={false}>
+                      {isLoadingThis ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+                          <ActivityIndicator size="small" color={PRIMARY} />
+                          <Text style={st.ingDetailLabel}>Looking up database...</Text>
+                        </View>
+                      ) : usdaInfo ? (
+                        <>
+                          <Text style={st.ingSheetText}>{usdaInfo.whatItIs}</Text>
+                          {usdaInfo.whatItDoes ? (
+                            <>
+                              <Text style={[st.ingDetailLabel, { marginTop: 16 }]}>What does it do?</Text>
+                              <Text style={st.ingSheetText}>{usdaInfo.whatItDoes}</Text>
+                            </>
+                          ) : null}
+                          {usdaInfo.whoSays ? (
+                            <>
+                              <Text style={[st.ingDetailLabel, { color: '#1565c0', marginTop: 16 }]}>WHO / JECFA</Text>
+                              <Text style={st.ingSheetText}>{usdaInfo.whoSays}</Text>
+                            </>
+                          ) : null}
+                          <Text style={st.ingDetailSource}>Source: {usdaInfo.source}</Text>
+                        </>
+                      ) : (
+                        <View style={st.ingEmptyCard}>
+                          <View style={st.ingEmptyIconWrap}>
+                            <Ionicons name="information-outline" size={22} color={ON_SURFACE_VAR} />
+                          </View>
+                          <Text style={st.ingEmptyTitle}>No info available</Text>
+                          <Text style={st.ingEmptyNote}>
+                            We couldn't find detailed data for this ingredient yet. It's still listed on the product label.
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </>
+                );
+              })()}
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── ADDITIVE DETAIL — bottom sheet ────────────────────────── */}
+      <Modal
+        visible={!!selectedAdditive}
+        transparent
+        animationType="none"
+        onRequestClose={closeAdditiveSheet}
+      >
+        <TouchableOpacity style={st.ingSheetOverlay} activeOpacity={1} onPress={closeAdditiveSheet}>
+          <Animated.View style={[st.ingSheet, { transform: [{ translateY: additiveSheetY }] }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={st.ingSheetHandle} />
+              <View style={st.ingSheetHeader}>
+                <Text style={st.ingSheetTitle}>{additiveInfo?.name || selectedAdditive}</Text>
+                <TouchableOpacity style={st.ingSheetClose} onPress={closeAdditiveSheet}>
+                  <Ionicons name="close" size={18} color={ON_SURFACE} />
+                </TouchableOpacity>
+              </View>
+              {!additiveLoading && (() => {
+                const risk = riskTier(additiveInfo?.healthVerdict);
+                return (
+                  <View style={[st.ingSheetPill, { backgroundColor: risk.bg }]}>
+                    <Text style={[st.ingSheetPillText, { color: risk.color }]}>{risk.label}</Text>
+                  </View>
+                );
+              })()}
+              <ScrollView style={st.ingSheetBody} showsVerticalScrollIndicator={false}>
+                {additiveLoading ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+                    <ActivityIndicator size="small" color={PRIMARY} />
+                    <Text style={st.ingDetailLabel}>Loading…</Text>
+                  </View>
+                ) : additiveInfo ? (
+                  <>
+                    <Text style={st.ingSheetText}>{additiveInfo.whatItIs}</Text>
+                    {additiveInfo.whatItDoes ? (
+                      <>
+                        <Text style={[st.ingDetailLabel, { marginTop: 16 }]}>What does it do?</Text>
+                        <Text style={st.ingSheetText}>{additiveInfo.whatItDoes}</Text>
+                      </>
+                    ) : null}
+                    {additiveInfo.whoSays ? (
+                      <>
+                        <Text style={[st.ingDetailLabel, { color: '#1565c0', marginTop: 16 }]}>WHO / JECFA</Text>
+                        <Text style={st.ingSheetText}>{additiveInfo.whoSays}</Text>
+                      </>
+                    ) : null}
+                    <Text style={st.ingDetailSource}>Source: {additiveInfo.source}</Text>
+                  </>
+                ) : (
+                  <View style={st.ingEmptyCard}>
+                    <View style={st.ingEmptyIconWrap}>
+                      <Ionicons name="information-outline" size={22} color={ON_SURFACE_VAR} />
+                    </View>
+                    <Text style={st.ingEmptyTitle}>No info available</Text>
+                    <Text style={st.ingEmptyNote}>
+                      We couldn't find detailed data for this additive yet. It's still listed on the product label.
+                    </Text>
+                  </View>
+                )}
+              </ScrollView>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      <ShareScoreSheet
+        visible={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        score={score}
+        productName={productName}
+        brandName={brandName}
+        verdict={verdict}
+      />
     </View>
   );
 };
@@ -1268,16 +1314,16 @@ const ResultsScreenV2 = ({ route, navigation }) => {
 // GAUGE STYLES
 // ═══════════════════════════════════════════════════════════════════
 const g = StyleSheet.create({
-  container: { width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
+  container: { width: 128, height: 128, alignItems: 'center', justifyContent: 'center' },
   gaugeBg: {
     position: 'absolute',
-    width: 170, height: 170, borderRadius: 85,
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
+    width: 128, height: 128, borderRadius: 64,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
   },
-  center:      { position: 'absolute', alignItems: 'center' },
-  scoreNum:    { fontSize: 52, fontWeight: '800', letterSpacing: -2, lineHeight: 56 },
-  scoreDenom:  { fontSize: 16, fontWeight: '500', color: ON_SURFACE_VAR, marginTop: -2 },
+  center:        { position: 'absolute', alignItems: 'center' },
+  scoreNum:      { fontSize: 30, fontWeight: '800', letterSpacing: -0.5, lineHeight: 34 },
+  scoreVerdict:  { fontSize: 12, fontWeight: '600', marginTop: 1 },
 });
 
 // ═══════════════════════════════════════════════════════════════════
@@ -1290,205 +1336,201 @@ const st = StyleSheet.create({
   goBackBtn:     { marginTop: 24, borderRadius: 24, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 },
   goBackBtnText: { color: ON_SURFACE, fontSize: 14, fontWeight: '600' },
 
-  // Header
-  header: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
-    backgroundColor: SURFACE,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)',
+  // Hero
+  heroContainer: { width: '100%', height: 288, position: 'relative', backgroundColor: SURFACE_HIGH, overflow: 'hidden' },
+  heroImage:     { width: '100%', height: '100%' },
+  heroTextWrap:  { position: 'absolute', left: 20, right: 20, bottom: 16 },
+  heroBrand:     { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
+  heroName:      { fontSize: 20, fontWeight: '800', color: WHITE, lineHeight: 24 },
+
+  // Floating nav buttons over the hero
+  floatingNav: { position: 'absolute', left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', zIndex: 50 },
+  floatingBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
-  headerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle:  { fontSize: 17, fontWeight: '700', color: ON_SURFACE },
-  iconBtn:      { padding: 8 },
-  avatarCircle: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(6,122,79,0.1)',
+
+  // Score ring — overlaps hero/content boundary
+  gaugeOverlapWrap: { alignItems: 'center', marginTop: -40 },
+  scoreCaption:     { textAlign: 'center', fontSize: 12, color: NEUTRAL_400, marginTop: 10, marginBottom: 20 },
+
+  // Why this score card
+  whyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: SURFACE_LOW, borderRadius: 16, borderWidth: 1, borderColor: NEUTRAL_100,
+    padding: 16,
+  },
+  whyCardIcon: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: PRIMARY_TINT,
     alignItems: 'center', justifyContent: 'center',
   },
+  whyCardText: { flex: 1, fontSize: 14, fontWeight: '600', color: ON_SURFACE },
 
-  // Hero with centered gauge
-  heroContainer:  { width: '100%', height: 280, position: 'relative', backgroundColor: SURFACE_HIGH },
-  heroImage:      { width: '100%', height: '100%' },
-  heroScrim:      { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(251,251,249,0.18)' },
-  gaugeCenterWrap:{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
-
-  // Product summary (below hero)
-  summarySection: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
-  saveToBestBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: 8, backgroundColor: PRIMARY, borderRadius: 24,
-    paddingVertical: 14, paddingHorizontal: 20, marginTop: 14,
-  },
-  saveToBestTxt: { color: WHITE, fontSize: 15, fontWeight: '700' },
-  ratingLabel:    { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
-  productNameText:{ fontSize: 20, fontWeight: '700', color: ON_SURFACE, lineHeight: 26, marginBottom: 4 },
-  brandLabel:     { fontSize: 13, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8 },
-  verdictDesc:    { fontSize: 13, color: ON_SURFACE_VAR, lineHeight: 20, marginBottom: 4 },
-
-  // Why this score
-  whyBtn: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 10, paddingHorizontal: 16,
-    borderRadius: 24, borderWidth: 1, borderColor: 'rgba(6,122,79,0.25)',
-    backgroundColor: 'rgba(6,122,79,0.06)',
-    marginBottom: 4,
-  },
-  whyBtnText: { fontSize: 13, fontWeight: '600', color: PRIMARY, flex: 1 },
-  verdictBadge:     { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginBottom: 16 },
-  verdictBadgeText: { fontSize: 12, fontWeight: '600' },
-
-  // WHY THIS SCORE expandable
-  whySection: {
-    marginHorizontal: 20, marginBottom: 24,
-    backgroundColor: SURFACE_LOW, borderRadius: 20,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
-    padding: 20,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
-  },
-  whyBarsWrap:    { marginBottom: 16 },
+  // WHY THIS SCORE sheet content
+  whyBarsWrap:    { marginBottom: 20 },
   whyBarRow:      { marginBottom: 12 },
   whyBarLabel:    { fontSize: 11, fontWeight: '600', color: ON_SURFACE_VAR, marginBottom: 4 },
-  whyBarTrack:    { height: 6, backgroundColor: SURFACE_HIGH, borderRadius: 3, overflow: 'hidden' },
+  whyBarTrack:    { height: 6, backgroundColor: TRACK_BG, borderRadius: 3, overflow: 'hidden' },
   whyBarFill:     { height: 6, borderRadius: 3 },
-  whyReasonsList: { gap: 6 },
-  whyPill: {
-    flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap',
-    paddingVertical: 10, paddingHorizontal: 14,
-    borderRadius: 12, borderWidth: 1, marginBottom: 4,
+  whyDotList:     { gap: 14 },
+  whyDotRow:      { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  whyDot:         { width: 10, height: 10, borderRadius: 5, marginTop: 4, flexShrink: 0 },
+  whyDotText:     { flex: 1, fontSize: 14, lineHeight: 20, color: ON_SURFACE },
+
+  // Segmented tab bar
+  tabBar: {
+    flexDirection: 'row', height: 44, backgroundColor: NEUTRAL_100, borderRadius: 16, padding: 4,
   },
-  whyPillText:   { flex: 1, fontSize: 13, lineHeight: 18, color: ON_SURFACE_VAR },
-  whyPillImpact: { fontSize: 12, fontWeight: '700', marginLeft: 8 },
+  tabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 12,
+  },
+  tabBtnActive: {
+    backgroundColor: WHITE,
+  },
+  tabBtnText:       { fontSize: 12, fontWeight: '500', color: ON_SURFACE_VAR },
+  tabBtnTextActive: { color: PRIMARY, fontWeight: '600' },
 
-  // Nutrition section
-  nutSection:  { paddingHorizontal: 20, paddingBottom: 4 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  viewLabels:    { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
-
+  // Nutrition section (simple list rows)
+  nutSection: { paddingHorizontal: 20, paddingBottom: 4, marginBottom: 8 },
   noNutBox: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 18, paddingHorizontal: 20,
-    marginBottom: 24,
-    borderWidth: 1, borderColor: OUTLINE,
+    marginHorizontal: 20, marginBottom: 24,
+    borderWidth: 1, borderColor: NEUTRAL_100,
     borderRadius: 16, backgroundColor: SURFACE_LOW,
   },
   noNutText: { fontSize: 13, color: ON_SURFACE_VAR, flex: 1 },
-  bentoGrid:         { marginBottom: 20 },
-  bentoRow:          { flexDirection: 'row' },
-  bentoCell:         {
-    flex: 1, backgroundColor: SURFACE_HIGH, borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
+  nutRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderWidth: 1, borderColor: NEUTRAL_100, borderRadius: 16,
+    paddingVertical: 12, paddingHorizontal: 16,
+    backgroundColor: SURFACE_LOW,
   },
-  bentoCellBadge:    { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 20, flexShrink: 0 },
-  bentoCellBadgeText:{ fontSize: 9, fontWeight: '800', letterSpacing: 0.4 },
-  bentoCellLabel:    { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 8 },
-  bentoBarRow:       { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  bentoBar:          { flex: 1, height: 4, backgroundColor: SURFACE_HIGH, borderRadius: 2, overflow: 'hidden' },
-  bentoBarFill:      { height: 4, borderRadius: 2 },
-  bentoCellValue:    { fontSize: 14, fontWeight: '700', flexShrink: 0 },
+  nutRowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  nutDot:      { width: 10, height: 10, borderRadius: 5 },
+  nutRowLabel: { fontSize: 14, color: NEUTRAL_600, fontWeight: '500' },
+  nutRowValue: { fontSize: 14, color: ON_SURFACE, fontWeight: '600' },
+  nutRowUnit:  { fontSize: 12, color: NEUTRAL_400, fontWeight: '500' },
 
   // Ingredients
-  section:      { paddingHorizontal: 20, paddingBottom: 12 },
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 0 },
+  section: { paddingHorizontal: 20, paddingBottom: 12 },
 
-  ingCountBadge: { backgroundColor: 'rgba(6,122,79,0.1)', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999 },
-  ingCountText:  { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
-
-  // Ingredient — each row is its own white card
+  // Ingredients — one continuous card, rows separated by hairline dividers
+  ingListCard: {
+    backgroundColor: SURFACE_LOW, borderRadius: 16,
+    borderWidth: 1, borderColor: NEUTRAL_100,
+    overflow: 'hidden',
+  },
+  ingRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 12, paddingHorizontal: 16,
+  },
+  ingRowDivider: {
+    borderTopWidth: 1, borderTopColor: NEUTRAL_100,
+  },
+  // Legacy single-card style — still used by the raw-ingredients-text fallback
   ingCard:  {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: SURFACE_LOW, borderRadius: 16, padding: 14,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.06)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 1,
-    marginBottom: 8,
+    backgroundColor: SURFACE_LOW, borderRadius: 16, paddingVertical: 11, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: NEUTRAL_100,
   },
-  ingSquare:     { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 },
+  ingStatusCircle: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 },
   ingCardMeta:   { flex: 1, marginRight: 10 },
-  ingCardName:   { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 2 },
-  ingCardDesc:   { fontSize: 12, color: ON_SURFACE_VAR, lineHeight: 16 },
-  ingBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1, flexShrink: 0 },
-  ingBadgeText:  { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  ingRiskRow:    { flexDirection: 'row', alignItems: 'flex-start', marginTop: 6, marginLeft: 54, paddingLeft: 10, borderLeftWidth: 2 },
-  ingRiskText:   { fontSize: 11, lineHeight: 16, flex: 1 },
+  ingCardName:   { fontSize: 14, fontWeight: '600', color: NEUTRAL_800 },
+  ingTagText:    { fontSize: 12, fontWeight: '600', color: AMBER_600 },
 
-  // Ingredient detail panel (shown on tap)
-  ingDetailPanel: {
-    backgroundColor: 'rgba(6,122,79,0.05)',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: 'rgba(6,122,79,0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginBottom: 8,
-  },
-  ingVerdictBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 999, marginBottom: 12 },
-  ingVerdictText:  { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
+  // Empty-state text for a tab with nothing to show
+  emptyTabBox:  { paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center' },
+  emptyTabText: { fontSize: 14, color: NEUTRAL_400, textAlign: 'center' },
+
   ingDetailRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   ingDetailLabel:  { fontSize: 11, fontWeight: '700', color: PRIMARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
   ingDetailText:   { fontSize: 13, color: ON_SURFACE, lineHeight: 19 },
   ingDetailSource: { fontSize: 10, color: ON_SURFACE_VAR, marginTop: 10, textAlign: 'right', fontStyle: 'italic' },
 
-  // Additives pills
-  additivePill:         { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999, backgroundColor: 'rgba(245,158,11,0.08)', borderWidth: 1, borderColor: 'rgba(245,158,11,0.25)' },
-  additivePillText:     { fontSize: 11, fontWeight: '600', color: WARNING_C },
-  additivePillActive:   { backgroundColor: WARNING_C, borderColor: WARNING_C },
-  additivePillTextActive: { color: WHITE },
+  // Empty state — ingredient/additive sheet has no matched data
+  ingEmptyCard: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 8 },
+  ingEmptyIconWrap: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: NEUTRAL_100,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  ingEmptyTitle: { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 6 },
+  ingEmptyNote: { fontSize: 13, color: ON_SURFACE_VAR, lineHeight: 19, textAlign: 'center' },
 
-  additivePanel: {
-    marginTop: 14,
-    backgroundColor: 'rgba(245,158,11,0.05)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(245,158,11,0.2)',
+  // Ingredient detail — bottom sheet
+  ingSheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  ingSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    maxHeight: '75%',
+    backgroundColor: WHITE,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 12, paddingHorizontal: 24,
+    paddingBottom: 34,
+  },
+  ingSheetHandle: {
+    alignSelf: 'center', width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(0,0,0,0.15)', marginBottom: 20,
+  },
+  ingSheetHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14,
+  },
+  ingSheetTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: ON_SURFACE, letterSpacing: -0.4, marginRight: 12 },
+  ingSheetClose: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: SURFACE_HIGH,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ingSheetPill: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, marginBottom: 18 },
+  ingSheetPillText: { fontSize: 12, fontWeight: '700' },
+  ingSheetBody: { marginBottom: 4 },
+  ingSheetText: { fontSize: 15, color: ON_SURFACE, lineHeight: 23 },
+
+  // No-additives clean state
+  cleanBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 18, paddingHorizontal: 20,
+    borderRadius: 16, backgroundColor: PRIMARY_TINT,
+  },
+  cleanBoxText: { fontSize: 13, color: PRIMARY, fontWeight: '500', flex: 1 },
+
+  // Additive cards
+  additiveCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    backgroundColor: SURFACE_LOW, borderRadius: 16, borderWidth: 1, borderColor: NEUTRAL_100,
     padding: 16,
   },
-  additivePanelCode: { width: 48, height: 48, borderRadius: 12, backgroundColor: 'rgba(245,158,11,0.12)', alignItems: 'center', justifyContent: 'center' },
-  additivePanelCodeText: { fontSize: 11, fontWeight: '800', color: WARNING_C },
-
-  showMore:     { marginTop: 14, paddingVertical: 14, borderTopWidth: 1, borderTopColor: 'rgba(0,0,0,0.06)', alignItems: 'center' },
-  showMoreText: { fontSize: 12, fontWeight: '600', color: PRIMARY },
+  additiveCardCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  additiveCardName:   { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 2 },
+  additiveCardRisk:   { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  additiveCardDesc:   { fontSize: 12, color: NEUTRAL_400, lineHeight: 17 },
 
   // AI card
   aiCardWrap: { paddingHorizontal: 20, marginBottom: 16 },
   aiCard: {
-    backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
+    backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)',
     borderRadius: 20, padding: 20,
     flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
   aiCardLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 4 },
   aiCardSub:     { fontSize: 15, fontWeight: '500', color: ON_SURFACE, lineHeight: 21 },
   aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(6,122,79,0.1)', alignItems: 'center', justifyContent: 'center' },
   aiCardConnect: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: PRIMARY },
 
-  // Alternatives
-  altSection:        { marginBottom: 32 },
-  altHeader:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 14, marginTop: 8 },
-  altViewAll:        { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
-  altCard:           {
-    width: 170, backgroundColor: SURFACE_LOW, borderRadius: 20, padding: 8,
-    borderWidth: 1, borderColor: 'rgba(0,0,0,0.08)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.06, shadowRadius: 16, elevation: 3,
-  },
-  altImgBox:         { width: 154, height: 154, position: 'relative', backgroundColor: SURFACE_HIGH, borderRadius: 16, overflow: 'hidden', marginBottom: 8 },
-  altImg:            { width: 154, height: 154 },
+  // Better Choices
+  altSection:      { marginBottom: 28 },
+  altSectionLabel: { fontSize: 12, fontWeight: '600', color: NEUTRAL_400, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 20, marginBottom: 14, marginTop: 8 },
+  altCard:         { width: 112 },
+  altImgBox:       { width: 112, height: 112, backgroundColor: SURFACE_HIGH, borderRadius: 16, overflow: 'hidden', marginBottom: 8 },
+  altImg:            { width: 112, height: 112 },
   altImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  altScorePill:      { position: 'absolute', top: 8, right: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  altScorePillText:  { fontSize: 10, fontWeight: '800', color: WHITE },
-  altInfo:           { paddingHorizontal: 4 },
-  altName:           { fontSize: 13, fontWeight: '700', color: ON_SURFACE, lineHeight: 17, marginBottom: 2, paddingHorizontal: 4 },
-  altBrand:          { fontSize: 11, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8, paddingHorizontal: 4 },
-  altViewBtn:        { backgroundColor: SURFACE_HIGH, borderRadius: 999, paddingVertical: 9, alignItems: 'center' },
-  altViewBtnText:    { fontSize: 11, fontWeight: '700', color: ON_SURFACE, letterSpacing: 0.4 },
+  altName:  { fontSize: 12, fontWeight: '600', color: ON_SURFACE, lineHeight: 16, marginBottom: 2 },
+  altBrand: { fontSize: 12, fontWeight: '400', color: NEUTRAL_400, marginBottom: 4 },
+  altScoreText: { fontSize: 12, fontWeight: '700' },
 
-  // Save
-  saveWrap:     { paddingHorizontal: 20, marginBottom: 8 },
-  saveBtn:      { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText:  { color: WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  barcodeFooter: { textAlign: 'center', fontSize: 12, color: ON_SURFACE_VAR, letterSpacing: 1, marginBottom: 24 },
 });
 
 export default ResultsScreenV2;

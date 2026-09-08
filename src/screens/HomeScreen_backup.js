@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -43,7 +43,7 @@ try {
         Camera not available on this device
       </Text>
       <TouchableOpacity
-        style={{ backgroundColor: '#4CAF50', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25 }}
+        style={{ backgroundColor: '#067A4F', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 25 }}
         onPress={onClose}
       >
         <Text style={{ color: '#fff', fontSize: 16 }}>Close</Text>
@@ -456,7 +456,7 @@ const HomeScreen = ({ navigation, route }) => {
       <EdgeToEdgeWrapper>
         <View style={styles.container}>
           <View style={styles.loadingContainer}>
-            <Ionicons name="leaf" size={isTablet ? 85 : 75} color="#4CAF50" />
+            <Ionicons name="leaf" size={isTablet ? 85 : 75} color="#067A4F" />
             <Text style={styles.appTitle}>HealthyScan</Text>
             <Text style={styles.loadingText}>Loading...</Text>
           </View>
@@ -539,7 +539,7 @@ const HomeScreen = ({ navigation, route }) => {
                 <SvgLinearGradient id="leafStroke" x1="0" y1="0" x2="1" y2="1">
                   <Stop offset="0%" stopColor="#FFF4C9" />
                   <Stop offset="50%" stopColor="#F8E79A" />
-                  <Stop offset="100%" stopColor="#D6FFB3" />
+                  <Stop offset="100%" stopColor="#B0E0CC" />
                 </SvgLinearGradient>
                 <SvgLinearGradient id="leafCore" x1="0" y1="1" x2="1" y2="0">
                   <Stop offset="0%" stopColor="rgba(255, 244, 201, 0.6)" />
@@ -832,8 +832,8 @@ const isTablet = screenWidth > 768;
 const GOLD_GRADIENT = ['rgba(180, 220, 160, 0.4)', 'rgba(120, 200, 140, 0.35)'];
 const PROGRESS_GRADIENT_STOPS = [
   { offset: '0%', color: '#F8E9B0' },
-  { offset: '60%', color: '#D9F1C0' },
-  { offset: '100%', color: '#C4F7B3' },
+  { offset: '60%', color: '#BFE0D3' },
+  { offset: '100%', color: '#A8DBC9' },
 ];
 
 const styles = StyleSheet.create({
@@ -952,7 +952,7 @@ const styles = StyleSheet.create({
     padding: isTablet ? 20 : 18,
     borderRadius: 999,
     backgroundColor: 'transparent',
-    shadowColor: '#D4E8A0',
+    shadowColor: '#BDD9CB',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.35,
     shadowRadius: isTablet ? 40 : 34,
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
     width: '100%',
     borderRadius: 22,
     padding: 1.5,
-    shadowColor: '#5ABF6A',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 16,
@@ -1020,7 +1020,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     width: '100%',
     borderWidth: 0,
-    shadowColor: '#5ABF6A',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1036,7 +1036,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     width: '100%',
     borderWidth: 0,
-    shadowColor: '#5ABF6A',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -1057,13 +1057,13 @@ const styles = StyleSheet.create({
     paddingVertical: isTablet ? 16 : 14,
     borderRadius: 25,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
     backgroundColor: 'transparent',
     minWidth: isTablet ? 280 : 240,
     marginBottom: 12,
   },
   searchButtonText: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: isTablet ? 18 : 16,
     fontWeight: '600',
     marginLeft: 8,
@@ -1108,7 +1108,7 @@ const styles = StyleSheet.create({
     marginRight: 16,
     width: 56,
     height: 56,
-    shadowColor: '#9BF6B5',
+    shadowColor: '#85D4B4',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.25,
     shadowRadius: 14,
@@ -1185,8 +1185,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: '#4CAF50',
-    shadowColor: '#4CAF50',
+    borderColor: '#067A4F',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -1194,7 +1194,7 @@ const styles = StyleSheet.create({
     minWidth: '85%',
   },
   getPremiumButtonText: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: 18,
     fontWeight: '700',
     marginLeft: 8,
@@ -1246,7 +1246,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
   },
   smallCancelButton: {
     flexDirection: 'row',
@@ -1283,7 +1283,7 @@ const styles = StyleSheet.create({
     maxWidth: 400,
     borderRadius: 25,
     overflow: 'hidden',
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.3,
     shadowRadius: 20,

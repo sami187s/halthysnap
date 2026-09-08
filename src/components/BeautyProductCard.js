@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ProductImage from './ProductImage';
@@ -31,7 +31,7 @@ const BeautyProductCard = ({ product, analysis, onViewDetails }) => {
             <View style={styles.beautyStat}>
               <Text style={styles.beautyStatNumber}>{analysis.goodIngredients?.length || 0}</Text>
               <Text style={styles.beautyStatLabel}>Safe</Text>
-              <View style={[styles.beautyStatIndicator, { backgroundColor: '#4CAF50' }]} />
+              <View style={[styles.beautyStatIndicator, { backgroundColor: '#067A4F' }]} />
             </View>
             
             <View style={styles.beautyStat}>

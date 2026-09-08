@@ -26,7 +26,6 @@ import { useScanContext } from '../contexts/ScanContext';
 import { useTheme } from '../contexts/ThemeContext';
 import SmartPostScanHandler, { useSmartPostScan } from '../components/SmartPostScanHandler';
 import ScanResultPreview from '../components/ScanResultPreview';
-import ScoreRing from '../components/ScoreRing';
 import { getHistory, getHistoryStats } from '../utils/historyManager';
 import {
   createFadeAnimation,
@@ -34,6 +33,7 @@ import {
   createScaleAnimation,
 } from '../utils/luxuryAnimations';
 import { checkAndResetDailyCounters } from '../utils/dailyReset';
+import { getQuota } from '../utils/scanQuota';
 
 // Safe imports with fallbacks
 let AlternativeBarcodeScanner;
@@ -55,10 +55,37 @@ try {
   );
 }
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const isTablet = screenWidth > 768;
-const DAILY_SCAN_LIMIT = 2;
+const DAILY_SCAN_LIMIT = 5; // legacy display counter; real enforcement is in utils/scanQuota.js
 
+// Scan-card height: sized so the greeting + two cards fill the screen down to
+// the tab bar, instead of the old fixed 192px leaving a visible empty gap
+// underneath them on most phones.
+const HOME_HEADER_APPROX  = Platform.OS === 'ios' ? 96 : 78;
+const HOME_GREETING_APPROX = 82;
+const HOME_TABBAR_APPROX   = 96; // tab bar height + safe-area/scroll-padding clearance
+const HOME_CARD_GAP        = 16;
+const HOME_CARDS_AVAILABLE = screenHeight - HOME_HEADER_APPROX - HOME_GREETING_APPROX - HOME_TABBAR_APPROX - HOME_CARD_GAP;
+const SCAN_CARD_H = Math.max(192, Math.min(260, HOME_CARDS_AVAILABLE / 2));
+
+const LOGO_IMG = require('../../assets/leaf-logo.png');
+const SCAN_FOOD_IMG = { uri: 'https://media.base44.com/images/public/6a83ef891bc0c00776a1d051/b6b2fe111_generated_image.png' };
+const SCAN_COSMETIC_IMG = { uri: 'https://media.base44.com/images/public/6a83ef891bc0c00776a1d051/4a6b9b42c_generated_image.png' };
+
+// Wraps any touchable in a spring scale-down for tap feedback (~0.96 on press).
+const AnimatedTouchable = ({ children, style, onPress, scaleTo = 0.96, ...rest }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+  const pressIn = () => Animated.spring(scale, { toValue: scaleTo, useNativeDriver: true, speed: 50, bounciness: 0 }).start();
+  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 6 }).start();
+  return (
+    <TouchableOpacity activeOpacity={0.85} onPressIn={pressIn} onPressOut={pressOut} onPress={onPress} {...rest}>
+      <Animated.View style={[style, { transform: [{ scale }] }]}>
+        {children}
+      </Animated.View>
+    </TouchableOpacity>
+  );
+};
 
 const HomeScreen = ({ navigation, route }) => {
   const { setIsScanning } = useScanContext();
@@ -76,12 +103,9 @@ const HomeScreen = ({ navigation, route }) => {
   const [remainingScans, setRemainingScans] = useState(0);
   const [showTrialCompleteModal, setShowTrialCompleteModal] = useState(false);
   const [userName, setUserName] = useState('');
-  const [averageScore, setAverageScore] = useState(0);
-  const [totalScans, setTotalScans] = useState(0);
-  const [recentScans, setRecentScans] = useState([]);
-  const [savedProducts, setSavedProducts] = useState([]);
-  const [activeFilter, setActiveFilter] = useState('all');
-  const [showScanPicker, setShowScanPicker] = useState(false);
+  // Free-tier daily scan quota — null = unlimited (paid / referral unlock)
+  const [foodLeft, setFoodLeft] = useState(null);
+  const [cosmeticLeft, setCosmeticLeft] = useState(null);
 
   // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -121,8 +145,8 @@ const HomeScreen = ({ navigation, route }) => {
     getBarCodeScannerPermissions();
     checkAndResetDailyCounters();
     checkSubscriptionStatus();
+    refreshQuota();
     loadUserName();
-    loadProfileData();
 
     return () => {
       if (loadTimer) clearTimeout(loadTimer);
@@ -135,7 +159,7 @@ const HomeScreen = ({ navigation, route }) => {
     React.useCallback(() => {
       setScanned(false);
       checkSubscriptionStatus();
-      loadProfileData();
+      refreshQuota();
 
       if (route.params?.premiumActivated) {
         Alert.alert(
@@ -165,29 +189,6 @@ const HomeScreen = ({ navigation, route }) => {
       setUserName(name || 'there');
     } catch {
       setUserName('there');
-    }
-  };
-
-  const loadProfileData = async () => {
-    try {
-      const historyJson = await AsyncStorage.getItem('scan_history');
-      const history = historyJson ? JSON.parse(historyJson) : [];
-      
-      if (history.length > 0) {
-        setTotalScans(history.length);
-        const avg = Math.round(history.reduce((sum, item) => sum + (item.score || 0), 0) / history.length);
-        setAverageScore(avg);
-        setRecentScans(history.slice(0, 5));
-        const saved = history.filter(item => item.score >= 70).slice(0, 4);
-        setSavedProducts(saved);
-      } else {
-        setTotalScans(0);
-        setAverageScore(0);
-        setRecentScans([]);
-        setSavedProducts([]);
-      }
-    } catch {
-      // Silently fail
     }
   };
 
@@ -225,7 +226,18 @@ const HomeScreen = ({ navigation, route }) => {
   };
 
   const showSubscriptionOptions = () => {
-    navigation.navigate('Subscription');
+    navigation.navigate('Subscription', { reason: 'limit' });
+  };
+
+  const refreshQuota = async () => {
+    try {
+      const [food, cosmetic] = await Promise.all([getQuota('food'), getQuota('cosmetic')]);
+      setFoodLeft(food.unlimited ? null : food.remaining);
+      setCosmeticLeft(cosmetic.unlimited ? null : cosmetic.remaining);
+    } catch {
+      setFoodLeft(null);
+      setCosmeticLeft(null);
+    }
   };
 
   const getBarCodeScannerPermissions = async () => {
@@ -242,7 +254,24 @@ const HomeScreen = ({ navigation, route }) => {
     } catch {}
   };
 
+  const renderQuotaBadge = (left) => {
+    if (left === null || left === undefined) return null;
+    const done = left <= 0;
+    return (
+      <View style={noir.quotaBadge}>
+        <Ionicons name={done ? 'lock-closed' : 'flash-outline'} size={11} color="#FFFFFF" />
+        <Text style={noir.quotaBadgeText}>{done ? 'Limit reached' : `${left} left today`}</Text>
+      </View>
+    );
+  };
+
   const startScanning = async (mode = 'food') => {
+    // Free-tier daily quota: block before opening the camera when exhausted.
+    const left = mode === 'cosmetic' ? cosmeticLeft : foodLeft;
+    if (left !== null && left <= 0) {
+      navigation.navigate('Subscription', { reason: 'limit' });
+      return;
+    }
     if (hasPermission === null) {
       Alert.alert('Permission Required', 'Camera permission is required to scan barcodes.');
       return;
@@ -323,23 +352,8 @@ const HomeScreen = ({ navigation, route }) => {
   };
 
   const handleUpgradeSelected = () => {
-    navigation.navigate('Subscription');
+    navigation.navigate('Subscription', { reason: 'limit' });
   };
-
-  const openHistoryItem = (item) => {
-    if (item.productType === 'cosmetic') {
-      navigation.navigate('CosmeticResults', { barcode: item.barcode });
-    } else {
-      navigation.navigate('Results', { barcode: item.barcode });
-    }
-  };
-
-  const listSource = savedProducts.length > 0 ? savedProducts : recentScans;
-  const listData = activeFilter === 'all'
-    ? listSource
-    : listSource.filter((item) => (item.productType || 'food') === activeFilter);
-
-  const progressWidth = isPremium ? 1 : remainingScans / DAILY_SCAN_LIMIT;
 
   // Loading state
   if (!isLoaded) {
@@ -382,26 +396,28 @@ const HomeScreen = ({ navigation, route }) => {
     <View style={{ flex: 1, backgroundColor: '#FBFBF9' }}>
       <StatusBar barStyle="dark-content" backgroundColor="#FBFBF9" />
 
-      {/* -- FIXED HEADER -- */}
+      {/* -- HEADER -- */}
       <View style={noir.header}>
         <TouchableOpacity
           style={noir.headerLeft}
           onPress={() => navigation.navigate('Profile')}
           activeOpacity={0.7}
         >
-          <View style={noir.avatarCircle}>
-            <Ionicons name="person" size={16} color="#067A4F" />
+          <View style={noir.logoChip}>
+            <Image source={LOGO_IMG} style={noir.logoImg} resizeMode="cover" />
           </View>
           <Text style={noir.headerBrand}>Vee</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={noir.iconBtn}
-          onPress={() => navigation.navigate('Settings')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="settings-outline" size={22} color="#556158" />
-        </TouchableOpacity>
+        <View style={noir.headerRight}>
+          <TouchableOpacity
+            style={noir.iconBtn}
+            onPress={() => navigation.navigate('Profile')}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="person-outline" size={20} color="#3B5B47" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
@@ -409,129 +425,73 @@ const HomeScreen = ({ navigation, route }) => {
         contentContainerStyle={noir.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero */}
-        <View style={noir.hero}>
-          <Text style={noir.heroTitle}>Know what's really{'\n'}in your products.</Text>
-          <Text style={noir.heroSubtitle}>
-            Search a product or scan its barcode to get an instant health score and safer alternatives.
-          </Text>
+        {/* Greeting */}
+        <View style={noir.greeting}>
+          <Text style={noir.greetingLabel}>Welcome back</Text>
+          <Text style={noir.greetingHeadline}>Hey, let's scan!</Text>
         </View>
 
-        {/* Search bar */}
-        <TouchableOpacity
-          style={noir.searchBar}
-          activeOpacity={0.8}
-          onPress={() => navigation.navigate('Search')}
+        {/* Scan Food card */}
+        <AnimatedTouchable
+          style={noir.scanCard}
+          scaleTo={0.98}
+          onPress={() => startScanning('food')}
         >
-          <Ionicons name="search" size={18} color="#A3A3A3" />
-          <Text style={noir.searchBarText}>Search product, brand or barcode</Text>
-        </TouchableOpacity>
+          <ImageBackground source={SCAN_FOOD_IMG} style={{ flex: 1 }} resizeMode="cover">
+            <LinearGradient
+              colors={['rgba(0,0,0,0.25)', 'rgba(0,0,0,0.35)', 'rgba(0,0,0,0.75)']}
+              locations={[0, 0.4, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <Ionicons name="barcode-outline" size={40} color="rgba(255,255,255,0.45)" style={noir.scanCardMotif} />
+            {renderQuotaBadge(foodLeft)}
+            <View style={noir.scanCardBody}>
+              <View>
+                <Text style={noir.scanCardTitle}>Scan Food</Text>
+                <Text style={noir.scanCardSubtitle}>Instant nutritional analysis</Text>
+              </View>
+              <View style={noir.scanPill}>
+                <Text style={noir.scanPillText}>SCAN NOW</Text>
+                <View style={noir.scanPillIcon}>
+                  <Ionicons name="scan" size={16} color="#FFFFFF" />
+                </View>
+              </View>
+            </View>
+          </ImageBackground>
+        </AnimatedTouchable>
 
-        {/* Category filters */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={noir.filterTabsScroll}
-          contentContainerStyle={noir.filterTabsContent}
+        {/* Scan Cosmetic card */}
+        <AnimatedTouchable
+          style={noir.scanCard}
+          scaleTo={0.98}
+          onPress={() => startScanning('cosmetic')}
         >
-          {[
-            { key: 'all', label: 'All' },
-            { key: 'food', label: 'Food' },
-            { key: 'cosmetic', label: 'Cosmetics' },
-          ].map((f) => (
-            <TouchableOpacity
-              key={f.key}
-              style={[noir.filterChip, activeFilter === f.key && noir.filterChipActive]}
-              activeOpacity={0.85}
-              onPress={() => setActiveFilter(f.key)}
-            >
-              <Text style={[noir.filterChipText, activeFilter === f.key && noir.filterChipTextActive]}>
-                {f.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        {/* Product list — matches Purely's Home: no section header, straight into the list */}
-        {listData.length === 0 ? (
-          <View style={noir.emptyList}>
-            <Ionicons name="search-outline" size={22} color="#C0C0C5" />
-            <Text style={noir.emptyListTitle}>No products found</Text>
-            <Text style={noir.emptyListText}>Scan a barcode to add your first product.</Text>
-          </View>
-        ) : (
-          <View style={noir.listWrap}>
-            {listData.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={noir.productRow}
-                activeOpacity={0.85}
-                onPress={() => openHistoryItem(item)}
-              >
-                <View style={noir.productIconWrap}>
-                  {item.productImage ? (
-                    <Image source={{ uri: item.productImage }} style={noir.productImg} resizeMode="cover" />
-                  ) : (
-                    <Ionicons
-                      name={item.productType === 'cosmetic' ? 'sparkles-outline' : 'nutrition-outline'}
-                      size={18}
-                      color="#067A4F"
-                    />
-                  )}
+          <ImageBackground source={SCAN_COSMETIC_IMG} style={{ flex: 1 }} resizeMode="cover">
+            <LinearGradient
+              colors={['rgba(30,122,74,0.30)', 'rgba(30,122,74,0.45)', 'rgba(15,61,36,0.85)']}
+              locations={[0, 0.4, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            {renderQuotaBadge(cosmeticLeft)}
+            <View style={noir.scanCardBody}>
+              <View>
+                <Text style={noir.scanCardTitle}>Scan Cosmetic</Text>
+                <Text style={noir.scanCardSubtitle}>Ingredient safety check</Text>
+              </View>
+              <View style={noir.scanPill}>
+                <Text style={noir.scanPillText}>SCAN NOW</Text>
+                <View style={noir.scanPillIcon}>
+                  <Ionicons name="scan" size={16} color="#FFFFFF" />
                 </View>
-                <View style={noir.productInfo}>
-                  <Text style={noir.productName} numberOfLines={1}>{item.productName}</Text>
-                  <Text style={noir.productBrand}>{item.productType === 'cosmetic' ? 'Cosmetics' : 'Food'}</Text>
-                </View>
-                <ScoreRing score={item.score || 0} size={40} stroke={4} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-
+              </View>
+            </View>
+          </ImageBackground>
+        </AnimatedTouchable>
       </ScrollView>
-
-      {/* Floating scan button — Purely's reference design has no equivalent (it uses a
-          separate bottom-tab "Scan" page instead), but scanning is this app's core
-          feature so it needs a reachable entry point without cluttering the Home
-          composition above. */}
-      <TouchableOpacity
-        style={noir.fab}
-        activeOpacity={0.85}
-        onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setShowScanPicker(true); }}
-      >
-        <Ionicons name="scan-outline" size={24} color="#FFFFFF" />
-      </TouchableOpacity>
-
-      {/* Scan-type picker sheet */}
-      <Modal
-        visible={showScanPicker}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowScanPicker(false)}
-      >
-        <TouchableOpacity style={hs.modalOverlay} activeOpacity={1} onPress={() => setShowScanPicker(false)}>
-          <View style={noir.pickerSheet}>
-            <Text style={noir.pickerTitle}>What are you scanning?</Text>
-            <TouchableOpacity
-              style={noir.pickerOption}
-              activeOpacity={0.85}
-              onPress={() => { setShowScanPicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('food'); }}
-            >
-              <Ionicons name="nutrition-outline" size={18} color="#067A4F" />
-              <Text style={noir.pickerOptionText}>Food</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={noir.pickerOption}
-              activeOpacity={0.85}
-              onPress={() => { setShowScanPicker(false); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); startScanning('cosmetic'); }}
-            >
-              <Ionicons name="sparkles-outline" size={18} color="#067A4F" />
-              <Text style={noir.pickerOptionText}>Cosmetics</Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Post-Scan Handler */}
       <SmartPostScanHandler
@@ -605,433 +565,155 @@ const HomeScreen = ({ navigation, route }) => {
 const noir = StyleSheet.create({
   /* ── Header ── */
   header: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    zIndex: 50,
-    height: Platform.OS === 'ios' ? 90 : 72,
-    paddingTop: Platform.OS === 'ios' ? 48 : 28,
-    paddingHorizontal: 20,
+    paddingTop: Platform.OS === 'ios' ? 54 : 36,
+    paddingHorizontal: 24,
+    paddingBottom: 8,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(251,251,249,0.92)',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
+    backgroundColor: '#FBFBF9',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 10,
   },
-  avatarCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#e8ede8',
-    borderWidth: 1,
-    borderColor: 'rgba(45,106,79,0.2)',
+  logoChip: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FDF4EB',
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
+  },
+  logoImg: {
+    width: '100%',
+    height: '100%',
   },
   headerBrand: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#067A4F',
+    color: '#3B5B47',
     letterSpacing: -0.3,
   },
-  iconBtn: { padding: 4 },
-
-  /* ── Scroll ── */
-  scrollContent: {
-    paddingTop: Platform.OS === 'ios' ? 110 : 90,
-    paddingHorizontal: 24,
-    paddingBottom: 120,
-  },
-
-  /* ── Greeting ── */
-  greeting: {
-    marginBottom: 32,
-  },
-  greetingLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#6E6E73',
-    letterSpacing: 4,
-    textTransform: 'uppercase',
-    marginBottom: 4,
-  },
-  greetingName: {
-    fontSize: 40,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    letterSpacing: -1,
-  },
-
-  /* ── Hero (matches Purely's Home heading) ── */
-  hero: {
-    marginBottom: 28,
-    gap: 10,
-  },
-  heroTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#171717',
-    letterSpacing: -0.8,
-    lineHeight: 38,
-  },
-  heroSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: '#737373',
-    maxWidth: 340,
-  },
-
-  /* ── Search bar ── */
-  searchBar: {
+  headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.08)',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    marginBottom: 20,
   },
-  searchBarText: {
-    fontSize: 14,
-    color: '#A3A3A3',
-  },
-
-  /* ── Empty list state ── */
-  emptyList: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 48,
-    gap: 6,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(0,0,0,0.1)',
-  },
-  emptyListTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#171717',
-    marginTop: 4,
-  },
-  emptyListText: {
-    fontSize: 13,
-    color: '#A3A3A3',
-    textAlign: 'center',
-    maxWidth: 220,
-  },
-  listWrap: {
-    gap: 12,
-  },
-  productImg: {
-    width: '100%',
-    height: '100%',
-  },
-
-  /* ── Floating scan button ── */
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 28,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#067A4F',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#067A4F',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-
-  /* ── Scan-type picker sheet ── */
-  pickerSheet: {
-    position: 'absolute',
-    left: 20,
-    right: 20,
-    bottom: 28,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    gap: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
-  },
-  pickerTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#171717',
-    marginBottom: 4,
-  },
-  pickerOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#F5F5F1',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  pickerOptionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#171717',
-  },
-
-  /* ── Start-a-scan compact cards ── */
-  scanRow: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  scanCard: {
-    flex: 1,
-    height: 140,
+  iconBtn: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-  },
-  scanCardContent: {
-    flex: 1,
-    padding: 14,
-    justifyContent: 'flex-end',
-  },
-  scanCardTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    marginBottom: 8,
-  },
-  scanCardBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-  },
-
-  /* ── Cards ── */
-  cardsSection: {
-    marginBottom: 32,
-  },
-  card: {
-    height: 260,
-    borderRadius: 28,
-    overflow: 'hidden',
-    backgroundColor: '#1a1a1a',
-    marginBottom: 20,
-  },
-  cardBgImage: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  cardContent: {
-    flex: 1,
-    padding: 28,
-    justifyContent: 'space-between',
-  },
-  cardTop: {
-    marginTop: 8,
-  },
-  cardTitle: {
-    fontSize: 30,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  cardSubtitle: {
-    fontSize: 13,
-    fontWeight: '300',
-    color: 'rgba(255,255,255,0.8)',
-    letterSpacing: 0,
-  },
-  cardBtn: {
-    backgroundColor: '#FFFFFF',
-    paddingVertical: 14,
-    borderRadius: 28,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  cardBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#067A4F',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
-
-  /* ── Best Products Filter List ── */
-  filterSection: {
-    marginBottom: 32,
-  },
-  filterSectionTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#1C1C1E',
-    letterSpacing: -0.5,
-    marginBottom: 4,
-  },
-  filterSectionSub: {
-    fontSize: 12,
-    fontWeight: '400',
-    color: '#6E6E73',
-    marginBottom: 16,
-  },
-  filterTabsScroll: {
-    marginBottom: 16,
-  },
-  filterTabsContent: {
-    gap: 8,
-    paddingRight: 4,
-  },
-  filterChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#F1F3F0',
-    borderWidth: 1,
-    borderColor: 'rgba(45,106,79,0.12)',
-  },
-  filterChipActive: {
-    backgroundColor: '#067A4F',
-    borderColor: '#067A4F',
-  },
-  filterChipText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#5A5A5F',
-  },
-  filterChipTextActive: {
-    color: '#FFFFFF',
-  },
-  productRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 1,
   },
-  productRank: {
-    width: 28,
-    alignItems: 'center',
-    marginRight: 10,
-  },
-  productRankText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#C0C0C5',
-    letterSpacing: 0.5,
-  },
-  productIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#F0F7F3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-    overflow: 'hidden',
-  },
-  productInfo: {
-    flex: 1,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1C1C1E',
-    marginBottom: 2,
-  },
-  productBrand: {
-    fontSize: 11,
-    fontWeight: '400',
-    color: '#8E8E93',
-  },
-  productScoreBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
-    backgroundColor: '#067A4F',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  productScoreText: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
+
+  /* ── Scroll ── */
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingBottom: 120,
   },
 
-  /* ── Recent Activity ── */
-  activityRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingTop: 8,
+  /* ── Greeting ── */
+  greeting: {
+    marginTop: 16,
+    marginBottom: 20,
   },
-  activityLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  activityIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 16,
-    backgroundColor: '#F1F8F1',
-    borderWidth: 1,
-    borderColor: 'rgba(45,106,79,0.15)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  activityTitle: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#1C1C1E',
-    marginBottom: 2,
-  },
-  activitySub: {
+  greetingLabel: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#6E6E73',
-    letterSpacing: 3,
+    color: '#A3A3A3',
+    letterSpacing: 2,
     textTransform: 'uppercase',
+    marginBottom: 4,
   },
-  activitySeeAll: {
-    fontSize: 10,
+  greetingHeadline: {
+    fontSize: 24,
     fontWeight: '700',
-    color: '#067A4F',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    color: '#171717',
+    letterSpacing: -0.4,
+  },
+
+  /* ── Scan cards ── */
+  scanCard: {
+    width: '100%',
+    height: SCAN_CARD_H,
+    borderRadius: 24,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  scanCardMotif: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+  },
+  quotaBadge: {
+    position: 'absolute',
+    top: 14,
+    left: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    zIndex: 5,
+  },
+  quotaBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  scanCardBody: {
+    flex: 1,
+    padding: 20,
+    justifyContent: 'space-between',
+  },
+  scanCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  scanCardSubtitle: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+  },
+
+  /* ── ScanPill ── */
+  scanPill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 999,
+    paddingLeft: 16,
+    paddingRight: 6,
+    paddingVertical: 6,
+  },
+  scanPillText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#27a567',
+    letterSpacing: 0.4,
+  },
+  scanPillIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#27a567',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

@@ -119,6 +119,8 @@ const ResultsScreen = ({ route, navigation }) => {
   const preloadedData  = route?.params?.preloadedData || null;
   const skipFetch      = route?.params?.skipFetch || false;
 
+  const safeAreaInsets = useSafeAreaInsetsWithFallback();
+
   const [product, setProduct]                 = useState(null);
   const [analysis, setAnalysis]               = useState(null);
   const [loading, setLoading]                 = useState(true);

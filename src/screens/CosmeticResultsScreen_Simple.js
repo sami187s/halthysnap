@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -69,7 +69,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   }, [barcode]);
 
   const getScoreColor = (score) => {
-    if (score >= 75) return '#4CAF50'; // Green
+    if (score >= 75) return '#067A4F'; // Green
     if (score >= 50) return '#FF9800'; // Orange
     return '#F44336'; // Red
   };
@@ -169,8 +169,8 @@ export default function CosmeticResultsScreen({ route, navigation }) {
           {analysis?.goodIngredients?.length > 0 && (
             <View style={styles.ingredientSection}>
               <View style={styles.ingredientHeader}>
-                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <Text style={[styles.ingredientHeaderText, { color: '#4CAF50' }]}>
+                <Ionicons name="checkmark-circle" size={20} color="#067A4F" />
+                <Text style={[styles.ingredientHeaderText, { color: '#067A4F' }]}>
                   Good Ingredients ({analysis.goodIngredients.length})
                 </Text>
               </View>
@@ -214,7 +214,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
         {/* Bottom Actions */}
         <View style={styles.actionsCard}>
           <TouchableOpacity style={styles.actionButton} onPress={handleScanAnother}>
-            <Ionicons name="scan" size={20} color="#4CAF50" />
+            <Ionicons name="scan" size={20} color="#067A4F" />
             <Text style={styles.actionButtonText}>Scan Another Product</Text>
           </TouchableOpacity>
         </View>
@@ -231,7 +231,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   header: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginLeft: 8,
   },
   errorContainer: {
@@ -416,7 +416,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderRadius: 8,
     paddingHorizontal: 24,
     paddingVertical: 12,

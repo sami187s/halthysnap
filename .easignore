@@ -1,0 +1,41 @@
+# EAS upload ignore list. When this file exists EAS uses ONLY this list
+# (not .gitignore), so every folder to skip must be named here.
+# Goal: keep the uploaded tarball small so a Defender/OneDrive file lock
+# is less likely to abort "Compressing project files" with EPERM.
+
+# regenerated in the cloud during the build
+node_modules/
+.git/
+.expo/
+android/
+ios/
+dist/
+web-build/
+.metro-health-check*
+
+# not part of the mobile app build
+temp_files/
+railway-server/
+cloudflare-worker/
+cf-turso-proxy/
+website/
+.vscode/
+
+# logs / scratch
+*.log
+*.stackdump
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.orig.*
+
+# secrets / signing — never upload
+.env
+.env*.local
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision
+*.pem
+*.key

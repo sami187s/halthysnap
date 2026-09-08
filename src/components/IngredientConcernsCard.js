@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SECTION_CARD, COLORS } from '../utils/resultScreenStyles';
@@ -155,7 +155,7 @@ const IngredientConcernsCard = ({ analysis, product, analyzeIndividual }) => {
                       setLearnMoreItem(isOpen ? null : idx);
                     }}
                   >
-                    <Ionicons name={isOpen ? 'close-circle' : 'information-circle-outline'} size={16} color="#5C6BC0" />
+                    <Ionicons name={isOpen ? 'close-circle' : 'information-circle-outline'} size={16} color="#067A4F" />
                     <Text style={styles.learnMoreText}>{isOpen ? 'Close' : 'Learn More'}</Text>
                   </TouchableOpacity>
                   <View style={[styles.quickBadge, { backgroundColor: item.level === 'bad' ? COLORS.poor : COLORS.moderate }]}>
@@ -167,7 +167,7 @@ const IngredientConcernsCard = ({ analysis, product, analyzeIndividual }) => {
                 {isOpen && (
                   <View style={styles.learnMoreContainer}>
                     <View style={styles.learnMoreCard}>
-                      <Ionicons name="book-outline" size={14} color="#5C6BC0" style={{ marginRight: 6, marginTop: 1 }} />
+                      <Ionicons name="book-outline" size={14} color="#067A4F" style={{ marginRight: 6, marginTop: 1 }} />
                       <Text style={styles.learnMoreDefinition}>
                         {getIngredientDefinition(item.name, analysis, analyzeIndividual)}
                       </Text>
@@ -241,7 +241,7 @@ const IngredientConcernsCard = ({ analysis, product, analyzeIndividual }) => {
         <Text style={styles.toggleText}>
           {expanded ? 'Hide ingredients' : `View all ${analysis.totalIngredients || allIngredients.length} ingredients`}
         </Text>
-        <Ionicons name={expanded ? 'chevron-up' : 'chevron-forward'} size={18} color="#2E7D32" />
+        <Ionicons name={expanded ? 'chevron-up' : 'chevron-forward'} size={18} color="#067A4F" />
       </TouchableOpacity>
     </View>
   );
@@ -322,13 +322,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    backgroundColor: '#EDE7F6',
+    backgroundColor: '#E5F2EC',
     borderRadius: 10,
   },
   learnMoreText: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#5C6BC0',
+    color: '#067A4F',
     marginLeft: 3,
   },
   learnMoreContainer: {
@@ -339,11 +339,11 @@ const styles = StyleSheet.create({
   },
   learnMoreCard: {
     flexDirection: 'row',
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#f1f8f1',
     borderRadius: 10,
     padding: 10,
     borderLeftWidth: 3,
-    borderLeftColor: '#5C6BC0',
+    borderLeftColor: '#067A4F',
   },
   learnMoreDefinition: {
     flex: 1,
@@ -423,7 +423,7 @@ const styles = StyleSheet.create({
   toggleText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#067A4F',
     marginRight: 4,
   },
 });

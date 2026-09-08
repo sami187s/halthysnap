@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+﻿import React, { useRef, useEffect, useState } from 'react';
 import { View, Text, StyleSheet, Animated, TouchableOpacity, LayoutAnimation, Platform, UIManager } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -164,7 +164,7 @@ const IngredientCard = ({
         <Ionicons
           name={showLearnMore ? 'close-circle' : 'information-circle-outline'}
           size={13}
-          color="#5C6BC0"
+          color="#067A4F"
         />
         <Text style={styles.learnMoreText}>
           {showLearnMore ? 'Close' : 'Learn More'}
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    backgroundColor: '#EDE7F6',
+    backgroundColor: '#E5F2EC',
     paddingHorizontal: 7,
     paddingVertical: 3,
     borderRadius: 8,
@@ -266,16 +266,16 @@ const styles = StyleSheet.create({
   learnMoreText: {
     fontSize: 9,
     fontWeight: '600',
-    color: '#5C6BC0',
+    color: '#067A4F',
     marginLeft: 3,
   },
   definitionBox: {
-    backgroundColor: '#F3F0FF',
+    backgroundColor: '#f1f8f1',
     borderRadius: 8,
     padding: 8,
     marginTop: 6,
     borderLeftWidth: 2,
-    borderLeftColor: '#5C6BC0',
+    borderLeftColor: '#067A4F',
   },
   definitionText: {
     fontSize: 11,

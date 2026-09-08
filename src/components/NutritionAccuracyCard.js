@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { checkNutritionCompleteness } from '../utils/nutritionProcessor';
@@ -7,7 +7,7 @@ const NutritionAccuracyCard = ({ nutrition, product, isExpanded, onToggle }) => 
   const completeness = checkNutritionCompleteness(nutrition || {});
   
   const getAccuracyColor = (percentage) => {
-    if (percentage >= 80) return '#4CAF50';
+    if (percentage >= 80) return '#067A4F';
     if (percentage >= 60) return '#FF9800';
     return '#F44336';
   };
@@ -55,7 +55,7 @@ const NutritionAccuracyCard = ({ nutrition, product, isExpanded, onToggle }) => 
             <View style={styles.fieldsList}>
               <View style={styles.fieldRow}>
                 <Text style={styles.fieldLabel}>Available:</Text>
-                <Text style={[styles.fieldValue, { color: '#4CAF50' }]}>
+                <Text style={[styles.fieldValue, { color: '#067A4F' }]}>
                   {completeness.available} fields
                 </Text>
               </View>

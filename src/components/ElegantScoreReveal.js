@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { 
   createSmoothAnimation, 
@@ -92,8 +92,8 @@ const ElegantScoreReveal = ({
   };
 
   const getScoreColor = (score) => {
-    if (score >= 90) return '#1B5E20'; // Excellent - Deep Green
-    if (score >= 75) return '#4CAF50'; // Good - Green
+    if (score >= 90) return '#067A4F'; // Excellent - Deep Green
+    if (score >= 75) return '#067A4F'; // Good - Green
     if (score >= 55) return '#FF9800'; // Average - Orange
     if (score >= 35) return '#FF5722'; // Poor - Red-orange
     return '#F44336'; // Very Poor - Red
@@ -268,7 +268,7 @@ const styles = StyleSheet.create({
     borderRadius: 70,
     borderWidth: 6,
     borderColor: 'transparent',
-    borderTopColor: '#4CAF50',
+    borderTopColor: '#067A4F',
     transform: [{ rotate: '-90deg' }],
   },
   scoreNumberContainer: {
@@ -314,7 +314,7 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
   },
   particle1: {
     top: 20,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Dimensions } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom: 30,
     backgroundColor: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // This won't work in RN, we'll use solid color
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
   },
@@ -296,7 +296,7 @@ const styles = StyleSheet.create({
   premiumActiveText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginBottom: 8,
   },
   premiumActiveSubtext: {
@@ -306,7 +306,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   goHomeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 30,
@@ -384,13 +384,13 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginRight: 4,
   },
   bigPrice: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   pricePeriod: {
     fontSize: 18,
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderRadius: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#067A4F',
   },
   benefitIcon: {
     fontSize: 24,
@@ -446,13 +446,13 @@ const styles = StyleSheet.create({
 
   // Upgrade Button
   upgradeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingVertical: 20,
     paddingHorizontal: 32,
     borderRadius: 30,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,

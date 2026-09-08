@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,25 +6,117 @@ import {
   TouchableOpacity,
   ScrollView,
   StatusBar,
-  Platform,
   Image,
+  Animated,
+  Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
+import * as StoreReview from 'expo-store-review';
 
-const ProfileScreen = ({ navigation }) => {
-  const [userName, setUserName] = useState('');
-  const [isPremium, setIsPremium] = useState(true);
-  const [averageScore, setAverageScore] = useState(0);
-  const [totalScans, setTotalScans] = useState(0);
-  const [recentScans, setRecentScans] = useState([]);
-  const [savedProducts, setSavedProducts] = useState([]);
+const PRIMARY  = '#067A4F';
+const BG       = '#f8faf8';
+const SURFACE  = '#ffffff';
+const ON_BG    = '#191c1b';
+const ON_VAR   = '#a3a8a3';
+const BORDER   = 'rgba(0,0,0,0.05)';
+const BEST_KEY = '@vee_curated_products';
+
+// Score → color, matching the app's score thresholds.
+const scoreColor = (s) => (s >= 75 ? PRIMARY : s >= 50 ? '#f59e0b' : '#ef4444');
+
+// A single Saved/History rail item — square thumbnail, name, brand subtitle,
+// score. Rendered inside a horizontal scroll rail.
+const RailTile = ({ item, index, onPress }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
 
   useEffect(() => {
-    loadData();
+    const delay = Math.min(index, 8) * 50;
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 300, delay, useNativeDriver: true }),
+    ]).start();
   }, []);
+
+  const color = scoreColor(item.score || 0);
+
+  return (
+    <Animated.View style={[tileStyles.wrap, { opacity, transform: [{ translateY }] }]}>
+      <TouchableOpacity activeOpacity={0.85} onPress={onPress}>
+        <View style={tileStyles.imgWrap}>
+          {item.productImage ? (
+            <Image source={{ uri: item.productImage }} style={tileStyles.img} />
+          ) : (
+            <Ionicons name="leaf-outline" size={24} color="#c7cdc7" />
+          )}
+        </View>
+        <Text style={tileStyles.name} numberOfLines={1}>{item.productName || 'Unknown Product'}</Text>
+        {item.productSubtitle ? (
+          <Text style={tileStyles.subtitle} numberOfLines={1}>{item.productSubtitle}</Text>
+        ) : null}
+        <Text style={[tileStyles.score, { color }]}>{item.score ?? '–'}/100</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// A few pulsing placeholder tiles, shown while data is loading.
+const SkeletonTiles = () => {
+  const pulse = useRef(new Animated.Value(0.4)).current;
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 700, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 0.4, duration: 700, useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+  return (
+    <View style={tileStyles.rail}>
+      {[0, 1, 2].map((i) => (
+        <Animated.View key={i} style={[tileStyles.skeletonTile, { opacity: pulse }]} />
+      ))}
+    </View>
+  );
+};
+
+const tileStyles = StyleSheet.create({
+  // History rail (horizontal scroll)
+  rail: { flexDirection: 'row', gap: 14 },
+  wrap: { width: 128 },
+  imgWrap: {
+    width: '100%', aspectRatio: 1, borderRadius: 16,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center', justifyContent: 'center',
+    overflow: 'hidden', marginBottom: 8,
+  },
+  img: { width: '100%', height: '100%', resizeMode: 'cover' },
+  name: { fontSize: 14, fontWeight: '600', color: '#191c1b', marginBottom: 2 },
+  subtitle: { fontSize: 12, fontWeight: '500', color: ON_VAR, marginBottom: 2 },
+  score: { fontSize: 14, fontWeight: '800' },
+  skeletonTile: { width: 128, height: 170, borderRadius: 16, backgroundColor: '#eef1ee' },
+});
+
+export default function ProfileScreen({ navigation }) {
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef(null);
+
+  const [userName, setUserName]       = useState('Guest user');
+  const [memberSince, setMemberSince] = useState('');
+  const [isPremium, setIsPremium]     = useState(false);
+  const [totalScans, setTotalScans]   = useState(0);
+  const [allScans, setAllScans]       = useState([]);
+  const [savedItems, setSavedItems]   = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [activeTab, setActiveTab]     = useState('saved'); // 'saved' | 'history'
+  const [profilePhoto, setProfilePhoto] = useState(null);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -34,662 +126,433 @@ const ProfileScreen = ({ navigation }) => {
 
   const loadData = async () => {
     try {
-      const [name, subscriptionType, historyJson] = await Promise.all([
+      const [name, subType, historyJson, firstLaunch, bestJson] = await Promise.all([
         AsyncStorage.getItem('userName'),
         AsyncStorage.getItem('subscriptionType'),
         AsyncStorage.getItem('scan_history'),
+        AsyncStorage.getItem('firstLaunchDate'),
+        AsyncStorage.getItem(BEST_KEY),
       ]);
-
-      setUserName(name || 'HealthyScan User');
-      const premium = subscriptionType === 'Premium';
-      setIsPremium(premium);
-
-      // Only load history data for premium users
-      if (premium) {
-        const history = historyJson ? JSON.parse(historyJson) : [];
-        if (history.length > 0) {
-          setTotalScans(history.length);
-          const avg = Math.round(
-            history.reduce((sum, item) => sum + (item.score || 0), 0) / history.length
-          );
-          setAverageScore(avg);
-          setRecentScans(history.slice(0, 5));
-          setSavedProducts(history.filter((item) => item.score >= 70).slice(0, 6));
-        } else {
-          setTotalScans(0);
-          setAverageScore(0);
-          setRecentScans([]);
-          setSavedProducts([]);
-        }
+      setUserName(name || 'Guest user');
+      setIsPremium(subType === 'Premium');
+      if (firstLaunch) {
+        const d = new Date(parseInt(firstLaunch));
+        setMemberSince(d.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
       } else {
-        // Free users see empty profile
-        setTotalScans(0);
-        setAverageScore(0);
-        setRecentScans([]);
-        setSavedProducts([]);
+        const now = new Date();
+        await AsyncStorage.setItem('firstLaunchDate', String(now.getTime()));
+        setMemberSince(now.toLocaleString('en-US', { month: 'short', year: 'numeric' }));
       }
+      const history = historyJson ? JSON.parse(historyJson) : [];
+      setTotalScans(history.length);
+      setAllScans(history.map(item => ({
+        ...item,
+        productSubtitle: item.productBrand || '',
+      })));
+
+      const best = bestJson ? JSON.parse(bestJson) : [];
+      setSavedItems(best.map(item => ({
+        id: item.barcode,
+        barcode: item.barcode,
+        productName: item.name,
+        productSubtitle: item.brand,
+        productImage: item.image,
+        score: item.score ?? item.defaultScore ?? 0,
+        productType: item.productType || 'food',
+        scannedAt: item.savedAt || null,
+      })));
+
+      const photo = await AsyncStorage.getItem('profilePhoto');
+      if (photo) setProfilePhoto(photo);
     } catch {
-      // Silently fail
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getScoreColor = (score) =>
-    score >= 70 ? '#2E7D32' : score >= 50 ? '#E67A00' : '#D32F2F';
-  const getScoreBg = (score) =>
-    score >= 70 ? '#E8F5E9' : score >= 50 ? '#FFF3E0' : '#FFEBEE';
+  const pickPhoto = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Please allow photo access to set a profile picture.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      setProfilePhoto(uri);
+      await AsyncStorage.setItem('profilePhoto', uri);
+    }
+  };
+
+  const scoreColor = (s) => s >= 70 ? PRIMARY : s >= 50 ? '#d97706' : '#dc2626';
+
+  const rateApp = async () => {
+    try {
+      if (await StoreReview.isAvailableAsync()) {
+        await StoreReview.requestReview();
+        return;
+      }
+    } catch {}
+    const url = StoreReview.storeUrl();
+    if (url) Linking.openURL(url);
+  };
+
+  const openScan = (item) => {
+    if (item.productType === 'cosmetic') {
+      navigation.navigate('CosmeticResults', { barcode: item.barcode });
+    } else {
+      navigation.navigate('Results', { barcode: item.barcode });
+    }
+  };
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent />
-      <LinearGradient
-        colors={['#B2DFBC', '#C8E6C9', '#E8F5E9', '#F1F8E9', '#F5F5F0']}
-        locations={[0, 0.2, 0.45, 0.7, 1]}
-        style={StyleSheet.absoluteFill}
-      />
+      <StatusBar barStyle="dark-content" backgroundColor={BG} />
+
+      {/* ── Header ── */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="arrow-back" size={20} color={ON_BG} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Profile</Text>
+        <TouchableOpacity
+          style={styles.headerBtn}
+          onPress={() => navigation.navigate('Settings')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="settings-outline" size={20} color={ON_BG} />
+        </TouchableOpacity>
+      </View>
 
       <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Ionicons name="chevron-back" size={24} color="#1B5E20" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Profile</Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Settings')}
-            style={styles.settingsBtn}
-          >
-            <Ionicons name="settings-outline" size={22} color="#5A7A5A" />
-          </TouchableOpacity>
-        </View>
-
-        {/* Avatar + Name */}
-        <View style={styles.profileTop}>
-          <View style={styles.avatarWrap}>
-            <LinearGradient
-              colors={['#1B5E20', '#2E7D32', '#388E3C']}
-              style={styles.avatarGradient}
-            >
-              <Ionicons name="person" size={40} color="#fff" />
-            </LinearGradient>
-            {isPremium && (
-              <View style={styles.proCheckmark}>
-                <Ionicons name="checkmark-circle" size={22} color="#2E7D32" />
-              </View>
+        {/* ── Hero ── */}
+        <View style={styles.hero}>
+          <TouchableOpacity onPress={pickPhoto} activeOpacity={0.85} style={styles.avatarCircle}>
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={styles.avatarCircleImg} />
+            ) : (
+              <Ionicons name="person-outline" size={44} color={ON_VAR} />
             )}
+          </TouchableOpacity>
+          {isPremium && (
+          <View style={styles.premiumPill}>
+            <Text style={styles.premiumPillText}>Premium</Text>
           </View>
-          <Text style={styles.profileName}>{userName}</Text>
-          <Text style={styles.profileRole}>Holistic Wellness Advocate</Text>
-          {isPremium ? (
-            <View style={styles.proBadgeWrap}>
-              <Ionicons name="diamond" size={12} color="#2E7D32" />
-              <Text style={styles.proBadgeLabel}>Pro Member</Text>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.upgradeBadge}
-              onPress={() => navigation.navigate('Subscription')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="diamond-outline" size={12} color="#FF9800" />
-              <Text style={styles.upgradeBadgeText}>Upgrade to Pro</Text>
-            </TouchableOpacity>
           )}
+
+          <Text style={styles.heroName}>{userName}</Text>
+          <Text style={styles.heroJoined}>
+            {memberSince ? `Member since ${memberSince}` : 'Welcome to Vee'}
+          </Text>
+
+          {/* Stat row */}
+          <View style={styles.statRow}>
+            <View style={styles.statPlain}>
+              <Text style={styles.statPlainNum}>{totalScans}</Text>
+              <Text style={styles.statPlainLabel}>Scans</Text>
+            </View>
+            <View style={styles.statDivider} />
+            <View style={styles.statPlain}>
+              <Text style={styles.statPlainNum}>{savedItems.length}</Text>
+              <Text style={styles.statPlainLabel}>Saved</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Overall Score Card */}
-        <View style={styles.scoreCard}>
-          <LinearGradient
-            colors={['#1B5E20', '#2E7D32', '#388E3C']}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={styles.scoreCardGradient}
-          >
-            <Text style={styles.scoreCardLabel}>OVERALL SCORE</Text>
-            <View style={styles.scoreRow}>
-              <View style={styles.scoreCircle}>
-                <Text style={styles.scoreNumber}>
-                  {totalScans > 0 ? averageScore : 0}%
-                </Text>
-                <Text style={styles.scoreStatusLabel}>
-                  {averageScore >= 70
-                    ? 'Optimal'
-                    : averageScore >= 50
-                    ? 'Moderate'
-                    : totalScans > 0
-                    ? 'Needs Work'
-                    : 'No Data'}
-                </Text>
-              </View>
-              <View style={styles.scoreInfo}>
-                <Text style={styles.scoreInfoText}>
-                  {totalScans > 0
-                    ? averageScore >= 70
-                      ? `Your pantry is ${averageScore - 50}% cleaner than the food average. Keep scanning!`
-                      : averageScore >= 50
-                      ? "You're on the right track. Try scanning for healthier alternatives!"
-                      : "Let's find healthier options together!"
-                    : 'Start scanning products to see your health score here.'}
-                </Text>
-              </View>
-            </View>
+        {/* ── Saved / History toggle ── */}
+        <View style={styles.section}>
+          <View style={styles.toggleWrap}>
             <TouchableOpacity
-              style={styles.detailedBtn}
-              onPress={() => navigation.navigate('History')}
+              style={[styles.toggleBtn, activeTab === 'saved' && styles.toggleBtnActive]}
+              onPress={() => setActiveTab('saved')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="bookmark" size={14} color={activeTab === 'saved' ? PRIMARY : ON_VAR} />
+              <Text style={[styles.toggleText, activeTab === 'saved' && styles.toggleTextActive]}>Saved</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.toggleBtn, activeTab === 'history' && styles.toggleBtnActive]}
+              onPress={() => setActiveTab('history')}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="time" size={14} color={activeTab === 'history' ? PRIMARY : ON_VAR} />
+              <Text style={[styles.toggleText, activeTab === 'history' && styles.toggleTextActive]}>History</Text>
+            </TouchableOpacity>
+          </View>
+
+          {loading ? (
+            <SkeletonTiles />
+          ) : (() => {
+            const activeList = activeTab === 'saved' ? savedItems : allScans;
+            if (activeList.length === 0) {
+              return (
+                <View style={styles.emptyBox}>
+                  <Ionicons
+                    name={activeTab === 'saved' ? 'bookmark-outline' : 'barcode-outline'}
+                    size={32}
+                    color="#d1d5db"
+                  />
+                  <Text style={styles.emptyTitle}>
+                    {activeTab === 'saved' ? 'No saved products yet' : 'No scans yet'}
+                  </Text>
+                  {activeTab === 'saved' && (
+                    <TouchableOpacity
+                      style={styles.scanCta}
+                      activeOpacity={0.85}
+                      onPress={() => navigation.navigate('Home', { startScanning: true })}
+                    >
+                      <Text style={styles.scanCtaText}>Scan a product</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              );
+            }
+            const isSaved = activeTab === 'saved';
+            return (
+              <>
+                <Text style={styles.groupLabel}>{isSaved ? 'Saved products' : 'Recent scans'}</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={tileStyles.rail}
+                >
+                  {activeList.slice(0, 8).map((item, idx) => (
+                    <RailTile key={item.id || idx} item={item} index={idx} onPress={() => openScan(item)} />
+                  ))}
+                </ScrollView>
+                {activeList.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.seeAllRow}
+                    onPress={() => navigation.navigate('History', isSaved ? { savedOnly: true } : undefined)}
+                  >
+                    <Text style={styles.seeAllBtn}>View all</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            );
+          })()}
+        </View>
+
+        {/* ── Rate us ── */}
+        <TouchableOpacity style={styles.rateCard} activeOpacity={0.85} onPress={rateApp}>
+          <View style={styles.rateIconWrap}>
+            <Ionicons name="star" size={18} color="#f5a623" />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.rateTitle}>Enjoying Vee?</Text>
+            <Text style={styles.rateSub}>Your review helps grow our community.</Text>
+          </View>
+          <View style={styles.rateBtn}>
+            <Text style={styles.rateBtnText}>Rate</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* ── Membership ── */}
+        <View style={styles.section}>
+          <Text style={styles.groupLabel}>Membership</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={styles.row}
+              onPress={() => navigation.navigate('Subscription')}
               activeOpacity={0.8}
             >
-              <Text style={styles.detailedBtnText}>Detailed Analysis</Text>
+              <View style={[styles.iconCircle, { backgroundColor: '#E5F2EC' }]}>
+                <Ionicons name="checkmark-circle" size={20} color={PRIMARY} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.rowTitle}>
+                  {isPremium ? 'Premium Membership' : 'Upgrade to Premium'}
+                </Text>
+                <Text style={styles.rowSub}>
+                  {isPremium ? 'Active plan' : 'Unlock all features'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
             </TouchableOpacity>
-          </LinearGradient>
-        </View>
-
-        {/* Quick Stats */}
-        <View style={styles.statsRow}>
-          <TouchableOpacity
-            style={styles.statItem}
-            onPress={() => navigation.navigate('History')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="time-outline" size={20} color="#2E7D32" />
-            <Text style={styles.statNumber}>{totalScans}</Text>
-            <Text style={styles.statLabel}>Scan History</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.statItem}
-            onPress={() => navigation.navigate('History')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="bookmark-outline" size={20} color="#2E7D32" />
-            <Text style={styles.statNumber}>{savedProducts.length}</Text>
-            <Text style={styles.statLabel}>Saved Products</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Recent Insights */}
-        {recentScans.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Recent Insights</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('History')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            {recentScans.map((item, index) => (
-              <TouchableOpacity
-                key={item.id || index}
-                style={styles.recentItem}
-                activeOpacity={0.7}
-                onPress={() => {
-                  if (item.productType === 'cosmetic') {
-                    navigation.navigate('CosmeticResults', { barcode: item.barcode });
-                  } else {
-                    navigation.navigate('Results', { barcode: item.barcode });
-                  }
-                }}
-              >
-                <View style={styles.recentItemLeft}>
-                  {item.productImage ? (
-                    <Image
-                      source={{ uri: item.productImage }}
-                      style={styles.recentItemImage}
-                    />
-                  ) : (
-                    <View style={[styles.recentItemImage, styles.recentItemPlaceholder]}>
-                      <Ionicons
-                        name={
-                          item.productType === 'cosmetic'
-                            ? 'sparkles-outline'
-                            : 'nutrition-outline'
-                        }
-                        size={18}
-                        color="#888"
-                      />
-                    </View>
-                  )}
-                  <View style={styles.recentItemInfo}>
-                    <Text style={styles.recentItemName} numberOfLines={1}>
-                      {item.productName}
-                    </Text>
-                    <Text style={styles.recentItemType}>
-                      {item.productType === 'cosmetic' ? 'Cosmetic' : 'Food'} •{' '}
-                      {new Date(item.scannedAt).toLocaleDateString()}
-                    </Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles.recentItemScore,
-                    { backgroundColor: getScoreBg(item.score) },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.recentItemScoreText,
-                      { color: getScoreColor(item.score) },
-                    ]}
-                  >
-                    {item.score}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
           </View>
-        )}
+        </View>
 
-        {/* Saved Favourites */}
-        {savedProducts.length > 0 && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Saved Favourites</Text>
-              <TouchableOpacity
-                onPress={() => navigation.navigate('History')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.seeAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 12 }}
+        {/* ── Application ── */}
+        <View style={styles.section}>
+          <Text style={styles.groupLabel}>Application</Text>
+          <View style={styles.card}>
+            <TouchableOpacity
+              style={[styles.row, styles.rowBorder]}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('History')}
             >
-              {savedProducts.map((item, index) => (
-                <TouchableOpacity
-                  key={item.id || index}
-                  style={styles.savedCard}
-                  activeOpacity={0.7}
-                  onPress={() => {
-                    if (item.productType === 'cosmetic') {
-                      navigation.navigate('CosmeticResults', { barcode: item.barcode });
-                    } else {
-                      navigation.navigate('Results', { barcode: item.barcode });
-                    }
-                  }}
-                >
-                  {item.productImage ? (
-                    <Image
-                      source={{ uri: item.productImage }}
-                      style={styles.savedCardImage}
-                    />
-                  ) : (
-                    <View style={[styles.savedCardImage, styles.savedCardPlaceholder]}>
-                      <Ionicons
-                        name={
-                          item.productType === 'cosmetic'
-                            ? 'sparkles-outline'
-                            : 'nutrition-outline'
-                        }
-                        size={22}
-                        color="#aaa"
-                      />
-                    </View>
-                  )}
-                  <Text style={styles.savedCardName} numberOfLines={1}>
-                    {item.productName}
-                  </Text>
-                  <Text style={styles.savedCardType}>
-                    {item.productType === 'cosmetic' ? 'Cosmetic' : 'Food'}
-                  </Text>
-                  <View
-                    style={[
-                      styles.savedCardScore,
-                      { backgroundColor: getScoreColor(item.score) },
-                    ]}
-                  >
-                    <Text style={styles.savedCardScoreText}>{item.score}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+              <View style={[styles.iconCircle, { backgroundColor: '#f2f4f2' }]}>
+                <Ionicons name="time-outline" size={20} color="#556158" />
+              </View>
+              <Text style={[styles.rowTitle, { flex: 1 }]}>History</Text>
+              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.row}
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('Settings')}
+            >
+              <View style={[styles.iconCircle, { backgroundColor: '#f2f4f2' }]}>
+                <Ionicons name="settings-outline" size={20} color="#556158" />
+              </View>
+              <Text style={[styles.rowTitle, { flex: 1 }]}>Settings</Text>
+              <Ionicons name="chevron-forward" size={18} color="#d1d5db" />
+            </TouchableOpacity>
           </View>
-        )}
+        </View>
+
       </ScrollView>
     </View>
   );
-};
+}
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#E8F5E9' },
-  scrollView: { flex: 1 },
-  scrollContent: { paddingBottom: 110, paddingHorizontal: 22 },
+  screen: { flex: 1, backgroundColor: BG },
 
   /* Header */
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 56 : 48,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  headerBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#f2f4f2',
+    alignItems: 'center', justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#1B5E20',
-  },
-  settingsBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
+    fontSize: 13, fontWeight: '700', color: ON_VAR,
+    letterSpacing: 1.5, textTransform: 'uppercase',
   },
 
-  /* Profile Top */
-  profileTop: {
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 20,
-  },
-  avatarWrap: {
-    position: 'relative',
-    marginBottom: 12,
-  },
-  avatarGradient: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.8)',
-    shadowColor: '#1B5E20',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  proCheckmark: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 1,
-  },
-  profileName: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1B5E20',
-    letterSpacing: -0.3,
-    marginBottom: 3,
-  },
-  profileRole: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#5A7A5A',
-    marginBottom: 10,
-  },
-  proBadgeWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(46,125,50,0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(46,125,50,0.2)',
-  },
-  proBadgeLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#2E7D32',
-    letterSpacing: 0.3,
-  },
-  upgradeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,152,0,0.1)',
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(255,152,0,0.2)',
-  },
-  upgradeBadgeText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#E67A00',
-    letterSpacing: 0.3,
-  },
+  content: { paddingHorizontal: 24, gap: 28 },
 
-  /* Score Card */
-  scoreCard: {
-    borderRadius: 20,
+  /* Hero */
+  hero: { alignItems: 'center', paddingTop: 4, paddingBottom: 8 },
+  avatarCircle: {
+    width: 96, height: 96, borderRadius: 48,
+    backgroundColor: '#f2f4f2',
+    alignItems: 'center', justifyContent: 'center',
     overflow: 'hidden',
     marginBottom: 16,
-    shadowColor: '#1B5E20',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 8,
   },
-  scoreCardGradient: {
-    padding: 22,
-    borderRadius: 20,
-  },
-  scoreCardLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 1.5,
-    marginBottom: 14,
-    textAlign: 'center',
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  scoreCircle: {
-    width: 85,
-    height: 85,
-    borderRadius: 42.5,
-    backgroundColor: 'rgba(255,255,255,0.18)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: 'rgba(255,255,255,0.35)',
-    marginRight: 16,
-  },
-  scoreNumber: {
-    fontSize: 26,
-    fontWeight: '900',
-    color: '#fff',
-  },
-  scoreStatusLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.8)',
-    marginTop: 1,
-  },
-  scoreInfo: { flex: 1 },
-  scoreInfoText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.9)',
-    lineHeight: 19,
-  },
-  detailedBtn: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 12,
-    paddingVertical: 11,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.25)',
-  },
-  detailedBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.3,
-  },
-
-  /* Stats Row */
-  statsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 24,
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: 'rgba(255,255,255,0.65)',
-    paddingVertical: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.8)',
-  },
-  statNumber: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1B5E20',
-    marginTop: 2,
-  },
-  statLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#5A7A5A',
-  },
-
-  /* Sections */
-  section: { marginBottom: 24 },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  avatarCircleImg: { width: '100%', height: '100%', resizeMode: 'cover' },
+  premiumPill: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 14, paddingVertical: 5,
+    borderRadius: 99,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1B5E20',
+  premiumPillText: {
+    color: '#fff', fontSize: 10, fontWeight: '800',
+    letterSpacing: 1.5, textTransform: 'uppercase',
   },
-  seeAllText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#2E7D32',
+  heroName: {
+    fontSize: 20, fontWeight: '800', color: ON_BG,
+    letterSpacing: -0.4, textAlign: 'center', marginBottom: 4,
+  },
+  heroJoined: { fontSize: 13, color: ON_VAR, fontWeight: '500', textAlign: 'center', marginBottom: 24 },
+
+  /* Stat row */
+  statRow: { flexDirection: 'row', alignItems: 'center', width: '100%', paddingHorizontal: 20 },
+  statPlain: { flex: 1, alignItems: 'center', gap: 4 },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 34, backgroundColor: BORDER },
+  statPlainNum: { fontSize: 22, fontWeight: '800', color: ON_BG, letterSpacing: -0.4 },
+  statPlainLabel: { fontSize: 12, color: ON_VAR, fontWeight: '500' },
+
+  /* Section */
+  section: { gap: 12 },
+  seeAllBtn: { fontSize: 13, fontWeight: '600', color: PRIMARY },
+  seeAllRow: { alignItems: 'center', paddingTop: 4 },
+  groupLabel: {
+    fontSize: 12, fontWeight: '700', color: ON_VAR,
+    letterSpacing: 1.2, textTransform: 'uppercase',
   },
 
-  /* Recent Items */
-  recentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.75)',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.85)',
+  /* Rate us */
+  rateCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 14,
+    backgroundColor: SURFACE, borderRadius: 20,
+    borderWidth: 1, borderColor: BORDER,
+    paddingHorizontal: 18, paddingVertical: 16,
   },
-  recentItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
+  rateIconWrap: {
+    width: 38, height: 38, borderRadius: 19,
+    backgroundColor: 'rgba(245,166,35,0.12)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  recentItemImage: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    marginRight: 12,
+  rateTitle: { fontSize: 14, fontWeight: '700', color: ON_BG, marginBottom: 2 },
+  rateSub: { fontSize: 12, color: ON_VAR, fontWeight: '500' },
+  rateBtn: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 16, paddingVertical: 9,
+    borderRadius: 999,
   },
-  recentItemPlaceholder: {
-    backgroundColor: '#f0f0f0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentItemInfo: { flex: 1 },
-  recentItemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#222',
-    marginBottom: 2,
-  },
-  recentItemType: {
-    fontSize: 11,
-    color: '#888',
-  },
-  recentItemScore: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recentItemScoreText: {
-    fontSize: 14,
-    fontWeight: '800',
-  },
+  rateBtnText: { fontSize: 13, fontWeight: '700', color: '#fff' },
 
-  /* Saved Cards */
-  savedCard: {
-    width: 140,
-    backgroundColor: 'rgba(255,255,255,0.8)',
-    borderRadius: 16,
+  /* Saved / History toggle */
+  toggleWrap: {
+    flexDirection: 'row', gap: 4,
+    backgroundColor: '#f2f4f2', borderRadius: 16, padding: 4,
+    marginBottom: 4,
+  },
+  toggleBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    paddingVertical: 10, borderRadius: 12,
+  },
+  toggleBtnActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.06, shadowRadius: 3, elevation: 1,
+  },
+  toggleText: { fontSize: 13, fontWeight: '600', color: ON_VAR },
+  toggleTextActive: { color: PRIMARY },
+
+  /* Empty */
+  emptyBox: {
+    alignItems: 'center', paddingVertical: 32, gap: 10,
+    backgroundColor: SURFACE, borderRadius: 20, borderWidth: 1, borderColor: BORDER,
+  },
+  emptyTitle: { fontSize: 14, fontWeight: '600', color: ON_BG },
+  scanCta: {
+    backgroundColor: PRIMARY,
+    paddingHorizontal: 20, paddingVertical: 10,
+    borderRadius: 999, marginTop: 4,
+  },
+  scanCtaText: { fontSize: 13, fontWeight: '700', color: '#fff' },
+
+  /* Card */
+  card: {
+    backgroundColor: SURFACE, borderRadius: 20,
+    borderWidth: 1, borderColor: BORDER,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.9)',
-    paddingBottom: 10,
   },
-  savedCardImage: {
-    width: '100%',
-    height: 85,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+  row: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 20, paddingVertical: 16, gap: 14,
   },
-  savedCardPlaceholder: {
-    backgroundColor: '#f0f4ef',
-    alignItems: 'center',
-    justifyContent: 'center',
+  rowBorder: {
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#f2f4f2',
   },
-  savedCardName: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#222',
-    paddingHorizontal: 8,
-    marginTop: 8,
-    marginBottom: 2,
+  iconCircle: {
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center',
   },
-  savedCardType: {
-    fontSize: 9,
-    fontWeight: '500',
-    color: '#999',
-    paddingHorizontal: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  savedCardScore: {
-    marginLeft: 8,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  savedCardScoreText: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#fff',
-  },
+  rowTitle: { fontSize: 15, fontWeight: '700', color: ON_BG },
+  rowSub: { fontSize: 12, color: ON_VAR, marginTop: 2 },
 });
-
-export default ProfileScreen;

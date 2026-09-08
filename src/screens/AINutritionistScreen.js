@@ -1,4 +1,4 @@
-/**
+﻿/**
  * AI Nutritionist Screen - Standalone chat with nutrition expert AI
  * Features: Text chat, image upload, voice output (TTS), free tier limits
  */
@@ -52,6 +52,7 @@ const AINutritionistScreen = () => {
   const [usage, setUsage] = useState({ remaining: 0, total: 3, isPremium: false });
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [chatbotAccess, setChatbotAccess] = useState('loading');
 
   const suggestedQuestions = [
     "What's the healthiest breakfast?",
@@ -71,8 +72,8 @@ const AINutritionistScreen = () => {
       } else {
         setMessages([WELCOME_MESSAGE]);
       }
+      setChatbotAccess('coming_soon');
     };
-
     init();
   }, []);
 
@@ -103,7 +104,6 @@ const AINutritionistScreen = () => {
 
   const autoSpeakMessage = async (text) => {
     if (Platform.OS === 'web' || !text) return;
-
     try {
       await Speech.stop();
       setIsSpeaking(true);
@@ -116,7 +116,6 @@ const AINutritionistScreen = () => {
         onError: () => setIsSpeaking(false),
       });
     } catch (error) {
-      console.error('Auto speech error:', error);
       setIsSpeaking(false);
     }
   };
@@ -124,7 +123,6 @@ const AINutritionistScreen = () => {
   const handleSend = async () => {
     if (!inputText.trim() && !selectedImage) return;
 
-    // AI chat is coming soon — show notice for everyone
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     const userMessage = {
       type: 'user',
@@ -132,14 +130,45 @@ const AINutritionistScreen = () => {
       image: selectedImage,
       timestamp: Date.now(),
     };
-    const comingSoonMsg = {
-      type: 'ai',
-      text: '✨ AI messaging is coming soon! You will be able to send messages here shortly. Stay tuned!',
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, userMessage, comingSoonMsg]);
+
+    if (chatbotAccess !== 'enabled') {
+      const comingSoonMsg = {
+        type: 'ai',
+        text: 'The AI Nutritionist chat is coming soon for your account! New subscribers get access first. Stay tuned!',
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, userMessage, comingSoonMsg]);
+      setInputText('');
+      setSelectedImage(null);
+      return;
+    }
+
+    setMessages((prev) => [...prev, userMessage]);
     setInputText('');
     setSelectedImage(null);
+    setLoading(true);
+
+    try {
+      const aiResponse = await cloudflareAPI.chatbot(inputText.trim());
+      const aiMessage = {
+        type: 'ai',
+        text: aiResponse,
+        timestamp: Date.now(),
+      };
+      setMessages((prev) => [...prev, aiMessage]);
+      await saveChatHistory([...messages, userMessage, aiMessage]);
+      autoSpeakMessage(aiResponse);
+    } catch (error) {
+      const errorMsg = {
+        type: 'ai',
+        text: 'Sorry, I had trouble responding. Please check your connection and try again.',
+        timestamp: Date.now(),
+        isError: true,
+      };
+      setMessages((prev) => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSuggestedQuestion = (question) => {
@@ -148,19 +177,16 @@ const AINutritionistScreen = () => {
 
   const handleImagePick = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Please allow photo library access to upload images.');
       return;
     }
-
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
       aspect: [4, 3],
       quality: 0.8,
     });
-
     if (!result.canceled && result.assets[0]) {
       setSelectedImage(result.assets[0].uri);
     }
@@ -171,7 +197,6 @@ const AINutritionistScreen = () => {
       Alert.alert('Text-to-Speech', 'Voice output is only available on iOS and Android devices.');
       return;
     }
-
     try {
       Haptics.selectionAsync();
       if (isSpeaking) {
@@ -179,7 +204,6 @@ const AINutritionistScreen = () => {
         setIsSpeaking(false);
         return;
       }
-
       setIsSpeaking(true);
       Speech.speak(text, {
         language: 'en-US',
@@ -197,7 +221,6 @@ const AINutritionistScreen = () => {
       Alert.alert('Error', 'Unable to use text-to-speech.');
     }
   };
-
 
   const handleClearChat = () => {
     Alert.alert('Clear Chat', 'Delete all messages? This cannot be undone.', [
@@ -234,7 +257,7 @@ const AINutritionistScreen = () => {
             <Ionicons
               name={isSpeaking ? 'volume-high' : 'volume-medium-outline'}
               size={16}
-              color="#e2e2e2"
+              color="#9ca3af"
             />
           </TouchableOpacity>
         )}
@@ -244,13 +267,15 @@ const AINutritionistScreen = () => {
 
   return (
     <View style={an.root}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      {/* -- HEADER -- */}
+      {/* HEADER */}
       <SafeAreaView style={an.headerSafe}>
         <View style={an.header}>
           <View style={an.headerLeft}>
-            <Ionicons name="leaf" size={18} color="#4CAF50" />
+            <View style={an.headerIconBox}>
+              <Ionicons name="leaf" size={16} color="#067A4F" />
+            </View>
             <Text style={an.headerTitle}>AI Nutritionist</Text>
           </View>
           <TouchableOpacity
@@ -258,12 +283,20 @@ const AINutritionistScreen = () => {
             style={an.avatarBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="trash-outline" size={16} color="#a0a0a0" />
+            <Ionicons name="trash-outline" size={16} color="#6b7280" />
           </TouchableOpacity>
         </View>
       </SafeAreaView>
 
-      {/* -- MAIN SCROLL -- */}
+      {/* COMING SOON BANNER — only for old users */}
+      {chatbotAccess === 'coming_soon' && (
+        <View style={an.comingSoonBanner}>
+          <Ionicons name="time-outline" size={14} color="#92400e" />
+          <Text style={an.comingSoonBannerText}>Chat is coming soon for your account</Text>
+        </View>
+      )}
+
+      {/* MAIN SCROLL */}
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -276,15 +309,13 @@ const AINutritionistScreen = () => {
           showsVerticalScrollIndicator={false}
           onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
         >
-          {/* Greeting block � always visible at top */}
           {isGreetingOnly && (
             <>
               <View style={an.greetSection}>
                 <Text style={an.greetTitle}>AI NUTRITIONIST</Text>
-                <Text style={an.greetBody}>What would you like to know?</Text>
+                <Text style={an.greetBody}>What would you{'\n'}like to know?</Text>
               </View>
 
-              {/* Suggested queries */}
               <View style={an.suggestSection}>
                 <Text style={an.suggestLabel}>SUGGESTED QUERIES</Text>
                 <View style={an.pillRow}>
@@ -295,47 +326,49 @@ const AINutritionistScreen = () => {
                       onPress={() => handleSuggestedQuestion(q)}
                       activeOpacity={0.75}
                     >
-                      <Text style={an.pillText}>{q.replace("What's the healthiest breakfast?", "Healthiest breakfast?").replace("Is intermittent fasting safe?", "Intermittent fasting").replace("How much protein do I need daily?", "Protein calculation")}</Text>
+                      <Text style={an.pillText}>
+                        {q
+                          .replace("What's the healthiest breakfast?", 'Healthiest breakfast?')
+                          .replace('Is intermittent fasting safe?', 'Intermittent fasting')
+                          .replace('How much protein do I need daily?', 'Protein needs')}
+                      </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
-
-
             </>
           )}
 
-          {/* Chat messages */}
           {!isGreetingOnly && messages.map((msg, idx) => renderMessage(msg, idx))}
 
           {loading && (
             <View style={an.bubbleAI}>
-              <ActivityIndicator size="small" color="#c6c6c6" />
-              <Text style={[an.bubbleText, { marginTop: 6 }]}>Analyzing�</Text>
+              <ActivityIndicator size="small" color="#067A4F" />
+              <Text style={[an.bubbleText, { marginTop: 6 }]}>Analyzing...</Text>
             </View>
           )}
         </ScrollView>
 
-        {/* -- IMAGE PREVIEW -- */}
+        {/* IMAGE PREVIEW */}
         {selectedImage && (
           <View style={an.imagePreviewWrap}>
             <Image source={{ uri: selectedImage }} style={an.imagePreview} />
             <TouchableOpacity style={an.imagePreviewRemove} onPress={() => setSelectedImage(null)}>
-              <Ionicons name="close-circle" size={22} color="#ffffff" />
+              <Ionicons name="close-circle" size={22} color="#067A4F" />
             </TouchableOpacity>
           </View>
         )}
 
-        {/* -- INPUT BAR -- */}
+        {/* INPUT BAR */}
         <View style={an.inputWrap}>
           <TouchableOpacity onPress={handleImagePick} hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}>
-            <Ionicons name="mic-outline" size={22} color="#919191" />
+            <Ionicons name="image-outline" size={22} color="#6b7280" />
           </TouchableOpacity>
 
           <TextInput
             style={an.input}
-            placeholder="Command Nutritionist..."
-            placeholderTextColor="rgba(145,145,145,0.6)"
+            placeholder="Ask your nutritionist..."
+            placeholderTextColor="#9ca3af"
             value={inputText}
             onChangeText={setInputText}
             multiline
@@ -351,7 +384,7 @@ const AINutritionistScreen = () => {
             <Ionicons
               name="send"
               size={20}
-              color={inputText.trim() || selectedImage ? '#ffffff' : '#474747'}
+              color={inputText.trim() || selectedImage ? '#067A4F' : '#d1d5db'}
             />
           </TouchableOpacity>
         </View>
@@ -360,92 +393,113 @@ const AINutritionistScreen = () => {
   );
 };
 
-/* =========================================
-   STYLES � AURA NOIR AI Nutritionist
-   ========================================= */
 const an = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: '#F5F5F0',
   },
 
   /* Header */
   headerSafe: {
-    backgroundColor: 'rgba(10,10,10,0.9)',
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.06)',
     zIndex: 50,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 16 : 8,
     paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.05)',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
+  headerIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(45,106,79,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   headerTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: 'rgba(240,240,240,0.8)',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
   },
   avatarBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: '#F2F2F2',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: 'rgba(0,0,0,0.08)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+
+  /* Coming Soon Banner */
+  comingSoonBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fef3c7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fde68a',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  comingSoonBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e',
   },
 
   /* Scroll */
   scrollContent: {
     flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 32,
-    paddingBottom: 24,
-    gap: 48,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 16,
+    gap: 28,
   },
 
   /* Greeting */
   greetSection: {
-    gap: 14,
+    gap: 8,
+    paddingHorizontal: 4,
   },
   greetTitle: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#a0a0a0',
-    letterSpacing: 4,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#067A4F',
+    letterSpacing: 2,
     textTransform: 'uppercase',
-    marginBottom: 4,
   },
   greetBody: {
-    fontSize: 40,
+    fontSize: 30,
     fontWeight: '700',
-    color: '#ffffff',
-    letterSpacing: -1,
-    lineHeight: 46,
+    color: '#1a1a1a',
+    letterSpacing: -0.5,
+    lineHeight: 38,
   },
 
   /* Suggestions */
   suggestSection: {
-    gap: 16,
+    gap: 12,
   },
   suggestLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#919191',
-    letterSpacing: 3,
+    color: '#6b7280',
+    letterSpacing: 1.5,
     textTransform: 'uppercase',
+    paddingHorizontal: 4,
   },
   pillRow: {
     flexDirection: 'row',
@@ -453,103 +507,75 @@ const an = StyleSheet.create({
     gap: 8,
   },
   pill: {
-    backgroundColor: '#111111',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 18,
+    borderColor: 'rgba(45,106,79,0.25)',
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 9999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   pillText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#e2e2e2',
-  },
-
-  /* Premium */
-  premiumSection: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(71,71,71,0.3)',
-    paddingTop: 28,
-    gap: 16,
-  },
-  premiumHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  premiumLabel: {
-    fontSize: 10,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
-  premiumBody: {
     fontSize: 13,
-    color: '#c6c6c6',
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-  premiumCta: {
-    fontSize: 11,
-    fontWeight: '900',
-    color: '#ffffff',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.5)',
-    alignSelf: 'flex-start',
-    paddingBottom: 4,
+    fontWeight: '600',
+    color: '#067A4F',
   },
 
   /* Chat bubbles */
   bubble: {
-    maxWidth: '80%',
+    maxWidth: '82%',
     padding: 14,
-    marginBottom: 12,
+    marginBottom: 10,
     borderRadius: 18,
   },
   bubbleAI: {
     alignSelf: 'flex-start',
-    backgroundColor: '#111111',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: 'rgba(0,0,0,0.07)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   bubbleUser: {
     alignSelf: 'flex-end',
-    backgroundColor: '#1a1a1a',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#067A4F',
   },
   bubbleError: {
-    backgroundColor: '#1a0a0a',
-    borderColor: '#ff4444',
+    backgroundColor: '#fff5f5',
+    borderColor: '#fca5a5',
+    borderWidth: 1,
   },
   bubbleText: {
     fontSize: 14,
-    color: '#c6c6c6',
+    color: '#374151',
     lineHeight: 21,
   },
   bubbleTextUser: {
-    color: '#e2e2e2',
+    color: '#ffffff',
   },
   bubbleImage: {
     width: '100%',
     height: 140,
-    borderRadius: 2,
+    borderRadius: 10,
     marginBottom: 8,
   },
 
   /* Image preview */
   imagePreviewWrap: {
-    marginHorizontal: 24,
+    marginHorizontal: 16,
     marginBottom: 8,
   },
   imagePreview: {
     width: 72,
     height: 72,
-    borderRadius: 2,
+    borderRadius: 10,
   },
   imagePreviewRemove: {
     position: 'absolute',
@@ -557,26 +583,29 @@ const an = StyleSheet.create({
     left: 62,
   },
 
-  /* Input */
+  /* Input bar */
   inputWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-    marginHorizontal: 24,
+    gap: 12,
+    marginHorizontal: 16,
     marginBottom: Platform.OS === 'ios' ? 24 : 16,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    backgroundColor: '#111111',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: 'rgba(0,0,0,0.08)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   input: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#e2e2e2',
-    letterSpacing: 0.3,
+    fontSize: 14,
+    color: '#1a1a1a',
     maxHeight: 80,
     padding: 0,
   },

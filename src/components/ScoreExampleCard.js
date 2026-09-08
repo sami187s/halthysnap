@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { calculateScoreExample } from '../utils/enhancedScoring';
@@ -45,7 +45,7 @@ const ScoreExampleCard = () => {
           </View>
           
           <View style={styles.fairnessNote}>
-            <Ionicons name="shield-checkmark" size={16} color="#4CAF50" />
+            <Ionicons name="shield-checkmark" size={16} color="#067A4F" />
             <Text style={styles.fairnessText}>
               <Text style={styles.boldText}>Research-Grade Scoring:</Text> Uses NOVA processing classification, 
               tiered penalties for sugar/sodium/fat, and rewards fiber, protein and whole grains.
@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
   },
   fairnessText: {
     fontSize: 11,
-    color: '#2e7d32',
+    color: '#067A4F',
     marginLeft: 8,
     flex: 1,
     lineHeight: 16,

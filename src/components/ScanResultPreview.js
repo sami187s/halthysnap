@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ScanResultPreview — Yuka-style card that slides up from bottom
  * after scanning a barcode. Shows circular score gauge, product name,
  * health status, and lets users tap to view full results.
@@ -11,6 +11,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Easing,
   Dimensions,
   ActivityIndicator,
   Platform,
@@ -24,6 +25,68 @@ import { calculateHealthScore } from '../utils/enhancedScoring';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
+const ANALYZING_STEPS = ['Detecting barcode', 'Reading ingredients', 'Calculating health score'];
+
+// Rotating ring spinner + step checklist, shown while the real product lookup
+// is in flight. Steps advance on a timer, but the moment the real fetch
+// finishes (loading flips false), this unmounts immediately — it never lags
+// behind or outlasts the actual work.
+const AnalyzingState = ({ loading, resetKey }) => {
+  const [activeStep, setActiveStep] = useState(0);
+  const spin = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(spin, { toValue: 1, duration: 900, easing: Easing.linear, useNativeDriver: true })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, []);
+
+  useEffect(() => {
+    if (!loading) { setActiveStep(0); return; }
+    setActiveStep(0);
+    const t1 = setTimeout(() => setActiveStep(1), 700);
+    const t2 = setTimeout(() => setActiveStep(2), 1400);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, [loading, resetKey]);
+
+  const rotate = spin.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] });
+
+  return (
+    <View style={styles.analyzingWrap}>
+      <View style={styles.spinnerBox}>
+        <Animated.View style={[styles.spinnerRing, { transform: [{ rotate }] }]} />
+        <Ionicons name="barcode-outline" size={22} color="#067A4F" />
+      </View>
+      <Text style={styles.analyzingTitle}>Analyzing</Text>
+      <Text style={styles.analyzingSub}>Hold tight — almost there</Text>
+      <View style={styles.stepsList}>
+        {ANALYZING_STEPS.map((label, idx) => {
+          const done = idx < activeStep;
+          const active = idx === activeStep;
+          return (
+            <View key={label} style={styles.stepRow}>
+              <View style={[
+                styles.stepDot,
+                done && styles.stepDotDone,
+                active && styles.stepDotActive,
+              ]}>
+                {done ? (
+                  <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                ) : active ? (
+                  <ActivityIndicator size="small" color="#067A4F" />
+                ) : null}
+              </View>
+              <Text style={[styles.stepLabel, (done || active) && styles.stepLabelActive]}>{label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+};
+
 /* ───── circular gauge constants ───── */
 const GAUGE_SIZE = 64;
 const GAUGE_STROKE = 6;
@@ -32,7 +95,7 @@ const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
 /* ───── score helpers ───── */
 const getScoreColor = (s) => {
-  if (s >= 70) return '#4CAF50';
+  if (s >= 70) return '#067A4F';
   if (s >= 50) return '#FF9800';
   if (s >= 25) return '#FF5722';
   return '#F44336';
@@ -171,11 +234,8 @@ const ScanResultPreview = ({
       {/* Card */}
       <View style={styles.card}>
         {loading ? (
-          /* Loading state */
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color="#4CAF50" />
-            <Text style={styles.loadingText}>Fetching product info…</Text>
-          </View>
+          /* Analyzing state */
+          <AnalyzingState loading={loading} resetKey={barcode} />
         ) : error ? (
           /* Error / not found state */
           <View style={styles.errorWrap}>
@@ -297,7 +357,7 @@ const ScanResultPreview = ({
               activeOpacity={0.85}
             >
               <LinearGradient
-                colors={['#43A047', '#2E7D32']}
+                colors={['#067A4F', '#067A4F']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.detailsGradient}
@@ -308,7 +368,7 @@ const ScanResultPreview = ({
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.rescanButton} onPress={onScanAgain} activeOpacity={0.8}>
-              <Ionicons name="scan-outline" size={20} color="#2E7D32" />
+              <Ionicons name="scan-outline" size={20} color="#067A4F" />
             </TouchableOpacity>
           </View>
         )}
@@ -341,17 +401,70 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
 
-  /* ── loading ── */
-  loadingWrap: {
-    paddingVertical: 40,
+  /* ── analyzing ── */
+  analyzingWrap: {
+    paddingVertical: 32,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  spinnerBox: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  spinnerRing: {
+    position: 'absolute',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    borderColor: '#F0F0EC',
+    borderTopColor: '#067A4F',
+  },
+  analyzingTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#171717',
+  },
+  analyzingSub: {
+    fontSize: 12,
+    color: '#A3A3A3',
+    marginTop: 3,
+    marginBottom: 20,
+  },
+  stepsList: {
+    width: '100%',
+    maxWidth: 260,
+    gap: 12,
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  stepDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#F0F0EC',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 15,
-    color: '#757575',
+  stepDotDone: {
+    backgroundColor: '#067A4F',
+  },
+  stepDotActive: {
+    backgroundColor: '#E5F2EC',
+  },
+  stepLabel: {
+    fontSize: 13,
+    color: '#A3A3A3',
     fontWeight: '500',
+  },
+  stepLabelActive: {
+    color: '#171717',
   },
 
   /* ── error ── */
@@ -381,7 +494,7 @@ const styles = StyleSheet.create({
   scanAgainBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingHorizontal: 20,
     paddingVertical: 11,
     borderRadius: 24,
@@ -533,7 +646,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E5F2EC',
     justifyContent: 'center',
     alignItems: 'center',
   },

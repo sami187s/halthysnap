@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test script for the improved Cosmetic Results Screen
  * This script validates the screen functionality and styling
  */
@@ -29,7 +29,7 @@ const testCosmeticData = {
 
 // Test helper functions
 function testScoreColor(score) {
-  if (score >= 70) return '#4CAF50'; // Green
+  if (score >= 70) return '#067A4F'; // Green
   if (score >= 40) return '#FF9800'; // Orange
   return '#F44336'; // Red
 }
@@ -67,7 +67,7 @@ ingredients.forEach((ingredient, index) => {
   
   if (testCosmeticData.analysis.goodIngredients.includes(ingredient)) {
     status = 'GOOD';
-    color = '#4CAF50';
+    color = '#067A4F';
   } else if (testCosmeticData.analysis.moderateIngredients.includes(ingredient)) {
     status = 'MODERATE';
     color = '#FF9800';

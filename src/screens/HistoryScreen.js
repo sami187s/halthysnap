@@ -1,4 +1,4 @@
-﻿import React, { useState, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,21 +14,20 @@ import {
   StatusBar,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, useRoute } from '@react-navigation/native';
 
 const BEST_PRODUCTS_KEY = '@vee_curated_products';
 import { Ionicons } from '@expo/vector-icons';
-import ScoreRing from '../components/ScoreRing';
 import { useTheme } from '../contexts/ThemeContext';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import {
   getHistory,
-  deleteHistoryItem,
-  clearHistory,
   searchHistory,
   getHistoryStats,
   checkPremiumStatus,
 } from '../utils/historyManager';
+
+const scoreColor = (s) => (s >= 75 ? '#067A4F' : s >= 50 ? '#f59e0b' : '#ef4444');
 
 const HistoryImage = ({ item, theme }) => {
   const [failed, setFailed] = React.useState(false);
@@ -54,6 +53,9 @@ const HistoryImage = ({ item, theme }) => {
 
 const HistoryScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute();
+  const savedOnly = route?.params?.savedOnly === true;
+  const canGoBack = navigation.canGoBack();
   const { theme, isDark } = useTheme();
   const insets = useSafeAreaInsetsWithFallback();
   const [history, setHistory] = useState([]);
@@ -74,6 +76,13 @@ const HistoryScreen = () => {
       return () => {};
     }, [])
   );
+
+  // Saved-only mode: re-filter to just the curated (bookmarked) items
+  // whenever either the full history or the curated set changes.
+  useEffect(() => {
+    if (!savedOnly || searchQuery.trim()) return;
+    setFilteredHistory(history.filter(item => curatedIds.has(item.barcode)));
+  }, [savedOnly, history, curatedIds, searchQuery]);
 
   const loadCuratedIds = async () => {
     try {
@@ -100,11 +109,13 @@ const HistoryScreen = () => {
         category: item.productType === 'food' ? 'FOOD' : 'COSMETIC',
         filterCat: item.productType === 'food' ? 'Food' : 'Cosmetic',
         tag: 'TOP PICK',
+        score: Math.round(item.score || 0),
         defaultScore: Math.round(item.score || 0),
         image: item.productImage || null,
         productType: item.productType || 'food',
         ingredients: item.ingredients || '',
         nutriments: item.nutriments || {},
+        savedAt: Date.now(),
       };
       const updated = [entry, ...list];
       await AsyncStorage.setItem(BEST_PRODUCTS_KEY, JSON.stringify(updated));
@@ -144,35 +155,14 @@ const HistoryScreen = () => {
 
   const handleSearch = async (query) => {
     setSearchQuery(query);
-    if (!query.trim()) { setFilteredHistory(history); return; }
+    if (!query.trim()) {
+      setFilteredHistory(savedOnly ? history.filter(item => curatedIds.has(item.barcode)) : history);
+      return;
+    }
     const result = await searchHistory(query);
-    if (result.success) setFilteredHistory(result.data);
-  };
-
-  const handleDeleteItem = (itemId, productName) => {
-    Alert.alert('Delete Scan', `Remove "${productName}" from history?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          const result = await deleteHistoryItem(itemId);
-          if (result.success) await loadHistory();
-        },
-      },
-    ]);
-  };
-
-  const handleClearAll = () => {
-    Alert.alert('Clear History', 'Delete all scan history? This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Clear All', style: 'destructive',
-        onPress: async () => {
-          const result = await clearHistory();
-          if (result.success) await loadHistory();
-        },
-      },
-    ]);
+    if (result.success) {
+      setFilteredHistory(savedOnly ? result.data.filter(item => curatedIds.has(item.barcode)) : result.data);
+    }
   };
 
   const handleItemPress = (item) => {
@@ -224,7 +214,13 @@ const HistoryScreen = () => {
         <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
         <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(251,251,249,0.92)', borderBottomColor: theme.headerBorder }]}>
           <View style={s.headerLeft}>
-            <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
+            {canGoBack ? (
+              <TouchableOpacity style={s.avatar} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <Ionicons name="arrow-back" size={18} color="#067A4F" />
+              </TouchableOpacity>
+            ) : (
+              <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
+            )}
             <Text style={s.headerTitle}>Vee</Text>
           </View>
           <Ionicons name="notifications-outline" size={22} color="#067A4F" />
@@ -262,7 +258,7 @@ const HistoryScreen = () => {
 
           {/* Score + actions */}
           <View style={s.rowRight}>
-            <ScoreRing score={item.score} size={46} stroke={5} />
+            <Text style={[s.scoreNum, { color: scoreColor(item.score || 0) }]}>{item.score}</Text>
             <TouchableOpacity
               onPress={() => handleAddToBest(item)}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
@@ -273,13 +269,6 @@ const HistoryScreen = () => {
                 size={16}
                 color={curatedIds.has(item.barcode) ? '#067A4F' : theme.textDim}
               />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => handleDeleteItem(item.id, item.productName)}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              style={s.trashBtn}
-            >
-              <Ionicons name="trash-outline" size={16} color={theme.textDim} />
             </TouchableOpacity>
           </View>
       </TouchableOpacity>
@@ -307,10 +296,12 @@ const HistoryScreen = () => {
 
   const renderEmpty = () => (
     <View style={s.emptyWrap}>
-      <Ionicons name="time-outline" size={64} color={theme.textDim} />
-      <Text style={[s.emptyTitle, { color: theme.text }]}>No scans yet</Text>
+      <Ionicons name={savedOnly ? 'bookmark-outline' : 'time-outline'} size={64} color={theme.textDim} />
+      <Text style={[s.emptyTitle, { color: theme.text }]}>
+        {savedOnly ? 'Nothing saved yet' : 'No scans yet'}
+      </Text>
       <Text style={[s.emptyDesc, { color: theme.textMuted }]}>
-        Products you scan will appear here
+        {savedOnly ? 'Tap the trophy icon on a scan to save it here' : 'Products you scan will appear here'}
       </Text>
       <TouchableOpacity style={s.scanNowBtn} onPress={() => navigation.navigate('Home')} activeOpacity={0.85}>
         <Text style={s.scanNowText}>SCAN NOW</Text>
@@ -319,8 +310,6 @@ const HistoryScreen = () => {
     </View>
   );
 
-  const canGoBack = navigation.canGoBack();
-
   return (
     <View style={[s.root, { backgroundColor: theme.bg }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
@@ -328,7 +317,13 @@ const HistoryScreen = () => {
       {/* Header */}
       <View style={[s.header, { paddingTop: insets.top + 12, backgroundColor: 'rgba(251,251,249,0.92)', borderBottomColor: theme.headerBorder }]}>
         <View style={s.headerLeft}>
-          <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
+          {canGoBack ? (
+            <TouchableOpacity style={s.avatar} onPress={() => navigation.goBack()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons name="arrow-back" size={18} color="#067A4F" />
+            </TouchableOpacity>
+          ) : (
+            <View style={s.avatar}><Ionicons name="person" size={18} color="#067A4F" /></View>
+          )}
           <Text style={s.headerTitle}>Vee</Text>
         </View>
         <TouchableOpacity hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -368,11 +363,6 @@ const HistoryScreen = () => {
                 <Text style={[s.countLabel, { color: theme.textMuted }]}>
                   {filteredHistory.length} {filteredHistory.length === 1 ? 'PRODUCT' : 'PRODUCTS'}
                 </Text>
-                {history.length > 0 && (
-                  <TouchableOpacity onPress={handleClearAll} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name="trash-outline" size={20} color={theme.textMuted} />
-                  </TouchableOpacity>
-                )}
               </View>
             )}
           </>
@@ -514,8 +504,8 @@ const s = StyleSheet.create({
   rowDot: { width: 3, height: 3, borderRadius: 2, backgroundColor: '#A3A3A3' },
   rowDate: { fontSize: 11, fontWeight: '400', color: '#737373' },
   rowRight: { alignItems: 'center', gap: 8, flexShrink: 0 },
+  scoreNum: { fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
   trophyBtn: { padding: 2, marginBottom: 4 },
-  trashBtn: { padding: 2 },
 
   // ── Empty ────────────────────────────────────────────
   emptyWrap: {

@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ProductImage from './ProductImage';
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   },
   noAdditivesText: {
     fontSize: 16,
-    color: '#4CAF50',
+    color: '#067A4F',
     fontWeight: '600',
   },
   additivesFoundText: {
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     minWidth: 60,
   },
   goodBadge: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
   },
   mediumBadge: {
     backgroundColor: '#FF9800',
@@ -299,7 +299,7 @@ const styles = StyleSheet.create({
     borderTopColor: '#f0f0f0',
   },
   viewDetailsText: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: 16,
     fontWeight: '600',
   },

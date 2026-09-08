@@ -1,4 +1,4 @@
-// Enhanced Ingredient Analyzer with Professional Database Integration
+﻿// Enhanced Ingredient Analyzer with Professional Database Integration
 // import { professionalIngredientDatabase, enhancedIngredientLookup } from './professionalIngredientDatabase';
 // import { getQuickLearningLink, generateUnknownIngredientExplanation } from './ingredientLearningLinks';
 
@@ -429,6 +429,29 @@ const SPECIFIC_INGREDIENT_LOOKUP = {
   'butter':             { status: 'MODERATE', reason: 'Natural dairy fat; OK in moderation, high in saturated fat' },
   'cocoa':              { status: 'GOOD',     reason: 'Rich in antioxidants (flavonoids) that support heart health' },
   'dark chocolate':     { status: 'GOOD',     reason: 'High in flavonoids and minerals; beneficial in moderation' },
+  // ── French ingredient names (common on Open Food Facts) ─────────────────
+  'sucre':              { status: 'MODERATE', reason: 'Sugar — adds sweetness but increases calorie count with no nutritional benefit' },
+  'sirop de glucose':   { status: 'POOR',     reason: 'Refined glucose syrup with no nutritional value, rapidly raises blood sugar' },
+  'sirop de glucose-fructose': { status: 'POOR', reason: 'High-fructose glucose syrup — processed sweetener linked to obesity and metabolic issues' },
+  'sirop de fructose':  { status: 'POOR',     reason: 'Fructose syrup processed primarily by the liver; linked to fatty liver disease' },
+  'lait écrémé':        { status: 'GOOD',     reason: 'Skim milk — good source of calcium and protein with low fat content' },
+  'lait entier':        { status: 'GOOD',     reason: 'Whole milk — source of calcium, protein and fat-soluble vitamins' },
+  'crème légère':       { status: 'MODERATE', reason: 'Light cream — lower fat than heavy cream; dairy source of calcium' },
+  'beurre':             { status: 'MODERATE', reason: 'Butter — natural dairy fat; OK in moderation, high in saturated fat' },
+  'farine de blé':      { status: 'MODERATE', reason: 'Wheat flour — refined carbohydrate; whole grain versions are more nutritious' },
+  'amidon de maïs':     { status: 'MODERATE', reason: 'Corn starch — thickening agent, high in carbohydrates, little nutritional value' },
+  'huile de palme':     { status: 'POOR',     reason: 'Palm oil — high in saturated fat; linked to heart disease and environmental concerns' },
+  'huile de tournesol': { status: 'MODERATE', reason: 'Sunflower oil — high in omega-6 fats; best consumed in moderation' },
+  'arôme naturel':      { status: 'MODERATE', reason: 'Natural flavoring — derived from natural sources but full composition may not be disclosed' },
+  'arôme artificiel':   { status: 'MODERATE', reason: 'Artificial flavoring — synthetic chemicals; exact composition not disclosed' },
+  'arôme':              { status: 'MODERATE', reason: 'Flavoring — natural or artificial; adds taste without significant nutritional value' },
+  'sel':                { status: 'MODERATE', reason: 'Salt — essential mineral; excess sodium intake raises blood pressure' },
+  'eau':                { status: 'EXCELLENT', reason: 'Water — essential base ingredient, hydrating and calorie-free' },
+  'cacao':              { status: 'GOOD',     reason: 'Cocoa — rich in antioxidants (flavonoids) that support heart health' },
+  'chocolat noir':      { status: 'GOOD',     reason: 'Dark chocolate — high in flavonoids and minerals; beneficial in moderation' },
+  'vanille':            { status: 'GOOD',     reason: 'Vanilla — natural flavoring with antioxidant properties' },
+  'jus de citron':      { status: 'EXCELLENT', reason: 'Lemon juice — rich in vitamin C and natural antioxidants' },
+  'miel':               { status: 'GOOD',     reason: 'Honey — natural sweetener with antimicrobial properties and trace antioxidants' },
 };
 
 // Food product analysis
@@ -441,19 +464,29 @@ export const analyzeFoodProduct = (productIngredients, nutriments = {}, productD
     : [];
   
   // General pattern fallbacks (only used when no specific match found)
+  // Includes French/multilingual terms for Open Food Facts products
   const excellentPatterns = [
     'organic', 'water', 'sea salt', 'himalayan salt', 'olive oil',
-    'coconut oil', 'avocado oil', 'lemon juice', 'apple cider vinegar', 'honey'
+    'coconut oil', 'avocado oil', 'lemon juice', 'apple cider vinegar', 'honey',
+    // French
+    'eau', 'jus de citron', 'miel', 'huile d\'olive', 'vinaigre de cidre',
   ];
   const goodPatterns = [
     'vitamin', 'mineral', 'fiber', 'whole grain', 'whole wheat',
     'fruit juice', 'vegetable', 'spinach', 'kale', 'broccoli',
-    'almond', 'walnut', 'cashew', 'oat', 'quinoa', 'flaxseed', 'chia'
+    'almond', 'walnut', 'cashew', 'oat', 'quinoa', 'flaxseed', 'chia',
+    // French dairy/natural
+    'lait', 'lait écrémé', 'lait entier', 'yaourt', 'fromage', 'oeuf', 'oeuf entier',
+    'farine complète', 'flocons d\'avoine', 'fruits', 'légumes', 'noix',
   ];
   const poorPatterns = [
     'artificial color', 'artificial dye', 'fd&c', 'certified color',
     'preservative', 'high fructose', 'trans fat', 'hydrogenated',
-    'nitrate', 'nitrite', 'sulfite', 'benzoate', 'bht', 'bha', 'tbhq'
+    'nitrate', 'nitrite', 'sulfite', 'benzoate', 'bht', 'bha', 'tbhq',
+    // French additives & bad ingredients
+    'sirop de glucose', 'sirop de glucose-fructose', 'sirop de fructose',
+    'huile de palme', 'graisse de palme', 'huile hydrogénée',
+    'colorant', 'arôme artificiel', 'conservateur',
   ];
 
   const excellentIngredients = [];
@@ -469,7 +502,7 @@ export const analyzeFoodProduct = (productIngredients, nutriments = {}, productD
     const specificKey = Object.keys(SPECIFIC_INGREDIENT_LOOKUP).find(key => lowerIng.includes(key));
     if (specificKey) {
       const entry = SPECIFIC_INGREDIENT_LOOKUP[specificKey];
-      const colorMap = { EXCELLENT: '#1B5E20', GOOD: '#4CAF50', MODERATE: '#FF9800', POOR: '#D32F2F' };
+      const colorMap = { EXCELLENT: '#067A4F', GOOD: '#067A4F', MODERATE: '#FF9800', POOR: '#D32F2F' };
       const analysis = { name: ingredient, status: entry.status, color: colorMap[entry.status], reason: entry.reason };
       analyzedIngredients.push(analysis);
       if (entry.status === 'EXCELLENT' || entry.status === 'GOOD') goodIngredients.push(analysis);
@@ -509,19 +542,23 @@ export const analyzeFoodProduct = (productIngredients, nutriments = {}, productD
       else if (lowerIng.includes('chia') || lowerIng.includes('flax')) reason = 'Rich in omega-3 fatty acids and fiber';
       else reason = 'Beneficial ingredient that supports nutrition';
     } else {
-      if (lowerIng.includes('flour')) reason = 'Refined carbohydrate; enriched flour has limited nutrients compared to whole grain';
-      else if (lowerIng.includes('sugar')) reason = 'Adds sweetness but increases calorie count with no nutritional benefit';
-      else if (lowerIng.includes('salt')) reason = 'Flavor enhancer; monitor total sodium intake';
-      else if (lowerIng.includes('starch')) reason = 'Thickening agent from plant sources; high in carbohydrates';
-      else if (lowerIng.includes('oil')) reason = 'Fat source; nutritional value depends on the type of oil';
-      else if (lowerIng.includes('milk')) reason = 'Dairy source of calcium, protein and vitamins';
-      else if (lowerIng.includes('egg')) reason = 'Good source of protein and essential nutrients';
-      else if (lowerIng.includes('cream')) reason = 'Dairy fat ingredient, adds richness';
-      else reason = 'Common food ingredient, generally safe in normal amounts';
+      if (lowerIng.includes('flour') || lowerIng.includes('farine')) reason = 'Refined carbohydrate; enriched flour has limited nutrients compared to whole grain';
+      else if (lowerIng.includes('sugar') || lowerIng.includes('sucre')) reason = 'Adds sweetness but increases calorie count with no nutritional benefit';
+      else if (lowerIng.includes('salt') || lowerIng === 'sel') reason = 'Flavor enhancer; monitor total sodium intake';
+      else if (lowerIng.includes('starch') || lowerIng.includes('amidon')) reason = 'Thickening agent from plant sources; high in carbohydrates';
+      else if (lowerIng.includes('oil') || lowerIng.includes('huile') || lowerIng.includes('graisse')) reason = 'Fat source; nutritional value depends on the type of oil';
+      else if (lowerIng.includes('milk') || lowerIng.includes('lait')) reason = 'Dairy source of calcium, protein and vitamins';
+      else if (lowerIng.includes('egg') || lowerIng.includes('oeuf')) reason = 'Good source of protein and essential nutrients';
+      else if (lowerIng.includes('cream') || lowerIng.includes('crème')) reason = 'Dairy fat ingredient, adds richness';
+      else if (lowerIng.includes('glucose') || lowerIng.includes('sirop')) reason = 'Refined sugar syrup that rapidly raises blood sugar';
+      else if (lowerIng.includes('beurre')) reason = 'Butter — natural dairy fat, use in moderation';
+      else if (lowerIng.includes('cacao') || lowerIng.includes('chocolat')) reason = 'Cocoa contains antioxidants; dark varieties are more beneficial';
+      else if (lowerIng.includes('arôme') || lowerIng.includes('arome')) reason = 'Flavoring — natural or artificial; exact composition may not be disclosed';
+      else reason = 'Common food ingredient';
     }
 
     const status = isExcellent ? 'EXCELLENT' : isGood ? 'GOOD' : isPoor ? 'POOR' : 'MODERATE';
-    const colorMap = { EXCELLENT: '#1B5E20', GOOD: '#4CAF50', MODERATE: '#FF9800', POOR: '#D32F2F' };
+    const colorMap = { EXCELLENT: '#067A4F', GOOD: '#067A4F', MODERATE: '#FF9800', POOR: '#D32F2F' };
     const analysis = { name: ingredient, status, color: colorMap[status], reason };
     
     analyzedIngredients.push(analysis);

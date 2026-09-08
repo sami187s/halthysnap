@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated, Easing } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SECTION_CARD, DAILY_VALUES, NUTRIENT_ICONS, COLORS } from '../utils/resultScreenStyles';
@@ -133,7 +133,7 @@ const NutritionBreakdownCard = ({ nutrition, product, selectedPortion }) => {
   return (
     <View style={styles.card}>
       <View style={styles.header}>
-        <Ionicons name="nutrition" size={20} color="#2E7D32" />
+        <Ionicons name="nutrition" size={20} color="#067A4F" />
         <Text style={styles.title}>Nutrition Breakdown</Text>
       </View>
 

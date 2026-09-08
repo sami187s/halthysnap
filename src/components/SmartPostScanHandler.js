@@ -1,4 +1,4 @@
-// Smart Post-Scan Handler
+﻿// Smart Post-Scan Handler
 // Manages what happens after scanning - upgrade prompts vs free usage
 
 import React, { useState, useEffect } from 'react';
@@ -51,7 +51,7 @@ const SmartPostScanHandler = ({
     if (onUpgradeSelected) {
       onUpgradeSelected();
     } else {
-      navigation.navigate('Subscription');
+      navigation.navigate('Subscription', { reason: 'limit' });
     }
     onClose();
   };
@@ -91,7 +91,7 @@ const SmartPostScanHandler = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.header}>
-              <Ionicons name="diamond" size={40} color="#4CAF50" />
+              <Ionicons name="diamond" size={40} color="#067A4F" />
               <Text style={styles.title}>Unlock Premium Features!</Text>
             </View>
 
@@ -102,15 +102,15 @@ const SmartPostScanHandler = ({
 
               <View style={styles.benefitsList}>
                 <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={20} color="#067A4F" />
                   <Text style={styles.benefitText}>Unlimited product scans</Text>
                 </View>
                 <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={20} color="#067A4F" />
                   <Text style={styles.benefitText}>Advanced AI ingredient analysis</Text>
                 </View>
                 <View style={styles.benefitItem}>
-                  <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={20} color="#067A4F" />
                   <Text style={styles.benefitText}>Detailed health scores</Text>
                 </View>
               </View>
@@ -230,13 +230,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   upgradeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
     borderRadius: 12,
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 4,

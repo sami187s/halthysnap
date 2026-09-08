@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Alert, Dimensions, ScrollView, Linking } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
@@ -95,7 +95,7 @@ const TestSubscriptionScreen = ({ navigation }) => {
       {currentTier === 'premium' && (
         <View style={styles.premiumActiveContainer}>
           <View style={styles.premiumActiveCard}>
-            <Ionicons name="shield-checkmark" size={48} color="#4CAF50" />
+            <Ionicons name="shield-checkmark" size={48} color="#067A4F" />
             <Text style={styles.premiumActiveText}>Premium Active</Text>
             <Text style={styles.premiumActiveSubtext}>All features unlocked</Text>
             <TouchableOpacity 
@@ -115,14 +115,14 @@ const TestSubscriptionScreen = ({ navigation }) => {
           {/* Left Side - Benefits */}
           <View style={styles.benefitsContainer}>
             <View style={styles.benefitsHeaderContainer}>
-              <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+              <Ionicons name="checkmark-circle" size={24} color="#067A4F" />
               <Text style={styles.benefitsHeader}>Premium Features</Text>
             </View>
             
             <View style={styles.benefitsList}>
               <View style={styles.benefitItem}>
                 <View style={styles.benefitIconContainer}>
-                  <MaterialIcons name="psychology" size={20} color="#4CAF50" />
+                  <MaterialIcons name="psychology" size={20} color="#067A4F" />
                 </View>
                 <Text style={styles.benefitTitle}>AI Analysis</Text>
               </View>
@@ -179,11 +179,11 @@ const TestSubscriptionScreen = ({ navigation }) => {
               {/* Trust Indicators */}
               <View style={styles.trustBadges}>
                 <View style={styles.trustBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={14} color="#067A4F" />
                   <Text style={styles.trustText}>Cancel anytime</Text>
                 </View>
                 <View style={styles.trustBadge}>
-                  <Ionicons name="checkmark-circle" size={14} color="#4CAF50" />
+                  <Ionicons name="checkmark-circle" size={14} color="#067A4F" />
                   <Text style={styles.trustText}>Secure payment</Text>
                 </View>
               </View>
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 24,
     paddingBottom: 40,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
@@ -321,14 +321,14 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
     maxWidth: 400,
     width: '100%',
   },
   premiumActiveText: {
     fontSize: 32,
     fontWeight: '700',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginTop: 24,
     marginBottom: 12,
   },
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   goHomeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 30,
@@ -423,13 +423,13 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginRight: 4,
   },
   bigPrice: {
     fontSize: 48,
     fontWeight: 'bold',
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   pricePeriod: {
     fontSize: 18,
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     borderRadius: 16,
     borderLeftWidth: 4,
-    borderLeftColor: '#4CAF50',
+    borderLeftColor: '#067A4F',
   },
   benefitIconContainer: {
     width: 40,
@@ -495,13 +495,13 @@ const styles = StyleSheet.create({
 
   // Upgrade Button
   upgradeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingVertical: 20,
     paddingHorizontal: 32,
     borderRadius: 30,
     alignItems: 'center',
     marginBottom: 24,
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -626,7 +626,7 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
     borderWidth: 2,
-    borderColor: '#4CAF50',
+    borderColor: '#067A4F',
     minWidth: screenWidth > 768 ? 280 : '100%',
   },
 
@@ -644,14 +644,14 @@ const styles = StyleSheet.create({
   currencySymbol: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#4CAF50',
+    color: '#067A4F',
     marginTop: 8,
   },
 
   bigPrice: {
     fontSize: 64,
     fontWeight: '800',
-    color: '#4CAF50',
+    color: '#067A4F',
     lineHeight: 64,
   },
 
@@ -670,12 +670,12 @@ const styles = StyleSheet.create({
 
   // Upgrade Button
   upgradeButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingVertical: 18,
     paddingHorizontal: 40,
     borderRadius: 30,
     marginBottom: 20,
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -759,7 +759,7 @@ const styles = StyleSheet.create({
 
   legalLinkText: {
     fontSize: 12,
-    color: '#4CAF50',
+    color: '#067A4F',
     textDecorationLine: 'underline',
     fontWeight: '500',
   },

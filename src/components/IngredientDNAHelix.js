@@ -1,11 +1,11 @@
-import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
+﻿import React, { useMemo, useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, Dimensions, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Line, Defs, LinearGradient as SvgGrad, Stop, Rect } from 'react-native-svg';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 const NODE_COLORS = {
-  good: { primary: '#4ECD78', r: 78, g: 205, b: 120 },
+  good: { primary: '#067A4F', r: 78, g: 205, b: 120 },
   warn: { primary: '#F0A830', r: 240, g: 168, b: 48 },
   bad:  { primary: '#F05454', r: 240, g: 84, b: 84 },
 };
@@ -279,7 +279,7 @@ const IngredientDNAHelix = ({ ingredients = [], height = 480 }) => {
           <Text style={styles.legendText}>Moderate</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: '#4ECD78', shadowColor: '#4ECD78' }]} />
+          <View style={[styles.legendDot, { backgroundColor: '#067A4F', shadowColor: '#067A4F' }]} />
           <Text style={styles.legendText}>Safe</Text>
         </View>
       </View>

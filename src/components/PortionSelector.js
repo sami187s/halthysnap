@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PORTION_PRESETS, isDrinkProduct } from '../utils/portionCalculator';
@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
   pillActive: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#067A4F',
   },
   pillText: {
     fontSize: 12,

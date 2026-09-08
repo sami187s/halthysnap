@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Food Photo Scoring Algorithm
  * Calculates health score (0-100) for real food based on nutrition data
  * Traffic light system: Green (70-100), Yellow (40-69), Red (0-39)
@@ -179,7 +179,7 @@ export const calculateFoodScore = (nutrition) => {
 export const getScoreColorAndGrade = (score) => {
   if (score >= 70) {
     return {
-      color: '#4CAF50', // Green
+      color: '#067A4F', // Green
       grade: 'HEALTHY'
     };
   } else if (score >= 40) {
@@ -256,8 +256,8 @@ export const formatNutritionForDisplay = (nutrition) => {
  */
 export const getScoreEmoji = (score) => {
   if (score >= 80) return { icon: 'star', color: '#FFD700' };
-  if (score >= 70) return { icon: 'checkmark-circle', color: '#4CAF50' };
-  if (score >= 60) return { icon: 'thumbs-up', color: '#8BC34A' };
+  if (score >= 70) return { icon: 'checkmark-circle', color: '#067A4F' };
+  if (score >= 60) return { icon: 'thumbs-up', color: '#067A4F' };
   if (score >= 50) return { icon: 'remove-circle', color: '#FF9800' };
   if (score >= 40) return { icon: 'alert-circle', color: '#FF9800' };
   return { icon: 'close-circle', color: '#F44336' };

@@ -1,21 +1,20 @@
-﻿/**
- * Vee List Screen - Elite Selections
- * Curated list of highest-rated products (90+ score only)
+/**
+ * Vee List Screen - Top Products
+ * Curated list of highest-rated products, reachable from Settings.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
+  TextInput,
   Image,
   StatusBar,
-  ScrollView,
-  Dimensions,
+  Animated,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,8 +23,18 @@ import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 
 const CACHE_KEY = '@vee_curated_cache';
 
-const CATEGORIES = ['All', 'Food', 'Cosmetic'];
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const PRIMARY      = '#27a567';
+const PRIMARY_TINT = 'rgba(39,165,103,0.10)';
+const AMBER        = '#f5a623';
+const AMBER_TINT   = 'rgba(245,166,35,0.10)';
+const RED          = '#e74c3c';
+const RED_TINT     = 'rgba(231,76,60,0.10)';
+
+const scoreBand = (score) => {
+  if (score >= 75) return { color: PRIMARY, bg: PRIMARY_TINT };
+  if (score >= 50) return { color: AMBER,   bg: AMBER_TINT   };
+  return { color: RED, bg: RED_TINT };
+};
 
 // Products from user's personal scan history — images confirmed from database
 const ELITE_PRODUCTS = [
@@ -124,17 +133,27 @@ const buildOffUrl = (barcode, variant) => {
   return null;
 };
 
-const EliteProductCard = ({ item, score, isLeft, onPress }) => {
+// A single grid card — fades + rises on mount with a small per-card delay.
+const ProductCard = ({ item, index, onPress }) => {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(8)).current;
   const [imgSrc, setImgSrc] = useState(item.image);
   const [fallbackVariant, setFallbackVariant] = useState(1);
   const [imgFailed, setImgFailed] = useState(false);
 
-  // Fix: reset image state whenever the product or its image changes
   useEffect(() => {
     setImgSrc(item.image);
     setFallbackVariant(1);
     setImgFailed(false);
   }, [item.id, item.image]);
+
+  useEffect(() => {
+    const delay = Math.min(index, 10) * 50;
+    Animated.parallel([
+      Animated.timing(opacity, { toValue: 1, duration: 300, delay, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 300, delay, useNativeDriver: true }),
+    ]).start();
+  }, []);
 
   const handleImageError = () => {
     const next = buildOffUrl(item.barcode, fallbackVariant);
@@ -146,82 +165,76 @@ const EliteProductCard = ({ item, score, isLeft, onPress }) => {
     }
   };
 
-  const scoreColor = score >= 80 ? '#067A4F' : score >= 50 ? '#FF9800' : '#F44336';
+  const score = item.defaultScore;
+  const band = scoreBand(score);
 
   return (
-    <TouchableOpacity
-      style={[styles.card, isLeft ? { marginRight: 6 } : { marginLeft: 6 }]}
-      onPress={onPress}
-      activeOpacity={0.88}
-    >
-      <View style={styles.imageSection}>
-        <View style={styles.cardImageClip}>
+    <Animated.View style={[styles.cardWrap, { opacity, transform: [{ translateY }] }]}>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
+        <View style={styles.thumbWrap}>
           {imgSrc && !imgFailed ? (
             <Image
               source={{ uri: imgSrc }}
-              style={styles.cardImage}
-              resizeMode="cover"
+              style={styles.thumb}
+              resizeMode="contain"
               onError={handleImageError}
             />
           ) : (
-            <View style={styles.cardImagePlaceholder}>
-              <Ionicons name="leaf-outline" size={32} color="#888" />
-            </View>
+            <Ionicons name="leaf-outline" size={28} color="#c7cdc7" />
           )}
-          {/* Bottom gradient for depth */}
-          <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.18)']}
-            style={StyleSheet.absoluteFillObject}
-            pointerEvents="none"
-          />
         </View>
-
-        {/* Tag pill */}
-        <View style={styles.tagPill}>
-          <View style={styles.tagDot} />
-          <Text style={styles.tagText}>{item.tag}</Text>
+        <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.cardBrand} numberOfLines={1}>{item.brand}</Text>
+        <View style={[styles.scoreBadge, { backgroundColor: band.bg }]}>
+          <Text style={[styles.scoreBadgeNum, { color: band.color }]}>{score}</Text>
+          <Text style={[styles.scoreBadgeMax, { color: band.color }]}>/100</Text>
         </View>
-
-        {/* Score seal */}
-        <View style={[styles.scoreSeal, { backgroundColor: scoreColor }]}>
-          <Text style={styles.sealScore}>{score}</Text>
-        </View>
-      </View>
-
-      <View style={styles.cardInfo}>
-        <Text style={styles.cardName} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.cardMeta}>
-          <Text style={styles.cardSubtitle} numberOfLines={1}>{item.brand}</Text>
-          <Ionicons name="chevron-forward" size={12} color="#bfcaba" />
-        </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
+
+const SkeletonGrid = () => (
+  <View style={styles.skeletonGrid}>
+    {[0, 1, 2, 3].map(i => (
+      <View key={i} style={styles.skeletonCard} />
+    ))}
+  </View>
+);
 
 const VeeListScreen = () => {
   const navigation = useNavigation();
   const insets = useSafeAreaInsetsWithFallback();
   const [activeCategory, setActiveCategory] = useState('All');
   const [customProducts, setCustomProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [topRated, setTopRated] = useState(false);
 
   useFocusEffect(
     React.useCallback(() => {
+      let cancelled = false;
       const load = async () => {
         try {
           // Step 1: Show cached products INSTANTLY (no waiting for network)
           const cached = await AsyncStorage.getItem(CACHE_KEY);
-          if (cached) setCustomProducts(JSON.parse(cached));
-
+          if (cached && !cancelled) {
+            setCustomProducts(JSON.parse(cached));
+            setLoading(false);
+          }
           // Step 2: Refresh from Turso in background, update cache
           const fresh = await fetchCuratedProducts();
-          setCustomProducts(fresh);
-          await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+          if (!cancelled) {
+            setCustomProducts(fresh);
+            setLoading(false);
+            await AsyncStorage.setItem(CACHE_KEY, JSON.stringify(fresh));
+          }
         } catch {
-          // Keep showing whatever is already displayed — no blank screen
+          if (!cancelled) setLoading(false);
         }
       };
       load();
+      return () => { cancelled = true; };
     }, [])
   );
 
@@ -231,9 +244,23 @@ const VeeListScreen = () => {
     ...ELITE_PRODUCTS.filter(e => !customProducts.some(c => c.barcode === e.barcode)),
   ];
 
-  const filteredProducts = activeCategory === 'All'
+  // Category chips derived from whatever categories actually exist in the data
+  const categories = ['All', ...Array.from(new Set(allProducts.map(p => p.filterCat).filter(Boolean)))];
+
+  let filteredProducts = activeCategory === 'All'
     ? allProducts
     : allProducts.filter((p) => p.filterCat === activeCategory);
+
+  if (searchQuery.trim()) {
+    const q = searchQuery.trim().toLowerCase();
+    filteredProducts = filteredProducts.filter((p) =>
+      (p.name || '').toLowerCase().includes(q) || (p.brand || '').toLowerCase().includes(q)
+    );
+  }
+
+  if (topRated) {
+    filteredProducts = [...filteredProducts].sort((a, b) => (b.defaultScore || 0) - (a.defaultScore || 0));
+  }
 
   const handleProductPress = (product) => {
     const curatedScore = product.defaultScore;
@@ -259,191 +286,246 @@ const VeeListScreen = () => {
     }
   };
 
-  const renderProductCard = ({ item, index }) => {
-    const score = item.defaultScore;
-    const isLeft = index % 2 === 0;
-    return (
-      <EliteProductCard
-        item={item}
-        score={score}
-        isLeft={isLeft}
-        onPress={() => handleProductPress(item)}
-      />
-    );
-  };
+  const renderProductCard = ({ item, index }) => (
+    <ProductCard item={item} index={index} onPress={() => handleProductPress(item)} />
+  );
+
+  const showSkeleton = loading && allProducts.length === 0;
 
   const ListHeader = () => (
     <>
-      <View style={styles.hero}>
-        <Text style={styles.heroLabel}>CURATED SELECTION</Text>
-        <Text style={styles.heroTitle}>Elite Choices</Text>
-        <Text style={styles.heroDesc}>
-          The world's most nutritious products — strictly filtered for elite health scores of 90 and above.
-        </Text>
+      <View style={styles.searchWrap}>
+        <Ionicons name="search" size={18} color="#a3a8a3" />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search products"
+          placeholderTextColor="#a3a8a3"
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.filterRow}
-      >
-        {CATEGORIES.map((cat) => {
+      <View style={styles.chipRow}>
+        {categories.map((cat) => {
           const isActive = activeCategory === cat;
           return (
             <TouchableOpacity
               key={cat}
-              style={[styles.filterPill, isActive && styles.filterPillActive]}
+              style={[styles.chip, isActive && styles.chipActive]}
               onPress={() => setActiveCategory(cat)}
-              activeOpacity={0.7}
+              activeOpacity={0.8}
             >
-              <Text style={[styles.filterPillText, isActive && styles.filterPillTextActive]}>
-                {cat === 'All' ? 'ALL' : cat.toUpperCase()}
-              </Text>
+              <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{cat}</Text>
             </TouchableOpacity>
           );
         })}
-      </ScrollView>
+      </View>
+
+      <View style={styles.toolbar}>
+        <Text style={styles.toolbarCount}>
+          {showSkeleton ? 'Loading…' : `${filteredProducts.length} product${filteredProducts.length === 1 ? '' : 's'}`}
+        </Text>
+        <TouchableOpacity
+          style={[styles.sortToggle, topRated && styles.sortToggleActive]}
+          onPress={() => setTopRated(v => !v)}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="trending-up" size={14} color={topRated ? PRIMARY : '#737373'} />
+          <Text style={[styles.sortToggleText, topRated && styles.sortToggleTextActive]}>Top rated</Text>
+        </TouchableOpacity>
+      </View>
+
+      {showSkeleton && <SkeletonGrid />}
     </>
   );
 
   return (
-    <View style={[styles.root, { backgroundColor: '#fafaf5' }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fafaf5" />
+    <View style={styles.root}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* Sticky header */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.headerLeft}>
-          <View style={styles.avatar}>
-            <Ionicons name="person" size={18} color="#067A4F" />
-          </View>
-          <Text style={styles.headerTitle}>Vee</Text>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="arrow-back" size={20} color="#171717" />
+        </TouchableOpacity>
+        <View style={styles.headerBadge}>
+          <Ionicons name="ribbon" size={20} color="#FFFFFF" />
         </View>
-        <Ionicons name="notifications-outline" size={22} color="#067A4F" />
+        <View>
+          <Text style={styles.headerTitle}>Top Products</Text>
+          <Text style={styles.headerSub}>Ranked by health score</Text>
+        </View>
       </View>
 
-      <FlatList
-        data={filteredProducts}
-        renderItem={renderProductCard}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        ListHeaderComponent={<ListHeader />}
-        contentContainerStyle={[styles.gridContent, { paddingTop: insets.top + 72 }]}
-        showsVerticalScrollIndicator={false}
-        columnWrapperStyle={styles.row}
-        ListEmptyComponent={
-          <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>No products in this category</Text>
-          </View>
-        }
-      />
+      {showSkeleton ? (
+        <View style={{ flex: 1 }}>
+          <ListHeader />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredProducts}
+          renderItem={renderProductCard}
+          keyExtractor={(item) => item.id}
+          numColumns={2}
+          ListHeaderComponent={<ListHeader />}
+          contentContainerStyle={styles.gridContent}
+          showsVerticalScrollIndicator={false}
+          columnWrapperStyle={styles.row}
+          ListEmptyComponent={
+            <View style={styles.emptyWrap}>
+              <View style={styles.emptyIconWrap}>
+                <Ionicons name="search-outline" size={28} color="#c7cdc7" />
+              </View>
+              <Text style={styles.emptyTitle}>No products found</Text>
+              <Text style={styles.emptyDesc}>Try a different category.</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
 
   header: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    zIndex: 50,
+    paddingHorizontal: 24,
+    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    backgroundColor: 'rgba(250,250,245,0.95)',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
+    gap: 12,
   },
-  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  avatar: {
+  backBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#E5F2EC',
+    backgroundColor: '#f3f3f3',
     alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: 'rgba(13,99,27,0.12)',
   },
-  headerTitle: { fontSize: 22, fontWeight: '800', color: '#067A4F', letterSpacing: -0.3 },
-
-  hero: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 20 },
-  heroLabel: { fontSize: 11, fontWeight: '700', color: '#067A4F', letterSpacing: 3, textTransform: 'uppercase', marginBottom: 4 },
-  heroTitle: { fontSize: 36, fontWeight: '800', color: '#1a1c19', letterSpacing: -1, lineHeight: 42, marginBottom: 10 },
-  heroDesc: { fontSize: 13, color: '#40493d', lineHeight: 20 },
-
-  filterRow: { paddingHorizontal: 20, gap: 8, paddingBottom: 16 },
-  filterPill: { paddingHorizontal: 16, paddingVertical: 7, borderRadius: 20, backgroundColor: '#eeeee9' },
-  filterPillActive: { backgroundColor: '#067A4F' },
-  filterPillText: { fontSize: 11, fontWeight: '700', color: '#40493d', letterSpacing: 0.8 },
-  filterPillTextActive: { color: '#ffffff' },
-
-  gridContent: { paddingHorizontal: 16, paddingBottom: 100 },
-  row: { marginBottom: 16 },
-
-  card: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    overflow: 'visible',
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-    shadowColor: '#1a1c19',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.10,
-    shadowRadius: 20,
-    elevation: 5,
+  headerBadge: {
+    width: 40, height: 40, borderRadius: 14,
+    backgroundColor: '#27a567',
+    alignItems: 'center', justifyContent: 'center',
   },
+  headerTitle: { fontSize: 20, fontWeight: '800', color: '#171717', letterSpacing: -0.3 },
+  headerSub: { fontSize: 12, color: '#a3a8a3', marginTop: 1 },
 
-  imageSection: { width: '100%', height: 170 },
-  cardImageClip: {
-    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    overflow: 'hidden',
-    backgroundColor: '#f0f0eb',
-  },
-  cardImage: { width: '100%', height: '100%' },
-  cardImagePlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#eeeee9' },
-
-  tagPill: {
-    position: 'absolute', top: 10, left: 10,
+  // Search
+  searchWrap: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 10,
+    height: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+    paddingHorizontal: 16,
+    marginHorizontal: 24,
+    marginBottom: 16,
+  },
+  searchInput: { flex: 1, fontSize: 15, color: '#171717', padding: 0 },
+
+  // Category chips
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: 24,
+    marginBottom: 16,
+  },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+  },
+  chipActive: { backgroundColor: '#27a567' },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#737373' },
+  chipTextActive: { color: '#FFFFFF' },
+
+  // Toolbar
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    marginBottom: 14,
+  },
+  toolbarCount: { fontSize: 12, color: '#a3a8a3' },
+  sortToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    backgroundColor: '#f5f5f5',
+  },
+  sortToggleActive: { backgroundColor: 'rgba(39,165,103,0.08)' },
+  sortToggleText: { fontSize: 12, fontWeight: '600', color: '#737373' },
+  sortToggleTextActive: { color: '#27a567' },
+
+  // Grid
+  gridContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  row: { gap: 12, marginBottom: 12 },
+  cardWrap: { flex: 1 },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#f5f5f5',
+    padding: 12,
+  },
+  thumbWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 12,
+    backgroundColor: '#f5f5f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: 10,
+  },
+  thumb: { width: '100%', height: '100%' },
+  cardName: { fontSize: 13, fontWeight: '600', color: '#171717', marginBottom: 2 },
+  cardBrand: { fontSize: 11, color: '#a3a8a3', marginBottom: 8 },
+  scoreBadge: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    alignSelf: 'flex-start',
     gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    paddingHorizontal: 9, paddingVertical: 4,
-    borderRadius: 99,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
-  tagDot: {
-    width: 6, height: 6, borderRadius: 3,
-    backgroundColor: '#067A4F',
-  },
-  tagText: { fontSize: 9, fontWeight: '800', color: '#067A4F', letterSpacing: 0.8 },
+  scoreBadgeNum: { fontSize: 14, fontWeight: '800' },
+  scoreBadgeMax: { fontSize: 11, fontWeight: '600', opacity: 0.7 },
 
-  scoreSeal: {
-    position: 'absolute',
-    bottom: -22,
-    right: 12,
-    width: 52, height: 52, borderRadius: 26,
-    borderWidth: 3, borderColor: '#FFFFFF',
+  // Skeleton loading
+  skeletonGrid: {
+    flexDirection: 'row', flexWrap: 'wrap',
+    paddingHorizontal: 20, gap: 12,
+  },
+  skeletonCard: {
+    width: '47%', height: 190,
+    borderRadius: 16, backgroundColor: '#f7f7f5',
+    marginBottom: 12,
+  },
+
+  // Empty state
+  emptyWrap: { alignItems: 'center', justifyContent: 'center', paddingTop: 60, paddingHorizontal: 40 },
+  emptyIconWrap: {
+    width: 56, height: 56, borderRadius: 16,
+    backgroundColor: '#f5f5f5',
     alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22, shadowRadius: 8,
-    elevation: 6, zIndex: 10,
+    marginBottom: 14,
   },
-  sealScore: { fontSize: 16, fontWeight: '900', color: '#FFFFFF', lineHeight: 18 },
-
-  cardInfo: { paddingTop: 28, paddingHorizontal: 12, paddingBottom: 14 },
-  cardName: { fontSize: 13, fontWeight: '700', color: '#1a1c19', lineHeight: 18, marginBottom: 6 },
-  cardMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardSubtitle: { fontSize: 11, color: '#707a6c', fontWeight: '600', letterSpacing: 0.3 },
-
-  emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
-  emptyText: { fontSize: 14, color: '#707a6c' },
+  emptyTitle: { fontSize: 15, fontWeight: '600', color: '#171717', marginBottom: 4 },
+  emptyDesc: { fontSize: 13, color: '#a3a8a3' },
 });
 
 export default VeeListScreen;

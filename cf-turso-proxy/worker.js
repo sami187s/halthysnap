@@ -77,6 +77,86 @@ async function ensureIngredientInfoTable(env) {
   ingredientTableReady = true;
 }
 
+// ── Referral program ───────────────────────────────────────────────────────
+// Device-based (the app has no user accounts): identity is a random install id
+// generated on the device and stored in AsyncStorage. A referral only counts
+// once the referred device completes its first real scan ("qualified"). When a
+// referrer reaches REFERRAL_GOAL qualified referrals their status flips to
+// 'unlocked' (lifetime free) — this is separate from IAP 'pro'.
+const REFERRAL_GOAL = 10;
+
+let referralTablesReady = false;
+async function ensureReferralTables(env) {
+  if (referralTablesReady) return;
+  await tursoQuery(env, `CREATE TABLE IF NOT EXISTS referral_users (
+    install_id TEXT PRIMARY KEY,
+    code       TEXT UNIQUE,
+    status     TEXT DEFAULT 'free',
+    created_at INTEGER
+  )`, [], 8000);
+  await tursoQuery(env, `CREATE TABLE IF NOT EXISTS referrals (
+    referred_id TEXT PRIMARY KEY,
+    referrer_id TEXT,
+    qualified   INTEGER DEFAULT 0,
+    created_at  INTEGER
+  )`, [], 8000);
+  await tursoQuery(env, `CREATE INDEX IF NOT EXISTS idx_referrals_referrer ON referrals(referrer_id)`, [], 8000);
+  referralTablesReady = true;
+}
+
+// Unambiguous alphabet (no 0/O/1/I) — 7 chars ≈ 27 billion combos.
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+function randomCode() {
+  let s = '';
+  for (let i = 0; i < 7; i++) s += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  return 'SG-' + s;
+}
+
+// Turso rows come back as arrays of { type, value }; flatten to plain values.
+function rowsOf(result) {
+  return (result.rows || []).map((r) => r.map((c) => (c && c.type !== 'null' ? c.value : null)));
+}
+
+// Get this device's referral row, creating it with a guaranteed-unique code.
+async function ensureReferralUser(env, installId) {
+  const existing = await tursoQuery(env,
+    `SELECT code, status FROM referral_users WHERE install_id = ? LIMIT 1`, [installId]);
+  const exRow = rowsOf(existing)[0];
+  if (exRow && exRow[0]) return { code: exRow[0], status: exRow[1] || 'free' };
+
+  let code = randomCode();
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const taken = await tursoQuery(env,
+      `SELECT install_id FROM referral_users WHERE code = ? LIMIT 1`, [code]);
+    const takenBy = rowsOf(taken)[0]?.[0];
+    if (!takenBy || takenBy === installId) break;
+    code = randomCode();
+  }
+  await tursoQuery(env, `INSERT OR IGNORE INTO referral_users (install_id, code, status, created_at)
+    VALUES (?, ?, 'free', ?)`, [installId, code, String(Date.now())]);
+
+  // Re-read: covers a concurrent create for the same install id.
+  const after = await tursoQuery(env,
+    `SELECT code, status FROM referral_users WHERE install_id = ? LIMIT 1`, [installId]);
+  const afterRow = rowsOf(after)[0];
+  return { code: afterRow?.[0] || code, status: afterRow?.[1] || 'free' };
+}
+
+async function referralSnapshot(env, installId) {
+  const { code, status: rowStatus } = await ensureReferralUser(env, installId);
+
+  const cntRes = await tursoQuery(env,
+    `SELECT COUNT(*) FROM referrals WHERE referrer_id = ? AND qualified = 1`, [installId]);
+  const count = Number(rowsOf(cntRes)[0]?.[0] || 0);
+
+  let status = rowStatus || 'free';
+  if (count >= REFERRAL_GOAL && status !== 'unlocked') {
+    await tursoQuery(env, `UPDATE referral_users SET status = 'unlocked' WHERE install_id = ?`, [installId]);
+    status = 'unlocked';
+  }
+  return { code, status, referral_count: count, goal: REFERRAL_GOAL };
+}
+
 // Each handler returns the raw Turso "result" shape (cols/rows), matching what
 // the app's existing tursoRowsToObjects()/tursoRowToProduct() helpers expect,
 // so the client only needs to change transport, not parsing logic.
@@ -214,31 +294,119 @@ const actions = {
       ]);
     return { ok: true };
   },
+
+  // ── Referral actions ─────────────────────────────────────────────────────
+
+  // Idempotent. Call on every app launch and when the paywall opens.
+  // Returns { code, status, referral_count, goal }.
+  async syncReferral(env, { installId }) {
+    if (!installId) return { error: 'missing installId' };
+    await ensureReferralTables(env);
+    return referralSnapshot(env, String(installId));
+  },
+
+  // Call once on first launch if the app arrived with a referral code, or when
+  // the user types a code on the paywall. Records referrer -> referred (pending
+  // until the referred device completes its first scan).
+  async trackReferral(env, { installId, refCode }) {
+    if (!installId || !refCode) return { ok: false, reason: 'missing_params' };
+    await ensureReferralTables(env);
+    const code = String(refCode).trim().toUpperCase();
+
+    // One referral per device, ever — check this before validating the code so
+    // the "you already used a code" message is accurate.
+    const exRes = await tursoQuery(env,
+      `SELECT referred_id FROM referrals WHERE referred_id = ? LIMIT 1`, [installId]);
+    if (rowsOf(exRes).length) return { ok: false, reason: 'already_referred' };
+
+    const refRes = await tursoQuery(env,
+      `SELECT install_id FROM referral_users WHERE code = ? LIMIT 1`, [code]);
+    const referrerId = rowsOf(refRes)[0]?.[0];
+    if (!referrerId) return { ok: false, reason: 'invalid_code' };
+    if (referrerId === String(installId)) return { ok: false, reason: 'self' };
+
+    await tursoQuery(env, `INSERT OR IGNORE INTO referrals (referred_id, referrer_id, qualified, created_at)
+      VALUES (?, ?, 0, ?)`, [installId, referrerId, String(Date.now())]);
+    return { ok: true, reason: 'pending_first_scan' };
+  },
+
+  // Call after the referred device's first successful scan. Flips the pending
+  // referral to qualified and refreshes the referrer's unlock status.
+  async qualifyReferral(env, { installId }) {
+    if (!installId) return { ok: false, reason: 'missing_params' };
+    await ensureReferralTables(env);
+    await tursoQuery(env,
+      `UPDATE referrals SET qualified = 1 WHERE referred_id = ? AND qualified = 0`, [installId]);
+
+    const refRes = await tursoQuery(env,
+      `SELECT referrer_id FROM referrals WHERE referred_id = ? LIMIT 1`, [installId]);
+    const referrerId = rowsOf(refRes)[0]?.[0];
+    if (!referrerId) return { ok: true, matched: false };
+
+    const snap = await referralSnapshot(env, referrerId);
+    return { ok: true, matched: true, referrerStatus: snap.status };
+  },
+
+  // Cleanup helper for automated tests: removes rows for install ids prefixed
+  // "test-", plus any explicit ids passed. Safe to keep.
+  async purgeTestReferrals(env, { ids } = {}) {
+    await ensureReferralTables(env);
+    await tursoQuery(env, `DELETE FROM referrals WHERE referrer_id LIKE 'test-%' OR referred_id LIKE 'test-%'`);
+    await tursoQuery(env, `DELETE FROM referral_users WHERE install_id LIKE 'test-%'`);
+    for (const id of Array.isArray(ids) ? ids.slice(0, 50) : []) {
+      await tursoQuery(env, `DELETE FROM referrals WHERE referrer_id = ? OR referred_id = ?`, [id, id]);
+      await tursoQuery(env, `DELETE FROM referral_users WHERE install_id = ?`, [id]);
+    }
+    return { ok: true };
+  },
 };
+
+// The website (vee.app) calls this Worker from a browser, so every response —
+// including errors and the OPTIONS preflight — must carry CORS headers or the
+// browser blocks the request before the app ever sees it. The mobile app's
+// fetch() ignores CORS, so this is purely additive for it.
+// Origin is '*' because the Worker exposes only a fixed allowlist of
+// parameterized actions and holds no user credentials/cookies — nothing here is
+// protected by the caller's origin.
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Max-Age': '86400',
+};
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+  });
+}
 
 export default {
   async fetch(request, env) {
+    // Preflight: a browser sends this before any POST with a JSON body.
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
     if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405 });
+      return json({ error: 'Method not allowed' }, 405);
     }
     let payload;
     try {
       payload = await request.json();
     } catch {
-      return new Response(JSON.stringify({ error: 'Invalid JSON' }), { status: 400 });
+      return json({ error: 'Invalid JSON' }, 400);
     }
     const { action, ...params } = payload || {};
     const handler = actions[action];
     if (!handler) {
-      return new Response(JSON.stringify({ error: `Unknown action: ${action}` }), { status: 400 });
+      return json({ error: `Unknown action: ${action}` }, 400);
     }
     try {
       const result = await handler(env, params);
-      return new Response(JSON.stringify({ result }), {
-        headers: { 'Content-Type': 'application/json' },
-      });
+      return json({ result });
     } catch (err) {
-      return new Response(JSON.stringify({ error: err.message || 'Query failed' }), { status: 500 });
+      return json({ error: err.message || 'Query failed' }, 500);
     }
   },
 };

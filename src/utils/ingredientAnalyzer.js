@@ -1,4 +1,4 @@
-import ingredientsDatabase from '../data/ingredientsDatabase.json';
+﻿import ingredientsDatabase from '../data/ingredientsDatabase.json';
 
 export const analyzeIngredients = (productIngredients) => {
   if (!productIngredients || typeof productIngredients !== 'string') {
@@ -116,8 +116,8 @@ const findIngredientInDatabase = (ingredient) => {
 };
 
 export const getScoreColor = (score) => {
-  if (score >= 75) return '#4CAF50';      // Green - Excellent
-  if (score >= 50) return '#8BC34A';      // Light Green - Good  
+  if (score >= 75) return '#067A4F';      // Green - Excellent
+  if (score >= 50) return '#067A4F';      // Light Green - Good  
   if (score >= 25) return '#FF9800';      // Orange - Mediocre
   return '#F44336';                       // Red - Poor
 };

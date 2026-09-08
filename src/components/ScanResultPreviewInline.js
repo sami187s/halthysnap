@@ -1,4 +1,4 @@
-/**
+﻿/**
  * ScanResultPreviewInline — Static inline version of ScanResultPreview
  * for DevScreen testing. Shows fake product data with circular score gauge.
  */
@@ -23,7 +23,7 @@ const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
 /* ───── score helpers ───── */
 const getScoreColor = (s) => {
-  if (s >= 70) return '#4CAF50';
+  if (s >= 70) return '#067A4F';
   if (s >= 50) return '#FF9800';
   if (s >= 25) return '#FF5722';
   return '#F44336';
@@ -154,7 +154,7 @@ const ScanResultPreviewInline = () => {
       <View style={styles.actionBar}>
         <View style={styles.detailsButton}>
           <LinearGradient
-            colors={['#43A047', '#2E7D32']}
+            colors={['#067A4F', '#067A4F']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={styles.detailsGradient}
@@ -165,7 +165,7 @@ const ScanResultPreviewInline = () => {
         </View>
 
         <TouchableOpacity style={styles.rescanButton} onPress={nextProduct} activeOpacity={0.8}>
-          <Ionicons name="scan-outline" size={20} color="#2E7D32" />
+          <Ionicons name="scan-outline" size={20} color="#067A4F" />
         </TouchableOpacity>
       </View>
 
@@ -305,7 +305,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: '#E5F2EC',
     justifyContent: 'center',
     alignItems: 'center',
   },

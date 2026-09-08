@@ -31,12 +31,20 @@ export default function ScoreRing({ score = 0, size = 72, stroke = 6, showLabel 
   const circumference = 2 * Math.PI * r;
 
   const anim = useRef(new Animated.Value(0)).current;
+  const numberOpacity = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     anim.setValue(0);
+    numberOpacity.setValue(0);
     Animated.timing(anim, {
       toValue: 1,
       duration: 900,
       useNativeDriver: false,
+    }).start();
+    Animated.timing(numberOpacity, {
+      toValue: 1,
+      duration: 400,
+      delay: 350,
+      useNativeDriver: true,
     }).start();
   }, [clamped]);
 
@@ -69,11 +77,11 @@ export default function ScoreRing({ score = 0, size = 72, stroke = 6, showLabel 
             strokeDashoffset={dashOffset}
           />
         </Svg>
-        <View style={styles.center}>
+        <Animated.View style={[styles.center, { opacity: numberOpacity }]}>
           <Text style={[styles.scoreText, { fontSize: size / 3.4, color: THEME.text }]}>
             {Math.round(clamped)}
           </Text>
-        </View>
+        </Animated.View>
       </View>
       {showLabel && (
         <Text style={[styles.label, { color: band.color }]}>{band.label}</Text>

@@ -10,37 +10,22 @@ import { getFocusedRouteNameFromRoute, useNavigation } from '@react-navigation/n
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
 
-// Global web scrollbar — always visible, thick, green themed
+// Global web scrollbars — hidden on every axis. Content still scrolls and
+// swipes; there is no visible bar or line anywhere.
 if (Platform.OS === 'web' && typeof document !== 'undefined') {
   const id = 'healthyscan-global-scrollbar';
   if (!document.getElementById(id)) {
     const s = document.createElement('style');
     s.id = id;
     s.textContent = `
-      /* All scrollable containers */
-      [data-testid="scroll-view"], [class*="ScrollView"], [class*="r-overflow"] {
-        scrollbar-width: auto !important;
-        scrollbar-color: #067A4F #E8E8E8 !important;
+      * {
+        scrollbar-width: none !important;
+        -ms-overflow-style: none !important;
       }
-      ::-webkit-scrollbar {
-        width: 10px !important;
-        height: 10px !important;
-      }
-      ::-webkit-scrollbar-track {
-        background: #E8E8E8 !important;
-        border-radius: 8px !important;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #067A4F !important;
-        border-radius: 8px !important;
-        border: 2px solid #E8E8E8 !important;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #067A4F !important;
-      }
-      /* Ensure overflow scroll on scrollable views */
-      [class*="r-overflow-hidden"] {
-        overflow: auto !important;
+      *::-webkit-scrollbar {
+        width: 0 !important;
+        height: 0 !important;
+        display: none !important;
       }
     `;
     document.head.appendChild(s);
@@ -48,6 +33,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // Screens and components
+import { AI_CHAT_ENABLED } from './src/config/featureFlags';
 import HomeScreen from './src/screens/HomeScreen';
 import ResultsScreen from './src/screens/ResultsScreen';
 import ResultsScreenV2 from './src/screens/ResultsScreenV2';
@@ -74,6 +60,7 @@ import { SubscriptionProvider } from './src/hooks/useSubscription';
 import iapManager from './src/services/iapManager';
 import { ScanContext, useScanContext } from './src/contexts/ScanContext';
 import { ThemeProvider, useTheme } from './src/contexts/ThemeContext';
+import { getInstallId, syncReferralStatus, trackCapturedReferral, captureRefCode } from './src/services/referral';
 import * as Sentry from '@sentry/react-native';
 
 Sentry.init({
@@ -138,27 +125,36 @@ function MainTabs() {
   return (
     <View style={{ flex: 1 }}>
     <Tab.Navigator
+      initialRouteName="Home"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
 
           if (route.name === 'Home') {
-            iconName = focused ? 'leaf' : 'leaf-outline';
+            iconName = focused ? 'scan' : 'scan-outline';
           } else if (route.name === 'Search') {
             iconName = focused ? 'search' : 'search-outline';
           } else if (route.name === 'AIChat') {
             iconName = focused ? 'nutrition' : 'nutrition-outline';
           } else if (route.name === 'VeeList') {
-            iconName = focused ? 'trophy' : 'trophy-outline';
-          } else if (route.name === 'Profile') {
-            iconName = focused ? 'person' : 'person-outline';
+            iconName = focused ? 'ribbon' : 'ribbon-outline';
           }
 
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return (
+            <View
+              style={{
+                width: 40, height: 40, borderRadius: 16,
+                alignItems: 'center', justifyContent: 'center',
+                backgroundColor: focused ? theme.tabActive : 'transparent',
+              }}
+            >
+              <Ionicons name={iconName} size={size} color={focused ? '#FFFFFF' : color} />
+            </View>
+          );
         },
         tabBarActiveTintColor: theme.tabActive,
         tabBarInactiveTintColor: theme.tabInactive,
-        tabBarActiveBackgroundColor: theme.tabActiveBg,
+        tabBarActiveBackgroundColor: 'transparent',
         tabBarInactiveBackgroundColor: 'transparent',
         tabBarStyle: isScanning ? { display: 'none' } : {
           backgroundColor: theme.tabBg,
@@ -172,24 +168,22 @@ function MainTabs() {
           shadowOpacity: 0,
         },
         tabBarItemStyle: {
-          borderRadius: 10,
           marginHorizontal: 4,
           paddingVertical: 2,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
-          fontWeight: '700',
-          letterSpacing: 0.5,
-          textTransform: 'uppercase',
-          marginTop: 2,
+          fontSize: 11,
+          fontWeight: '600',
+          marginTop: 4,
         },
         headerShown: false,
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      {/* Visual order: Scan · Search · Top */}
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
-        options={{ tabBarLabel: 'Home' }}
+        options={{ tabBarLabel: 'Scan' }}
       />
       <Tab.Screen
         name="Search"
@@ -197,21 +191,17 @@ function MainTabs() {
         options={{ tabBarLabel: 'Search' }}
       />
       <Tab.Screen
-        name="AIChat"
-        component={AINutritionistScreen}
-        options={{ tabBarLabel: 'AI Chat' }}
-      />
-      
-      <Tab.Screen
         name="VeeList"
         component={VeeListScreen}
-        options={{ tabBarLabel: 'Best' }}
+        options={{ tabBarLabel: 'Top' }}
       />
-      <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{ tabBarLabel: 'Profile' }}
-      />
+      {(AI_CHAT_ENABLED || Platform.OS === 'android') && (
+        <Tab.Screen
+          name="AIChat"
+          component={AINutritionistScreen}
+          options={{ tabBarLabel: 'AI' }}
+        />
+      )}
     </Tab.Navigator>
 
     {/* Floating Dev Menu Button — only in development */}
@@ -360,10 +350,23 @@ function App() {
         // Check if user has seen onboarding
         await checkOnboarding();
 
-        // AI chatbot is turned off for everyone (new and existing users) until
-        // it's ready to launch — protects API costs. Set unconditionally on every
-        // launch so no prior 'enabled' value lingers on a device.
-        await AsyncStorage.setItem('chatbotAccess', 'coming_soon');
+        // AI chatbot: enabled + free on Android (no paywall there), still
+        // "coming soon" on iOS until launch. Set on every launch so no stale
+        // value lingers.
+        await AsyncStorage.setItem(
+          'chatbotAccess',
+          Platform.OS === 'android' ? 'enabled' : 'coming_soon'
+        );
+
+        // 🎁 Referral program — ensure this device has an install id + share code,
+        // send any captured referral code, and refresh unlock status. All calls
+        // are network-resilient and never throw.
+        getInstallId()
+          .then(() => {
+            syncReferralStatus();
+            trackCapturedReferral();
+          })
+          .catch(() => {});
 
         // 🖼️ Prefetch Vee List images so they're ready instantly
         const VEE_IMAGE_URLS = [
@@ -435,14 +438,20 @@ function App() {
         // Check for affiliate parameters
         if (data.queryParams?.ref || data.queryParams?.promo || data.queryParams?.affiliate) {
           console.log('🎯 Affiliate params detected:', data.queryParams);
-          
+
           // Store affiliate source for analytics
           await AsyncStorage.setItem('affiliateSource', JSON.stringify({
             ...data.queryParams,
             timestamp: new Date().toISOString()
           }));
-          
+
           // GoMarketMe SDK will automatically capture these params
+        }
+
+        // 🎁 Referral code from a friend's invite link (?ref=SG-XXXXXX)
+        if (data.queryParams?.ref) {
+          captureRefCode(data.queryParams.ref);
+          trackCapturedReferral();
         }
       } catch (error) {
         console.error('❌ Error handling deep link:', error);
@@ -478,7 +487,8 @@ function App() {
     },
   };
 
-  // Simplified loading screen — fills the entire screen on all platforms
+  // Loading screen — full-bleed splash art so it matches the native splash
+  // seamlessly (no small square logo floating on green).
   if (!isReady || showOnboarding === null) {
     const { width: SW, height: SH } = Dimensions.get('screen');
     return (
@@ -487,14 +497,13 @@ function App() {
         top: 0, left: 0,
         width: SW,
         height: SH,
-        backgroundColor: '#067A4F',
-        justifyContent: 'center',
-        alignItems: 'center',
+        backgroundColor: '#FDF4EB',
       }}>
-        <StatusBar style="light" backgroundColor="transparent" translucent={true} />
+        <StatusBar style="dark" backgroundColor="transparent" translucent={true} />
         <Image
           source={require('./assets/logo.png')}
-          style={{ width: SW * 0.72, height: SW * 0.72, resizeMode: 'contain' }}
+          style={{ width: '100%', height: '100%' }}
+          resizeMode="contain"
         />
       </View>
     );
@@ -522,10 +531,11 @@ function App() {
               (() => {
                 const { width: SW, height: SH } = Dimensions.get('screen');
                 return (
-                  <View style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH, backgroundColor: '#067A4F', justifyContent: 'center', alignItems: 'center' }}>
+                  <View style={{ position: 'absolute', top: 0, left: 0, width: SW, height: SH, backgroundColor: '#FDF4EB' }}>
                     <Image
                       source={require('./assets/logo.png')}
-                      style={{ width: SW * 0.72, height: SW * 0.72, resizeMode: 'contain' }}
+                      style={{ width: '100%', height: '100%' }}
+                      resizeMode="contain"
                     />
                   </View>
                 );
@@ -671,6 +681,13 @@ function App() {
                   </NavigationErrorBoundary>
                 )}
               </Stack.Screen>
+              <Stack.Screen name="VeeList">
+                {(props) => (
+                  <NavigationErrorBoundary screenName="VeeList" navigation={props.navigation}>
+                    <VeeListScreen {...props} />
+                  </NavigationErrorBoundary>
+                )}
+              </Stack.Screen>
               <Stack.Screen name="Settings">
                 {(props) => (
                   <NavigationErrorBoundary screenName="Settings" navigation={props.navigation}>
@@ -697,9 +714,14 @@ function App() {
               {__DEV__ && (
                 <Stack.Screen
                   name="DevMenu"
-                  component={DevScreen}
                   options={{ headerShown: false, presentation: 'modal', animation: 'slide_from_bottom' }}
-                />
+                >
+                  {(props) => (
+                    <NavigationErrorBoundary screenName="DevMenu" navigation={props.navigation}>
+                      <DevScreen {...props} />
+                    </NavigationErrorBoundary>
+                  )}
+                </Stack.Screen>
               )}
             </Stack.Navigator>
           </NavigationContainer>

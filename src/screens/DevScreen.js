@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import ResultsScreen from '../../ResultsScreen';
+import ResultsScreen from './ResultsScreen';
 
 const PreviewStack = createNativeStackNavigator();
 const { width: DEV_SCREEN_W, height: DEV_SCREEN_H } = Dimensions.get('window');
@@ -78,7 +78,7 @@ const SCREENS = [
     name: 'MainTabs',
     label: 'Home (MainTabs)',
     icon: 'leaf-outline',
-    color: '#4CAF50',
+    color: '#067A4F',
     description: 'Main tab navigator with Home, Search, AI Chat, History/Premium',
   },
   {
@@ -232,7 +232,7 @@ const SCREENS = [
     name: 'Results',
     label: 'Results (Food) ✅',
     icon: 'restaurant-outline',
-    color: '#4CAF50',
+    color: '#067A4F',
     description: 'Food product — mock data, AI always on',
     params: {
       devHasAIAccess: true,
@@ -355,7 +355,7 @@ const SCREENS = [
       devScoreData: {
         score: 82,
         grade: 'Excellent',
-        color: '#4CAF50',
+        color: '#067A4F',
       },
     },
   },
@@ -374,7 +374,7 @@ const SCREENS = [
     name: 'MainTabs',
     label: 'Home (Premium) 💎',
     icon: 'diamond-outline',
-    color: '#2E7D32',
+    color: '#067A4F',
     description: 'Set subscription → Premium, then open Home',
     devAction: 'setPremiumAndNavigate',
   },
@@ -389,6 +389,13 @@ const SCREENS = [
 
   // ── Utility Screens ──
   { section: 'Utility Screens' },
+  {
+    name: 'Profile',
+    label: 'Profile',
+    icon: 'person-outline',
+    color: '#067A4F',
+    description: 'User profile — saved products, history, membership',
+  },
   {
     name: 'Settings',
     label: 'Settings',
@@ -441,6 +448,11 @@ export default function DevScreen({ navigation }) {
         await AsyncStorage.removeItem('subscriptionExpiry');
         console.log('[DevScreen] ✅ Reset subscription to Free');
         navigation.navigate('MainTabs');
+        return;
+      }
+      // Reset to Onboarding so it always starts fresh at slide 0
+      if (screen.name === 'Onboarding') {
+        navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
         return;
       }
       if (screen.params) {

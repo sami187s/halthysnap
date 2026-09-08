@@ -218,7 +218,23 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
     return result;
   }
 
-  // STEP 2: Not in our food DB — try cosmetic sources
+  // STEP 1.5: Not in Turso — try OpenFoodFacts before cosmetic DBs.
+  // OpenFoodFacts is food-only, so a hit here definitively means food.
+  try {
+    const offRes = await axios.get(
+      `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`,
+      { headers: { 'User-Agent': 'HealthyScan/1.0' }, timeout: 8000 }
+    );
+    const offProduct = offRes?.data?.product;
+    if (offProduct && offProduct.product_name) {
+      console.log('✅ ReliableAPI: Found on OpenFoodFacts (food):', offProduct.product_name);
+      const result = formatProductData(offProduct, barcode, 'Open Food Facts', 'food');
+      setCachedProduct(barcode, result);
+      return result;
+    }
+  } catch { /* not found on OpenFoodFacts — continue to cosmetic lookup */ }
+
+  // STEP 2: Not in any food DB — try cosmetic sources
   console.log('🔍 ReliableAPI: Not in food DB, trying cosmetic databases...');
   let cosmeticProduct = null;
   try {
@@ -289,7 +305,7 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
 
 // Enhanced search function with Yuka-style multi-source approach
 export const searchProductByName = async (productName) => {
-  // 🔍 SEARCH: Turso DB for food, Open Beauty Facts for cosmetics, USDA for food — IN PARALLEL
+  // 🔍 SEARCH: Turso DB, OpenFoodFacts, Open Beauty Facts, USDA — IN PARALLEL
   let foodResults = [];
   let beautyResults = [];
   let usdaResults = [];
@@ -300,7 +316,7 @@ export const searchProductByName = async (productName) => {
   };
 
   try {
-    const [tursoSettled, beautySettled, usdaSettled] = await Promise.allSettled([
+    const [tursoSettled, beautySettled, usdaSettled, offSettled] = await Promise.allSettled([
       // SEARCH 1: Our Turso database (food products)
       searchProductsInTurso(productName),
       // SEARCH 2: Open Beauty Facts (cosmetic/beauty products)
@@ -326,118 +342,188 @@ export const searchProductByName = async (productName) => {
         headers: searchHeaders,
         timeout: 8000,
       }),
+      // SEARCH 4: Open Food Facts (food products — reliable fallback when Turso/USDA unavailable)
+      axios.get('https://world.openfoodfacts.org/cgi/search.pl', {
+        params: {
+          search_terms: productName,
+          search_simple: 1,
+          action: 'process',
+          json: 1,
+          page_size: 15,
+          fields: 'code,product_name,brands,image_url,categories,nutriments,ingredients_text',
+        },
+        headers: searchHeaders,
+        timeout: 8000,
+      }),
     ]);
 
     // Process food results from Turso
-    if (tursoSettled.status === 'fulfilled' && Array.isArray(tursoSettled.value)) {
-      foodResults = tursoSettled.value
-        .filter(p => p.product_name && p.product_name.trim() !== '' && p.barcode)
-        .map(p => ({
-          name: p.product_name,
-          brand: p.brands || 'Unknown Brand',
-          image: p.image_url || null,
-          barcode: p.barcode,
-          categories: 'food',
-          source: 'HealthyScan DB',
-          productType: 'food',
-        }));
-      console.log(`✅ Turso food search returned ${foodResults.length} results`);
-    } else {
-      console.log('⚠️ Turso search returned 0 products');
+    try {
+      if (tursoSettled.status === 'fulfilled' && Array.isArray(tursoSettled.value)) {
+        foodResults = tursoSettled.value
+          .filter(p => p && p.product_name && p.product_name.trim() !== '' && p.barcode)
+          .map(p => ({
+            name: p.product_name,
+            brand: p.brands || 'Unknown Brand',
+            image: p.image_url || null,
+            barcode: String(p.barcode),
+            categories: 'food',
+            source: 'HealthyScan DB',
+            productType: 'food',
+            nutriments: p.nutriments || {},
+            ingredients_text: p.ingredients_text || '',
+          }));
+        console.log(`✅ Turso food search returned ${foodResults.length} results`);
+      } else {
+        console.log('⚠️ Turso search returned 0 products');
+      }
+    } catch (e) {
+      console.log('⚠️ Turso result processing error:', e?.message);
+      foodResults = [];
     }
 
     // Process USDA results — only include products with a barcode not already in Turso
     const tursoBarcodesFound = new Set(foodResults.map(r => r.barcode).filter(Boolean));
-    if (usdaSettled.status === 'fulfilled') {
-      const usdaFoods = usdaSettled.value?.data?.foods || [];
-      for (const item of usdaFoods) {
-        const barcode = item.gtinUpc != null ? String(item.gtinUpc).replace(/^0+/, '') : null;
-        if (!barcode || tursoBarcodesFound.has(barcode)) continue;
+    try {
+      if (usdaSettled.status === 'fulfilled') {
+        const usdaFoods = usdaSettled.value?.data?.foods;
+        if (Array.isArray(usdaFoods)) {
+          for (const item of usdaFoods) {
+            try {
+              const rawUpc = item.gtinUpc;
+              const barcode = rawUpc != null ? String(rawUpc).replace(/^0+/, '') : null;
+              if (!barcode || tursoBarcodesFound.has(barcode)) continue;
 
-        // Map USDA nutrients
-        const getNutrient = (id) => {
-          const n = (item.foodNutrients || []).find(fn => fn.nutrientId === id);
-          return n ? n.value : null;
-        };
-        const sodiumMg = getNutrient(1093);
-        const nutriments = {
-          'energy-kcal_100g': getNutrient(1008),
-          'fat_100g': getNutrient(1004),
-          'saturated-fat_100g': getNutrient(1258),
-          'sugars_100g': getNutrient(2000),
-          'salt_100g': sodiumMg != null ? parseFloat((sodiumMg * 2.5 / 1000).toFixed(3)) : null,
-          'proteins_100g': getNutrient(1003),
-          'fiber_100g': getNutrient(1079),
-        };
+              const getNutrient = (id) => {
+                const nutrients = item.foodNutrients;
+                if (!Array.isArray(nutrients)) return null;
+                const n = nutrients.find(fn => fn && fn.nutrientId === id);
+                return n ? n.value : null;
+              };
+              const sodiumMg = getNutrient(1093);
+              const nutriments = {
+                'energy-kcal_100g': getNutrient(1008),
+                'fat_100g': getNutrient(1004),
+                'saturated-fat_100g': getNutrient(1258),
+                'sugars_100g': getNutrient(2000),
+                'salt_100g': sodiumMg != null ? parseFloat((Number(sodiumMg) * 2.5 / 1000).toFixed(3)) : null,
+                'proteins_100g': getNutrient(1003),
+                'fiber_100g': getNutrient(1079),
+              };
 
-        const usdaProduct = {
-          product_name: item.description || 'Food Product',
-          brands: item.brandOwner || item.brandName || 'Unknown Brand',
-          image_url: null,
-          ingredients_text: item.ingredients || '',
-          nutriments,
-          categories: item.foodCategory || 'food',
-          nutriscore_grade: null,
-          nova_group: null,
-          allergens_tags: [],
-          additives_tags: [],
-          labels: '',
-        };
+              const usdaProduct = {
+                product_name: item.description || 'Food Product',
+                brands: item.brandOwner || item.brandName || 'Unknown Brand',
+                image_url: null,
+                ingredients_text: item.ingredients || '',
+                nutriments,
+                categories: item.foodCategory || 'food',
+                nutriscore_grade: null,
+                nova_group: null,
+                allergens_tags: [],
+                additives_tags: [],
+                labels: '',
+              };
 
-        usdaResults.push({
-          name: usdaProduct.product_name,
-          brand: usdaProduct.brands,
-          image: null,
-          barcode,
-          categories: usdaProduct.categories,
-          source: 'USDA FoodData',
-          productType: 'food',
-        });
+              usdaResults.push({
+                name: usdaProduct.product_name,
+                brand: usdaProduct.brands,
+                image: null,
+                barcode,
+                categories: usdaProduct.categories,
+                source: 'USDA FoodData',
+                productType: 'food',
+                nutriments: usdaProduct.nutriments,
+                ingredients_text: usdaProduct.ingredients_text,
+              });
 
-        // Save to Turso in background so the database grows
-        saveProductToTurso(barcode, usdaProduct);
-        tursoBarcodesFound.add(barcode);
+              saveProductToTurso(barcode, usdaProduct);
+              tursoBarcodesFound.add(barcode);
+            } catch (itemErr) {
+              // Skip this individual item — don't abort the whole loop
+            }
+          }
+        }
+        console.log(`✅ USDA search returned ${usdaResults.length} new results`);
+      } else {
+        console.log('⚠️ USDA search error:', usdaSettled.reason?.message || 'Unknown');
       }
-      console.log(`✅ USDA search returned ${usdaResults.length} new results`);
-    } else {
-      console.log('⚠️ USDA search error:', usdaSettled.reason?.message || 'Unknown');
+    } catch (e) {
+      console.log('⚠️ USDA result processing error:', e?.message);
+      usdaResults = [];
     }
 
     // Interleave Turso + USDA — 2 USDA for every 1 Turso, so USDA appears more
-    {
+    try {
       const mixed = [];
       let t = 0, u = 0;
       while (t < foodResults.length || u < usdaResults.length) {
-        // 2 USDA
         if (u < usdaResults.length) { mixed.push(usdaResults[u++]); }
         if (u < usdaResults.length) { mixed.push(usdaResults[u++]); }
-        // 1 Turso
         if (t < foodResults.length) { mixed.push(foodResults[t++]); }
       }
       foodResults = mixed;
+    } catch (e) {
+      console.log('⚠️ Interleave error:', e?.message);
+      foodResults = [...foodResults, ...usdaResults];
+    }
+
+    // Process Open Food Facts results (fallback food search)
+    try {
+      if (offSettled.status === 'fulfilled') {
+        const offData = offSettled.value?.data;
+        if (offData && Array.isArray(offData.products) && offData.products.length > 0) {
+          const existingBarcodes = new Set(foodResults.map(r => r.barcode).filter(Boolean));
+          const offFoodResults = offData.products
+            .filter(p => p && p.product_name && p.product_name.trim() !== '' && p.code && !existingBarcodes.has(String(p.code)))
+            .map(p => ({
+              name: p.product_name,
+              brand: p.brands || 'Unknown Brand',
+              image: p.image_url || null,
+              barcode: String(p.code),
+              categories: p.categories || 'food',
+              source: 'Open Food Facts',
+              productType: 'food',
+              nutriments: p.nutriments || {},
+              ingredients_text: p.ingredients_text || '',
+            }));
+          console.log(`✅ OpenFoodFacts search returned ${offFoodResults.length} new results`);
+          foodResults = [...foodResults, ...offFoodResults];
+        }
+      } else {
+        console.log('⚠️ OpenFoodFacts search error:', offSettled.reason?.message || 'Unknown');
+      }
+    } catch (e) {
+      console.log('⚠️ OFF result processing error:', e?.message);
     }
 
     // Process beauty results
-    if (beautySettled.status === 'fulfilled') {
-      const beautyResponse = beautySettled.value;
-      if (beautyResponse.data && beautyResponse.data.products && beautyResponse.data.products.length > 0) {
-        beautyResults = beautyResponse.data.products
-          .filter(p => p.product_name && p.product_name.trim() !== '' && p.code)
-          .map(product => ({
-            name: product.product_name,
-            brand: product.brands || 'Unknown Brand',
-            image: product.image_url || product.image_front_url || null,
-            barcode: product.code,
-            categories: product.categories || 'beauty, cosmetic',
-            source: 'Open Beauty Facts',
-            productType: 'cosmetic'
-          }));
-        console.log(`✅ Beauty search returned ${beautyResults.length} results`);
+    try {
+      if (beautySettled.status === 'fulfilled') {
+        const beautyData = beautySettled.value?.data;
+        if (beautyData && Array.isArray(beautyData.products) && beautyData.products.length > 0) {
+          beautyResults = beautyData.products
+            .filter(p => p && p.product_name && p.product_name.trim() !== '' && p.code)
+            .map(product => ({
+              name: product.product_name,
+              brand: product.brands || 'Unknown Brand',
+              image: product.image_url || product.image_front_url || null,
+              barcode: String(product.code),
+              categories: product.categories || 'beauty, cosmetic',
+              source: 'Open Beauty Facts',
+              productType: 'cosmetic',
+              ingredients_text: product.ingredients_text || '',
+            }));
+          console.log(`✅ Beauty search returned ${beautyResults.length} results`);
+        } else {
+          console.log('⚠️ Beauty search returned 0 products');
+        }
       } else {
-        console.log('⚠️ Beauty search returned 0 products');
+        console.log('❌ Beauty search FAILED:', beautySettled.reason?.message || 'Unknown error');
       }
-    } else {
-      console.log('❌ Beauty search FAILED:', beautySettled.reason?.message || 'Unknown error');
+    } catch (e) {
+      console.log('⚠️ Beauty result processing error:', e?.message);
+      beautyResults = [];
     }
 
     // STEP 3: Try Yuka-Style cosmetic search ONLY if keyword is clearly cosmetic
@@ -454,7 +540,8 @@ export const searchProductByName = async (productName) => {
             barcode: cosmeticResult.barcode || '',
             categories: cosmeticResult.categories || 'beauty, cosmetic',
             source: cosmeticResult.source || 'Multi-Source Cosmetic DB',
-            productType: 'cosmetic'
+            productType: 'cosmetic',
+            ingredients_text: cosmeticResult.ingredients_text || '',
           });
         }
       } catch (error) {
@@ -506,6 +593,7 @@ export const searchProductByName = async (productName) => {
     const apisFailed =
       beautySettled.status === 'rejected' &&
       usdaSettled.status === 'rejected' &&
+      offSettled.status === 'rejected' &&
       foodResults.length === 0;
 
     return {
@@ -515,7 +603,7 @@ export const searchProductByName = async (productName) => {
         : 'No products found. Try different keywords.',
     };
   } catch (error) {
-    console.log('❌ Search overall error:', error?.message || String(error));
+    console.log('❌ Search overall error:', error?.message || String(error), error?.stack);
     // Return any results collected before the error instead of discarding them
     const partialResults = [...foodResults, ...beautyResults];
     if (partialResults.length > 0) {
@@ -527,7 +615,7 @@ export const searchProductByName = async (productName) => {
     }
     return {
       success: false,
-      error: 'Search failed. Please check your connection and try again.',
+      error: 'Could not reach search servers. Please check your connection and try again.',
     };
   }
 };

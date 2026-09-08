@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -98,7 +98,7 @@ const WhatsInsideCard = ({ insights = [], onSeeFullList, totalIngredients = 0 })
           <Text style={styles.fullListText}>
             See Full Ingredient List{totalIngredients > 0 ? ` (${totalIngredients})` : ''}
           </Text>
-          <Ionicons name="arrow-forward" size={14} color="#2E7D32" />
+          <Ionicons name="arrow-forward" size={14} color="#067A4F" />
         </TouchableOpacity>
       )}
     </Animated.View>
@@ -131,7 +131,7 @@ const StaggerChip = ({ children, delay = 0 }) => {
 const CHIP_STYLES = {
   bad: { bg: '#FFF0F0', text: '#C62828', dot: '🔴' },
   moderate: { bg: '#FFFDE7', text: '#F57C00', dot: '🟡' },
-  good: { bg: '#F1F8F1', text: '#2E7D32', dot: '🟢' },
+  good: { bg: '#F1F8F1', text: '#067A4F', dot: '🟢' },
 };
 
 const styles = StyleSheet.create({
@@ -201,7 +201,7 @@ const styles = StyleSheet.create({
   fullListText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#2E7D32',
+    color: '#067A4F',
     marginRight: 4,
   },
 });

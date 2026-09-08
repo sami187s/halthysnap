@@ -1,4 +1,4 @@
-// Shared styling constants for ResultsScreen and CosmeticResultsScreen
+﻿// Shared styling constants for ResultsScreen and CosmeticResultsScreen
 // Ensures visual consistency across both food and cosmetic product displays
 import { THEME } from './theme';
 
@@ -95,8 +95,8 @@ export const TYPOGRAPHY = {
 
 export const COLORS = {
   // Health status colors
-  excellent: '#1B5E20',      // Dark Green
-  good: '#2E7D32',           // Brand Green (actions, confirmed)
+  excellent: '#067A4F',      // Dark Green
+  good: '#067A4F',           // Brand Green (actions, confirmed)
   moderate: '#F57C00',       // Warning Orange
   poor: '#C62828',           // Danger Red
   unknown: '#9E9E9E',       // Gray
@@ -109,8 +109,8 @@ export const COLORS = {
   unknownBg: 'rgba(158, 158, 158, 0.08)',
   
   // Text colors
-  excellentText: '#1B5E20',
-  goodText: '#2E7D32',
+  excellentText: '#067A4F',
+  goodText: '#067A4F',
   moderateText: '#F57C00',
   poorText: '#C62828',
   unknownText: '#8A9A8A',

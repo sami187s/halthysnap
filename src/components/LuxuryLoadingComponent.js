@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { 
   createPulseAnimation, 
@@ -122,7 +122,7 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     borderWidth: 2,
     borderColor: '#E8F5E8',
-    borderTopColor: '#4CAF50',
+    borderTopColor: '#067A4F',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FFF8',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#4CAF50',
+    shadowColor: '#067A4F',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
   },
   message: {
     fontSize: 17,
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     marginHorizontal: 4,
   },
 });

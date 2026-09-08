@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { localCrashReporter } from '../utils/crashReporting';
@@ -133,7 +133,7 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   retryButton: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     paddingHorizontal: 30,
     paddingVertical: 12,
     borderRadius: 25,

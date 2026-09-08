@@ -1,18 +1,18 @@
 {
   "expo": {
     "owner": "sami187s1",
-    "name": "HealthyScan: Food & Beauty Check",
+    "name": "Vee",
     "slug": "healthyscan",
-    "version": "3.7.12",
+    "version": "4.1.0",
     "orientation": "portrait",
-    "icon": "./assets/vee-logo.png",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "Scan barcodes to analyze food nutrition and cosmetic ingredient safety. Get instant health scores and detailed ingredient analysis for both food and personal care products.",
     "privacy": "public",
     "splash": {
-      "image": "./assets/vee-logo.png",
+      "image": "./assets/logo.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0a0a0a"
+      "backgroundColor": "#FDF4EB"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -25,7 +25,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.healthyscan.app",
-      "buildNumber": "62",
+      "buildNumber": "69",
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -60,12 +60,7 @@
               "NSExceptionRequiresForwardSecrecy": false,
               "NSExceptionAllowsInsecureHTTPLoads": false
             },
-            "turso.io": {
-              "NSIncludesSubdomains": true,
-              "NSExceptionRequiresForwardSecrecy": false,
-              "NSExceptionAllowsInsecureHTTPLoads": false
-            },
-            "aws-us-east-2.turso.io": {
+            "workers.dev": {
               "NSIncludesSubdomains": true,
               "NSExceptionRequiresForwardSecrecy": false,
               "NSExceptionAllowsInsecureHTTPLoads": false
@@ -97,11 +92,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/vee-logo.png",
-        "backgroundColor": "#0a0a0a"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FDF4EB"
       },
       "package": "com.healthyscan.app",
-      "versionCode": 7,
+      "versionCode": 8,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.INTERNET",
@@ -112,7 +107,7 @@
       "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
-      "favicon": "./assets/logo.png",
+      "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "plugins": [

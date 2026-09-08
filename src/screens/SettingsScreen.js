@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,20 +9,46 @@ import {
   Platform,
   Switch,
   Alert,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../contexts/ThemeContext';
 
 const NAV_ITEMS = [
-  { icon: 'time-outline',               label: 'Scan History', route: 'History' },
+  { icon: 'ribbon-outline',             label: 'Top Products', route: 'VeeList' },
   { icon: 'information-circle-outline', label: 'About',        route: 'About'   },
   { icon: 'book-outline',               label: 'Sources',      route: 'Sources' },
 ];
 
+const DEV_MODE_KEY = '@vee_dev_mode';
+
 const SettingsScreen = ({ navigation }) => {
   const { theme, isDark, toggleTheme } = useTheme();
   const t = theme;
+  const [isDevMode, setIsDevMode] = useState(false);
+  const tapCount = useRef(0);
+  const tapTimer = useRef(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(DEV_MODE_KEY).then(v => setIsDevMode(v === 'true'));
+  }, []);
+
+  const handleVersionTap = async () => {
+    tapCount.current += 1;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    tapTimer.current = setTimeout(() => { tapCount.current = 0; }, 2000);
+    if (tapCount.current >= 5) {
+      tapCount.current = 0;
+      const next = !isDevMode;
+      await AsyncStorage.setItem(DEV_MODE_KEY, next ? 'true' : 'false');
+      setIsDevMode(next);
+      Alert.alert(
+        next ? '🔓 Developer Mode ON' : '🔒 Developer Mode OFF',
+        next ? 'Trophy buttons are now visible. You can save products to the Best section.' : 'Trophy buttons are now hidden from users.',
+      );
+    }
+  };
 
   const handleCancelSubscription = async () => {
     const doCancel = async () => {
@@ -73,6 +99,27 @@ const SettingsScreen = ({ navigation }) => {
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={st.scrollContent} showsVerticalScrollIndicator={false}>
 
+        {/* Upgrade */}
+        <Text style={[st.sectionLabel, { color: t.textDim }]}>MEMBERSHIP</Text>
+        <View style={[st.section, { backgroundColor: t.bgCard, borderColor: t.border }]}>
+          <TouchableOpacity
+            style={st.row}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Subscription')}
+          >
+            <View style={st.rowLeft}>
+              <View style={[st.iconBox, { backgroundColor: '#e8f5e9', borderColor: '#a5d6a7' }]}>
+                <Ionicons name="diamond" size={20} color="#067A4F" />
+              </View>
+              <View>
+                <Text style={[st.rowLabel, { color: t.text }]}>Upgrade to Premium</Text>
+                <Text style={[st.rowSub, { color: t.textDim }]}>Unlock all features — $2.99/week</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={t.chevron} />
+          </TouchableOpacity>
+        </View>
+
         {/* Navigation items */}
         <Text style={[st.sectionLabel, { color: t.textDim }]}>GENERAL</Text>
         <View style={[st.section, { backgroundColor: t.bgCard, borderColor: t.border }]}>
@@ -97,26 +144,33 @@ const SettingsScreen = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Cancel Subscription */}
-        <Text style={[st.sectionLabel, { color: t.textDim }]}>ACCOUNT</Text>
+        {/* Rate Us */}
+        <Text style={[st.sectionLabel, { color: t.textDim }]}>SUPPORT</Text>
         <View style={[st.section, { backgroundColor: t.bgCard, borderColor: t.border }]}>
           <TouchableOpacity
             style={st.row}
-            onPress={handleCancelSubscription}
             activeOpacity={0.7}
+            onPress={() => Linking.openURL('https://apps.apple.com/us/app/vee-product-check/id6751061358')}
           >
             <View style={st.rowLeft}>
-              <View style={[st.iconBox, { backgroundColor: '#1a0000', borderColor: '#3a0000' }]}>
-                <Ionicons name="close-circle-outline" size={20} color="#F44336" />
+              <View style={[st.iconBox, { backgroundColor: '#fff8e1', borderColor: '#fde68a' }]}>
+                <Ionicons name="star" size={20} color="#f59e0b" />
               </View>
-              <Text style={[st.rowLabel, { color: '#F44336' }]}>Cancel Subscription</Text>
+              <View>
+                <Text style={[st.rowLabel, { color: t.text }]}>Rate Us</Text>
+                <Text style={[st.rowSub, { color: t.textDim }]}>Enjoy the app? Leave a review!</Text>
+              </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={t.chevron} />
           </TouchableOpacity>
         </View>
 
-        {/* Footer */}
-        <Text style={[st.version, { color: t.textDim }]}>HealthyScan v3.3.1</Text>
+        {/* Footer — tap 5× to toggle dev mode */}
+        <TouchableOpacity onPress={handleVersionTap} activeOpacity={1}>
+          <Text style={[st.version, { color: t.textDim }]}>
+            Vee v3.3.1{isDevMode ? '  🔓' : ''}
+          </Text>
+        </TouchableOpacity>
 
       </ScrollView>
     </View>

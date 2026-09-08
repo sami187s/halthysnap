@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+﻿import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,8 +16,10 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AIService } from '../services/aiService';
 import { checkPremiumStatus } from '../utils/aiChatManager';
+import { cloudflareAPI } from '../services/cloudflareAPI';
 
 /**
  * Typing indicator — 3-dot animation
@@ -50,7 +52,7 @@ const TypingIndicator = () => {
   return (
     <View style={styles.typingContainer}>
       <View style={styles.aiAvatar}>
-        <Ionicons name="leaf" size={14} color="#2E7D32" />
+        <Ionicons name="leaf" size={14} color="#067A4F" />
       </View>
       <View style={styles.typingBubble}>
         <Animated.View style={[styles.typingDot, dotStyle(dot1)]} />
@@ -101,7 +103,7 @@ const MessageBubble = ({ message, index }) => {
           <Ionicons
             name={message.isError ? 'warning' : 'leaf'}
             size={14}
-            color={message.isError ? '#C62828' : '#2E7D32'}
+            color={message.isError ? '#C62828' : '#067A4F'}
           />
         </View>
       )}
@@ -132,13 +134,17 @@ const ProductAIChat = ({ product, ingredients, analysis, visible = true, style =
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isPremium, setIsPremium] = useState(null);
+  const [chatbotAccess, setChatbotAccess] = useState('coming_soon');
   const scrollViewRef = useRef(null);
   const sendBtnAnim = useRef(new Animated.Value(0)).current;
   const hasAutoSent = useRef(false);
 
-  // Check premium status when component mounts or becomes visible
+  // Check premium status and chatbot access when component mounts or becomes visible
   useEffect(() => {
     checkPremiumStatus().then(status => setIsPremium(status));
+    AsyncStorage.getItem('chatbotAccess').then(access => {
+      setChatbotAccess(access || 'coming_soon');
+    });
   }, [visible]);
 
   // Build a clean string array of ingredient names so the AI always knows the product context
@@ -203,16 +209,42 @@ const ProductAIChat = ({ product, ingredients, analysis, visible = true, style =
   const askAI = async (questionText = question) => {
     if (!questionText.trim()) return;
 
-    // AI chat is coming soon — show notice for everyone
     const userMessage = { type: 'user', text: questionText, timestamp: Date.now() };
-    const comingSoonMsg = {
-      type: 'ai',
-      text: '✨ AI messaging is coming soon! You will be able to send messages here shortly. Stay tuned!',
-      timestamp: Date.now(),
-    };
-    setMessages(prev => [...prev, userMessage, comingSoonMsg]);
+
+    if (chatbotAccess !== 'enabled') {
+      const comingSoonMsg = {
+        type: 'ai',
+        text: 'AI chat is coming soon for your account! New subscribers get access first. Stay tuned!',
+        timestamp: Date.now(),
+      };
+      setMessages(prev => [...prev, userMessage, comingSoonMsg]);
+      setQuestion('');
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      return;
+    }
+
+    setMessages(prev => [...prev, userMessage]);
     setQuestion('');
+    setLoading(true);
     setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+
+    try {
+      const contextPrompt = `I'm looking at a product called "${product?.product_name || product?.name || 'this product'}". ${questionText}`;
+      const aiResponse = await cloudflareAPI.chatbot(contextPrompt);
+      const aiMessage = { type: 'ai', text: aiResponse, timestamp: Date.now() };
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      const errorMsg = {
+        type: 'ai',
+        text: 'Sorry, I had trouble responding. Please check your connection and try again.',
+        timestamp: Date.now(),
+        isError: true,
+      };
+      setMessages(prev => [...prev, errorMsg]);
+    } finally {
+      setLoading(false);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    }
   };
 
   if (!visible) return null;
@@ -228,6 +260,14 @@ const ProductAIChat = ({ product, ingredients, analysis, visible = true, style =
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
+          {/* Coming Soon Banner — only for old users */}
+          {chatbotAccess === 'coming_soon' && (
+            <View style={styles.comingSoonBanner}>
+              <Ionicons name="time-outline" size={14} color="#92400e" />
+              <Text style={styles.comingSoonBannerText}>Chat is coming soon for your account</Text>
+            </View>
+          )}
+
           {/* Context Bar — pinned product info */}
           <View style={styles.contextBar}>
             <View style={styles.contextLeft}>
@@ -345,6 +385,22 @@ const styles = StyleSheet.create({
   },
   keyboardView: {
     flex: 1,
+  },
+  comingSoonBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fef3c7',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fde68a',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingTop: Platform.OS === 'ios' ? 56 : 8,
+  },
+  comingSoonBannerText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#92400e',
   },
 
   // Context bar
@@ -506,7 +562,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   userBubble: {
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#067A4F',
     borderBottomRightRadius: 6,
   },
   aiBubble: {
@@ -584,7 +640,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#2E7D32',
+    backgroundColor: '#067A4F',
     alignItems: 'center',
     justifyContent: 'center',
   },

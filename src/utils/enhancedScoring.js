@@ -1,4 +1,4 @@
-// Enhanced Health Scoring System v2
+﻿// Enhanced Health Scoring System v2
 // Research-grade scoring: Nutrition 55% + Ingredients 30% + Processing 10% + Positive Nutrients 5%
 // Starts at 100 and subtracts penalties — harder to manipulate
 
@@ -210,30 +210,35 @@ const calculateProcessingScore = (product) => {
   wholeFoodMarkers.forEach(m => { if (ingredients.includes(m) || productName.includes(m)) wholeCount++; });
   minimalProcessMarkers.forEach(m => { if (ingredients.includes(m)) minimalCount++; });
   
-  let score;
+  // Continuous score (not a fixed 4-value bucket): start at 100, subtract per
+  // ultra-processed marker actually found and per ingredient beyond a
+  // reasonable whole-food length, add back for whole/minimal markers found —
+  // so two products with different ingredient lists get different numbers.
+  let score = 100;
+  score -= ultraCount * 12;
+  score -= Math.max(0, ingredientCount - 5) * 2;
+  score += Math.min(10, wholeCount * 5);
+  score += Math.min(6, minimalCount * 3);
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
   let novaClass;
-  
-  if (wholeCount >= 2 && ultraCount === 0 && ingredientCount <= 3) {
-    score = 100;
+  if (score >= 85) {
     novaClass = 'Whole food';
     reasons.push({ text: 'Whole food (minimal ingredients)', type: 'bonus', impact: 0 });
-  } else if (ultraCount === 0 && ingredientCount <= 5 && (minimalCount > 0 || wholeCount > 0)) {
-    score = 80;
+  } else if (score >= 65) {
     novaClass = 'Minimally processed';
     reasons.push({ text: 'Minimally processed food', type: 'bonus', impact: 0 });
-  } else if (ultraCount <= 1 && ingredientCount <= 10) {
-    score = 50;
+  } else if (score >= 35) {
     novaClass = 'Processed';
-    reasons.push({ text: 'Processed food', type: 'penalty', impact: -50 });
+    reasons.push({ text: 'Processed food', type: 'penalty', impact: score - 100 });
   } else {
-    score = 20;
     novaClass = 'Ultra-processed';
     const markers = [];
     if (ultraCount >= 3) markers.push(`${ultraCount} ultra-processed additives`);
     if (ingredientCount > 8) markers.push(`${ingredientCount} ingredients`);
-    reasons.push({ text: `Ultra-processed${markers.length ? ' — ' + markers.join(', ') : ''}`, type: 'penalty', impact: -80 });
+    reasons.push({ text: `Ultra-processed${markers.length ? ' — ' + markers.join(', ') : ''}`, type: 'penalty', impact: score - 100 });
   }
-  
+
   return { score, novaClass, reasons };
 };
 
@@ -697,8 +702,8 @@ const getScoreGrade = (score) => {
 
 // Get score color (Updated Color Scheme)
 const getScoreColor = (score) => {
-  if (score >= 90) return '#1B5E20';  // Very Dark Green - Excellent
-  if (score >= 70) return '#4CAF50';  // Green - Good (was Medium/Orange)
+  if (score >= 90) return '#067A4F';  // Very Dark Green - Excellent
+  if (score >= 70) return '#067A4F';  // Green - Good (was Medium/Orange)
   if (score >= 50) return '#FF9800';  // Orange - Average (was Good)
   if (score >= 25) return '#FF5722';  // Red-orange - Poor
   return '#F44336';                   // Red - Very Poor

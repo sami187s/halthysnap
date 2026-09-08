@@ -11,35 +11,31 @@ import {
   Image,
   Alert,
   Platform,
-  LayoutAnimation,
-  UIManager,
   Dimensions,
-  TextInput,
-  Share,
   FlatList,
+  Modal,
 } from 'react-native';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle as SvgCircle } from 'react-native-svg';
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
 import { useFocusEffect } from '@react-navigation/native';
-import ScreenWrapper from '../components/shared/ScreenWrapper';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
-import LuxuryLoadingComponent from '../components/LuxuryLoadingComponent';
 import { fetchProductByBarcode } from '../services/reliableAPI';
 import { analyzeIngredients } from '../utils/enhancedIngredientAnalyzer';
 import { AIService } from '../services/aiService';
 import ProductAIChat from '../components/ProductAIChat';
-import IngredientDNAHelix from '../components/IngredientDNAHelix';
+import ShareScoreSheet from '../components/ShareScoreSheet';
+import { AI_CHAT_ENABLED } from '../config/featureFlags';
 import { saveToHistory } from '../utils/historyManager';
+import { checkAndConsume } from '../utils/scanQuota';
+import { isProductSaved, toggleSavedProduct } from '../utils/curatedProducts';
 import { getFreeRecommendationUsage, useFreeRecommendation } from '../utils/dailyReset';
 import { getIngredientInfo } from '../services/usdaAPI';
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import axios from 'axios';
 
 const { width: W } = Dimensions.get('window');
@@ -57,29 +53,41 @@ const CosmeticAltImg = React.memo(({ uri, imgStyle }) => {
 });
 
 // -- Light Wellness Palette (Purely-aligned) --
-const BG             = '#FBFBF9';
-const SURFACE        = 'rgba(251,251,249,0.92)';
+const BG             = '#FFFFFF';
 const SURFACE_LOW    = '#FFFFFF';
 const SURFACE_HIGH   = '#F5F5F1';
 const OUTLINE        = '#D9D9D4';
 const ON_SURFACE     = '#171717';
 const ON_SURFACE_VAR = '#737373';
 const WHITE          = '#FFFFFF';
-const PRIMARY        = '#067A4F';
+const PRIMARY        = '#27a567';
 const GOOD_C         = '#84CC16';
-const ERROR_C        = '#EF4444';
-const WARNING_C      = '#F59E0B';
+const ERROR_C        = '#e74c3c';
+const WARNING_C      = '#f5a623';
+const AMBER_600      = '#d97706';
+// Matches ResultsScreenV2 (food) exactly — keeps card borders/dividers/captions identical across both screens.
+const NEUTRAL_100    = '#f5f5f5';
+const NEUTRAL_300    = '#d4d4d4';
+const NEUTRAL_400    = '#a3a3a3';
+const NEUTRAL_800    = '#262626';
+const TRACK_BG       = '#f1f1f1';
 
-// -- Gauge constants --
-const GAUGE_R    = 72;
+// Ingredient "function" values that read as additives (preservatives, dyes,
+// surfactants, etc.) rather than active/beneficial skincare ingredients.
+const ADDITIVE_FUNCTIONS = new Set([
+  'preservative', 'surfactant', 'fragrance', 'colorant', 'emulsifier',
+  'silicone', 'ph_adjuster', 'chelating', 'thickener', 'stabilizer',
+]);
+
+// -- Gauge constants (matches food ResultsScreenV2 exactly) --
+const GAUGE_R    = 52;
 const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 
 // Purely-style 4-band score scale — aligned with ScoreRing.getScoreBand
 // so score colors agree across every screen.
 const getScoreColor = (sc) => {
   if (sc >= 75) return PRIMARY;
-  if (sc >= 50) return GOOD_C;
-  if (sc >= 25) return WARNING_C;
+  if (sc >= 50) return WARNING_C;
   return ERROR_C;
 };
 
@@ -93,20 +101,20 @@ const getVerdict = (sc) => {
 
 // -- VEE COLOR PALETTE (Purely-aligned) --
 const C = {
-  greenDark: '#067A4F',
-  green: '#067A4F',
-  greenMid: '#067A4F',
-  greenLight: 'rgba(6,122,79,0.08)',
-  greenBg: 'rgba(6,122,79,0.08)',
-  greenBr: 'rgba(6,122,79,0.22)',
-  amber: '#F59E0B',
-  amberLight: 'rgba(245,158,11,0.10)',
-  amberBg: 'rgba(245,158,11,0.10)',
-  amberBr: 'rgba(245,158,11,0.22)',
-  red: '#EF4444',
-  redLight: 'rgba(239,68,68,0.10)',
-  redBg: 'rgba(239,68,68,0.10)',
-  redBr: 'rgba(239,68,68,0.22)',
+  greenDark: '#27a567',
+  green: '#27a567',
+  greenMid: '#27a567',
+  greenLight: 'rgba(39,165,103,0.08)',
+  greenBg: 'rgba(39,165,103,0.08)',
+  greenBr: 'rgba(39,165,103,0.22)',
+  amber: '#f5a623',
+  amberLight: 'rgba(245,166,35,0.10)',
+  amberBg: 'rgba(245,166,35,0.10)',
+  amberBr: 'rgba(245,166,35,0.22)',
+  red: '#e74c3c',
+  redLight: 'rgba(231,76,60,0.10)',
+  redBg: 'rgba(231,76,60,0.10)',
+  redBr: 'rgba(231,76,60,0.22)',
   purple: '#7B61FF',
   purpleBg: 'rgba(123,97,255,.09)',
   text: '#171717',
@@ -120,23 +128,6 @@ const C = {
   sep: 'rgba(0,0,0,0.06)',
   sep2: 'rgba(0,0,0,0.08)',
   page: '#FFFFFF',
-};
-
-// Score/rating label color mirrors the same 4-band scale as getScoreColor.
-const scoreToColor = (s) => getScoreColor(s);
-const scoreToLabel = (s) => s >= 85 ? 'Excellent' : s >= 70 ? 'Good' : s >= 50 ? 'Use with Caution' : s >= 30 ? 'Poor' : 'Risky';
-const scoreToVerdictBg = (s) => {
-  if (s >= 75) return { bg: 'rgba(6,122,79,0.10)', border: 'rgba(6,122,79,0.25)' };
-  if (s >= 50) return { bg: 'rgba(132,204,22,0.14)', border: 'rgba(132,204,22,0.3)' };
-  if (s >= 25) return { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)' };
-  return { bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)' };
-};
-const scoreToDesc = (s, analysis) => {
-  const bad = analysis?.badCount || analysis?.badIngredients?.length || 0;
-  const good = (analysis?.excellentCount || 0) + (analysis?.goodCount || analysis?.goodIngredients?.length || 0);
-  if (s >= 70) return `Generally safe product with ${good} beneficial ingredients. Suitable for most skin types.`;
-  if (s >= 40) return `Contains ${bad} concern${bad !== 1 ? 's' : ''} alongside beneficial actives. Some ingredients may cause reactions in sensitive skin.`;
-  return `Multiple concerning ingredients detected. Consider alternatives if you have sensitive skin.`;
 };
 
 // -- AI DAILY LIMIT --
@@ -164,41 +155,6 @@ const incrementAIDailyUsage = async () => {
 };
 
 // -- INGREDIENT HELPERS --
-const getIngIcon = (n) => {
-  const l = n.toLowerCase();
-  if (l.includes('water') || l.includes('aqua'))                                       return 'water';
-  if (l.includes('glycerin') || l.includes('hyaluronic') || l.includes('sorbitol') ||
-      l.includes('betaine') || l.includes('panthenol'))                                return 'rainy';
-  if (l.includes('oil') || l.includes('butter') || l.includes('squalane') ||
-      l.includes('jojoba') || l.includes('argan') || l.includes('shea'))               return 'drop';
-  if (l.includes('extract') || l.includes('aloe') || l.includes('botanical') ||
-      l.includes('chamomil') || l.includes('green tea') || l.includes('calendula'))    return 'leaf';
-  if (l.includes('vitamin') || l.includes('tocopherol') || l.includes('retinol') ||
-      l.includes('niacinamide') || l.includes('ascorbic') || l.includes('coenzyme'))   return 'medical';
-  if (l.includes('sunscreen') || l.includes('spf') || l.includes('avobenzone') ||
-      l.includes('oxybenzone') || l.includes('octinoxate'))                             return 'sunny';
-  if (l.includes('zinc oxide') || l.includes('titanium') || l.includes('mica') ||
-      l.includes('silica') || l.includes('bismuth'))                                    return 'diamond';
-  if (l.includes('fragrance') || l.includes('parfum') || l.includes('linalool') ||
-      l.includes('limonene') || l.includes('geraniol'))                                 return 'sparkles';
-  if (l.includes('dimethicone') || l.includes('siloxane') || l.includes('silicone') ||
-      l.includes('cyclomethicone'))                                                      return 'layers';
-  if (l.includes('cetearyl') || l.includes('stearate') || l.includes('laureth') ||
-      l.includes('polysorbate') || l.includes('emulsif'))                               return 'git-merge';
-  if (l.includes('acid') || l.includes('glycolic') || l.includes('salicylic') ||
-      l.includes('lactic') || l.includes('mandelic') || l.includes('azelaic'))          return 'flask';
-  if (l.includes('paraben') || l.includes('phenoxyethanol') || l.includes('preserv') ||
-      l.includes('methylisothiazolinone'))                                               return 'shield-checkmark';
-  if (l.includes('sulfate') || l.includes('sulphate') || l.includes('sls') ||
-      l.includes('sles'))                                                                return 'warning';
-  if (l.includes('color') || l.includes('colour') || l.includes('dye') ||
-      l.includes('pigment') || l.includes('ci '))                                       return 'color-palette';
-  if (l.includes('alcohol') || l.includes('ethanol'))                                   return 'wine';
-  if (l.includes('peptide') || l.includes('collagen') || l.includes('keratin') ||
-      l.includes('protein') || l.includes('amino'))                                     return 'fitness';
-  return 'nutrition';
-};
-
 const getShortDesc = (n) => {
   const l = n.toLowerCase();
   const db = {
@@ -264,89 +220,26 @@ const getShortDesc = (n) => {
   return null;
 };
 
-const getDetailedExplanation = (name) => {
-  const l = name.toLowerCase().trim();
-  const db = {
-    'water': 'Water (Aqua) is the most common base ingredient in cosmetics. It dissolves other ingredients and helps deliver them to the skin.',
-    'aqua': 'Aqua is the INCI name for water, used as a base in most cosmetic formulations.',
-    'glycerin': 'Glycerin is a humectant that draws moisture from the air into your skin. It strengthens the skin barrier and is well-tolerated by all skin types.',
-    'hyaluronic acid': 'Hyaluronic acid holds up to 1000x its weight in water. It deeply hydrates, plumps fine lines, and supports the skin barrier.',
-    'niacinamide': 'Vitamin B3 that reduces pore size, regulates oil production, fades dark spots, and strengthens the skin barrier.',
-    'dimethicone': 'A silicone that creates a protective barrier on skin, locking in moisture. Non-comedogenic and hypoallergenic.',
-    'retinol': 'Vitamin A derivative that accelerates cell turnover, stimulates collagen, and targets wrinkles. Can cause initial irritation.',
-    'fragrance': 'Synthetic fragrance can contain dozens of undisclosed chemicals. One of the most common causes of contact dermatitis.',
-    'parfum': 'INCI term for fragrance. May contain allergens like linalool or limonene. Sensitive skin should avoid.',
-    'phenoxyethanol': 'Widely used preservative considered safer than parabens. Generally well-tolerated at concentrations under 1%.',
-    'methylparaben': 'A preservative that mimics estrogen. While studies are inconclusive, many brands prefer paraben-free options.',
-    'sodium lauryl sulfate': 'A harsh surfactant that can strip natural oils and cause irritation. Better alternatives exist.',
-    'salicylic acid': 'A BHA that penetrates pores to dissolve oil and dead skin. Excellent for acne-prone skin.',
-    'glycolic acid': 'An AHA that exfoliates dead skin cells, improves texture, and boosts collagen.',
-    'zinc oxide': 'A mineral UV filter providing broad-spectrum sun protection. Also anti-inflammatory.',
-    'ceramides': 'Lipids naturally found in the skin barrier. They prevent moisture loss and protect against environmental damage.',
-    'aloe vera': 'Rich in vitamins and minerals. Known for soothing, anti-inflammatory, and healing properties.',
-    'shea butter': 'Rich emollient high in fatty acids and vitamins. Intensely moisturizes and protects dry skin.',
-    'panthenol': 'Pro-vitamin B5 that deeply moisturizes, promotes wound healing, and reduces inflammation.',
-    'tocopherol': 'Natural Vitamin E. Provides antioxidant protection and helps preserve formulations.',
-    'alcohol denat': 'Denatured alcohol evaporates quickly but can dry out and irritate skin with prolonged use.',
-    'propylparaben': 'Paraben preservative with higher estrogenic activity. Consider paraben-free alternatives.',
-    'formaldehyde': 'Known carcinogen used as preservative. Can cause allergic reactions and respiratory issues. Banned in many countries.',
-  };
-  if (db[l]) return db[l];
-  for (const [k, v] of Object.entries(db)) { if (l.includes(k) || k.includes(l)) return v; }
-  return `${name} is a cosmetic ingredient. Check product packaging or consult a dermatologist for more information.`;
-};
-
-// -- SKIN TYPE DATA (generated from analysis) --
-const getSkinTypes = (analysis) => {
-  const score = analysis?.score || 50;
-  const hasBadIng = (analysis?.badCount || 0) > 0;
-  const hasFragrance = analysis?.analyzedIngredients?.some(i => 
-    i.name?.toLowerCase().includes('fragrance') || i.name?.toLowerCase().includes('parfum')
-  );
-  return [
-    { name: 'Normal', compat: score >= 60 ? 'Great fit' : 'Caution', level: score >= 60 ? 'ok' : 'warn', icon: 'checkmark' },
-    { name: 'Dry', compat: score >= 50 ? 'Great fit' : 'Caution', level: score >= 50 ? 'ok' : 'warn', icon: 'checkmark' },
-    { name: 'Oily', compat: score >= 65 ? 'Great fit' : 'Caution', level: score >= 65 ? 'ok' : 'warn', icon: 'alert' },
-    { name: 'Combination', compat: score >= 60 ? 'OK' : 'Caution', level: score >= 60 ? 'ok' : 'warn', icon: 'alert' },
-    { name: 'Sensitive', compat: hasBadIng || hasFragrance ? 'Avoid' : score >= 70 ? 'OK' : 'Caution', level: hasBadIng || hasFragrance ? 'bad' : score >= 70 ? 'ok' : 'warn', icon: hasBadIng ? 'shield' : 'alert' },
-    { name: 'Acne-prone', compat: score >= 65 ? 'OK' : 'Caution', level: score >= 65 ? 'ok' : 'warn', icon: 'alert' },
-  ];
-};
-
-// -- SAFETY RATINGS (generated from analysis) --
-const getSafetyRatings = (analysis) => {
-  const score = analysis?.score || 50;
-  const bad = analysis?.badCount || 0;
-  const excellent = analysis?.excellentCount || 0;
-  return [
-    { name: 'Ingredient Safety', value: Math.min(10, Math.round(score / 10)), icon: 'flask-outline', color: score >= 70 ? 'g' : score >= 40 ? 'a' : 'r' },
-    { name: 'Allergen Risk', value: Math.min(10, bad >= 3 ? 7 : bad >= 1 ? 5 : 2), icon: 'alert-circle-outline', color: bad >= 3 ? 'r' : bad >= 1 ? 'a' : 'g', invert: true },
-    { name: 'Skin Nourishment', value: Math.min(10, excellent >= 5 ? 9 : excellent >= 3 ? 7 : 5), icon: 'heart-outline', color: excellent >= 3 ? 'g' : 'a' },
-    { name: 'Hydration Score', value: Math.min(10, score >= 70 ? 9 : score >= 50 ? 6 : 4), icon: 'water-outline', color: score >= 60 ? 'g' : 'a' },
-    { name: 'Irritation Potential', value: Math.min(10, bad >= 3 ? 8 : bad >= 1 ? 5 : 2), icon: 'eye-outline', color: bad >= 3 ? 'r' : bad >= 1 ? 'a' : 'g', invert: true },
-  ];
-};
-
 // -- Score Gauge ------------------------------------------------------
-const ScoreGauge = ({ score, scoreColor }) => {
+const ScoreGauge = ({ score, scoreColor, verdict }) => {
   const anim = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(anim, { toValue: 1, duration: 1100, useNativeDriver: false }).start();
+    Animated.timing(anim, { toValue: 1, duration: 1000, useNativeDriver: false }).start();
   }, [score]);
   const dashOffset = anim.interpolate({
     inputRange: [0, 1],
     outputRange: [GAUGE_CIRC, GAUGE_CIRC - (GAUGE_CIRC * score) / 100],
   });
-  const SIZE = 190;
+  const SIZE = 120;
   const CX   = SIZE / 2;
   return (
     <View style={g.container}>
       <View style={g.gaugeBg} />
       <Svg width={SIZE} height={SIZE} style={{ position: 'absolute', transform: [{ rotate: '-90deg' }] }}>
-        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={SURFACE_HIGH} strokeWidth={9} fill="transparent" />
+        <SvgCircle cx={CX} cy={CX} r={GAUGE_R} stroke={TRACK_BG} strokeWidth={10} fill="transparent" />
         <AnimatedSvgCircle
           cx={CX} cy={CX} r={GAUGE_R}
-          stroke={scoreColor} strokeWidth={9}
+          stroke={scoreColor} strokeWidth={10}
           fill="transparent"
           strokeDasharray={GAUGE_CIRC}
           strokeDashoffset={dashOffset}
@@ -355,7 +248,7 @@ const ScoreGauge = ({ score, scoreColor }) => {
       </Svg>
       <View style={g.center}>
         <Text style={[g.scoreNum, { color: scoreColor }]}>{score}</Text>
-        <Text style={g.scoreDenom}>/100</Text>
+        <Text style={[g.scoreVerdict, { color: scoreColor }]}>{verdict}</Text>
       </View>
     </View>
   );
@@ -381,26 +274,21 @@ export default function CosmeticResultsScreen({ route, navigation }) {
   const [premiumLoading, setPremiumLoading] = useState(true);
   const [aiAnalysis, setAiAnalysis] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
-  const [additiveAnalysis, setAdditiveAnalysis] = useState(null);
   const [showAIChat, setShowAIChat] = useState(false);
-  const [expandedIngId, setExpandedIngId] = useState(null);
   const [aiDailyUsage, setAiDailyUsage] = useState({ used: 0, remaining: AI_DAILY_LIMIT });
   const [freeRecUsage, setFreeRecUsage] = useState({ remaining: 2, total: 2 });
-  const [openAccordions, setOpenAccordions] = useState({});
-  const [askText, setAskText] = useState('');
   const [realAlternatives, setRealAlternatives] = useState([]);
   const [altsLoading, setAltsLoading] = useState(false);
-  const [showAllIngredients, setShowAllIngredients] = useState(false);
   const [expandedIngredient, setExpandedIngredient] = useState(null);
   const [usdaCache, setUsdaCache]                   = useState({});
   const [usdaLoading, setUsdaLoading]               = useState(null);
-  const containerFade = useRef(new Animated.Value(0)).current;
-  const ringAnim = useRef(new Animated.Value(0)).current;
+  const [activeTab, setActiveTab] = useState('ingredients'); // 'ingredients' | 'additives'
+  const [showWhyRating, setShowWhyRating] = useState(false);
+  const [showShareSheet, setShowShareSheet] = useState(false);
+  const [isSaved, setIsSaved] = useState(false);
+  const whySheetY = useRef(new Animated.Value(420)).current;
+  const ingSheetY = useRef(new Animated.Value(420)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const bar1Anim = useRef(new Animated.Value(0)).current;
-  const bar2Anim = useRef(new Animated.Value(0)).current;
-  const bar3Anim = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef(null);
 
   // -- DATA FETCH --
   useEffect(() => {
@@ -409,7 +297,6 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       setAnalysis(devAnalysis);
       setLoading(false);
       setPremiumLoading(false);
-      Animated.timing(containerFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
       checkSubscriptionStatus();
     } else if (skipFetch && preloadedData) {
       // Elite product: use hardcoded data, skip all API calls
@@ -426,7 +313,6 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       setAnalysis(stubAnalysis);
       setLoading(false);
       setPremiumLoading(false);
-      Animated.timing(containerFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
       checkSubscriptionStatus();
     } else {
       fetchProductData();
@@ -460,6 +346,12 @@ export default function CosmeticResultsScreen({ route, navigation }) {
         navigation.replace('ProductNotFound', { barcode, productType: 'cosmetic' });
         return;
       }
+      // Free-tier daily scan quota — a found product counts; block at the limit.
+      const quota = await checkAndConsume('cosmetic', barcode);
+      if (quota.blocked) {
+        navigation.replace('Subscription', { reason: 'limit' });
+        return;
+      }
       setProduct(productData);
       const ingredients = productData.ingredients_text || '';
       let analysisResult = ingredients
@@ -470,18 +362,14 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       setAnalysis(analysisResult);
       setLoading(false);
 
-      const sub = await AsyncStorage.getItem('subscriptionType');
-      const exp = await AsyncStorage.getItem('subscriptionExpiresAt');
-      const hasActivePremium = sub === 'Premium' && (!exp || new Date(parseInt(exp, 10)) > new Date());
-      if (hasActivePremium) {
-        await saveToHistory({
-          barcode, productName: productData.product_name, productImage: productData.image_url,
-          productType: 'cosmetic', score: analysisResult.score,
-          ingredients: productData.ingredients_text || '', source: productData.source || 'Unknown'
-        });
-      }
+      await saveToHistory({
+        barcode, productName: productData.product_name, brand: productData.brands || '',
+        productImage: productData.image_url,
+        productType: 'cosmetic', score: analysisResult.score,
+        ingredients: productData.ingredients_text || '', source: productData.source || 'Unknown'
+      });
+      isProductSaved(barcode).then(setIsSaved);
       await incrementTrialCounter();
-      Animated.timing(containerFade, { toValue: 1, duration: 300, useNativeDriver: true }).start();
     } catch (err) {
       setError('Failed to analyze product. Please try again.');
       setLoading(false);
@@ -683,8 +571,6 @@ export default function CosmeticResultsScreen({ route, navigation }) {
               setAnalysis(prev => ({ ...enh, missingIngredientsDetected: newIng, originalIngredientCount: ingredients.length, totalIngredients: updated.length, aiEnhanced: true }));
             }
           }
-          const additiveResult = await AIService.analyzeAdditives(product, ingredients);
-          setAdditiveAnalysis(additiveResult);
         } catch (e) {}
       }, 100);
     } catch (e) {
@@ -696,72 +582,18 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     if (product && analysis && !loading) { checkSubscriptionStatus(); }
   }, [product, analysis, loading]);
 
-  // Animate score ring + bars
+  // Fade in once the product + analysis are ready (matches food ResultsScreenV2)
   useEffect(() => {
-    if (analysis) {
-      Animated.timing(ringAnim, { toValue: analysis.score || 50, duration: 1400, delay: 300, useNativeDriver: false }).start();
-    }
     if (!loading && product && analysis) {
       Animated.timing(fadeAnim, { toValue: 1, duration: 400, useNativeDriver: true }).start();
-      Animated.stagger(120, [
-        Animated.timing(bar1Anim, { toValue: 1, duration: 600, useNativeDriver: false }),
-        Animated.timing(bar2Anim, { toValue: 1, duration: 600, useNativeDriver: false }),
-        Animated.timing(bar3Anim, { toValue: 1, duration: 600, useNativeDriver: false }),
-      ]).start();
     }
   }, [analysis, loading, product]);
-
-  // -- INGREDIENT ANALYSIS --
-  const analyzeIng = useCallback((ingredient, analysis) => {
-    const l = ingredient.toLowerCase().trim();
-    // Normalize: strip parenthetical content, numbers, extra whitespace
-    const norm = l.replace(/\(.*?\)/g, '').replace(/\[.*?\]/g, '').replace(/\d+%?/g, '').trim();
-
-    // Try matching by exact name OR normalized name
-    const existing = analysis.analyzedIngredients?.find(i => {
-      const n = (i.name || '').toLowerCase().trim();
-      return n === l || n === norm || l.includes(n) || n.includes(norm);
-    });
-    if (existing && !existing.isUnknown) {
-      if (existing.score >= 90) return { status: 'EXCELLENT', color: '#067A4F' };
-      if (existing.score >= 75) return { status: 'GOOD', color: C.green };
-      if (existing.score >= 45) return { status: 'MODERATE', color: C.amber };
-      return { status: 'POOR', color: C.red };
-    }
-
-    // Check categorized lists with fuzzy matching
-    const fuzzyFind = (list) => list?.find(i => {
-      const n = (i.name || '').toLowerCase().trim();
-      return n === l || n === norm || l.includes(n) || n.includes(norm);
-    });
-    if (fuzzyFind(analysis.goodIngredients)) return { status: 'GOOD', color: C.green };
-    if (fuzzyFind(analysis.moderateIngredients)) return { status: 'MODERATE', color: C.amber };
-    if (fuzzyFind(analysis.badIngredients)) return { status: 'POOR', color: C.red };
-
-    // Pattern-based fallback for common cosmetic ingredients
-    const excellentPatterns = ['water', 'aqua', 'glycerin', 'hyaluronic acid', 'aloe', 'shea butter', 'vitamin c', 'vitamin e', 'niacinamide', 'ceramide', 'panthenol', 'jojoba', 'argan', 'tocopherol', 'squalane', 'allantoin', 'centella'];
-    const badPatterns = ['paraben', 'formaldehyde', 'triclosan', 'phthalate', 'sodium lauryl sulfate', 'sls', 'bha', 'bht', 'dea', 'mea', 'toluene', 'coal tar', 'hydroquinone'];
-    const moderatePatterns = ['fragrance', 'parfum', 'phenoxyethanol', 'alcohol denat', 'silicone', 'dimethicone', 'peg-', 'sodium laureth', 'ceteareth', 'edta', 'propylene glycol'];
-
-    if (badPatterns.some(p => norm.includes(p))) return { status: 'POOR', color: C.red };
-    if (excellentPatterns.some(p => norm.includes(p))) return { status: 'GOOD', color: C.green };
-    if (moderatePatterns.some(p => norm.includes(p))) return { status: 'MODERATE', color: C.amber };
-
-    // Default to MODERATE instead of UNKNOWN for better UX
-    return { status: 'MODERATE', color: C.amber };
-  }, []);
-
-  const toggleExpand = (id) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedIngId(prev => prev === id ? null : id);
-  };
 
   const handleGoBack = useCallback(() => navigation.goBack(), [navigation]);
   const handleScanAnother = useCallback(() => navigation.navigate('Home', { startScanning: true }), [navigation]);
 
   const handleIngredientTap = async (ing) => {
     const key = (ing.name || '').toLowerCase().trim();
-    if (expandedIngredient === key) { setExpandedIngredient(null); return; }
     setExpandedIngredient(key);
     if (usdaCache[key]) return;
     setUsdaLoading(key);
@@ -775,279 +607,83 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     }
   };
 
+  useEffect(() => {
+    if (expandedIngredient) {
+      ingSheetY.setValue(420);
+      Animated.spring(ingSheetY, { toValue: 0, damping: 30, stiffness: 300, useNativeDriver: true }).start();
+    }
+  }, [expandedIngredient]);
+
+  const closeIngredientSheet = () => {
+    Animated.timing(ingSheetY, { toValue: 420, duration: 200, useNativeDriver: true }).start(() => {
+      setExpandedIngredient(null);
+    });
+  };
+
+  const openWhySheet = () => {
+    setShowWhyRating(true);
+    whySheetY.setValue(420);
+    Animated.spring(whySheetY, { toValue: 0, damping: 30, stiffness: 300, useNativeDriver: true }).start();
+  };
+  const closeWhySheet = () => {
+    Animated.timing(whySheetY, { toValue: 420, duration: 200, useNativeDriver: true }).start(() => {
+      setShowWhyRating(false);
+    });
+  };
+
   const score = useMemo(() => analysis?.score || 50, [analysis?.score]);
   const scoreColor = useMemo(() => getScoreColor(score), [score]);
-  const sLabel = useMemo(() => scoreToLabel(score), [score]);
 
   // Ingredient lists from analyzer
   const analyzedList = useMemo(() => analysis?.analyzedIngredients || [], [analysis]);
   const badIngs = useMemo(() => analyzedList.filter(i => (i.status || '').toUpperCase() === 'POOR' || (i.category || '').toLowerCase() === 'bad' || (i.score != null && i.score < 45)), [analyzedList]);
   const moderateIngs = useMemo(() => analyzedList.filter(i => (i.status || '').toUpperCase() === 'MODERATE' || (i.category || '').toLowerCase() === 'moderate' || (i.category || '').toLowerCase() === 'unknown' || (i.score != null && i.score >= 45 && i.score < 70)), [analyzedList]);
   const goodIngs = useMemo(() => analyzedList.filter(i => { const s = (i.status || '').toUpperCase(); const c = (i.category || '').toLowerCase(); return s === 'GOOD' || s === 'EXCELLENT' || c === 'good' || c === 'excellent' || (i.score != null && i.score >= 70 && s !== 'POOR' && s !== 'MODERATE' && c !== 'bad' && c !== 'moderate'); }), [analyzedList]);
-
-  // DNA helix ingredient data � always show, fallback to raw ingredient names
-  const dnaIngredients = useMemo(() => {
-    if (analyzedList.length > 0) {
-      return analyzedList.slice(0, 12).map(ing => {
-        const s = (ing.status || '').toUpperCase();
-        const c = (ing.category || '').toLowerCase();
-        const sc = ing.score ?? 100;
-        const isBad = s === 'POOR' || c === 'bad' || sc < 45;
-        const isModerate = s === 'MODERATE' || c === 'moderate' || c === 'unknown' || (sc >= 45 && sc < 70);
-        return {
-          name: ing.name || '',
-          type: isBad ? 'bad' : isModerate ? 'warn' : 'good',
-        };
-      });
-    }
-    // Fallback: use raw ingredient names when analyzedList is empty
-    const raw = (product?.ingredients_text || '').split(/,|;/).map(s => s.trim()).filter(Boolean);
-    return raw.slice(0, 12).map(name => ({ name, type: 'warn' }));
-  }, [analyzedList, product]);
-
-  const safetyRatings = useMemo(() => getSafetyRatings(analysis), [analysis]);
-  const skinTypes = useMemo(() => getSkinTypes(analysis), [analysis]);
-
-  // Allergens & warnings � scan raw ingredient names + analyzer results
-  const warnings = useMemo(() => {
-    if (!analysis) return [];
-    const w = [];
-    const seen = new Set();
-
-    // 1. Flagged bad ingredients from analyzer
-    const bad = analysis.badIngredients || [];
-    bad.forEach(i => {
-      const key = (i.name || '').toLowerCase();
-      if (!seen.has(key)) {
-        seen.add(key);
-        w.push({ name: i.name, sub: i.concerns || i.notes || 'Potential concern detected', badge: 'FLAGGED', color: C.red });
-      }
-    });
-
-    // 2. Scan ALL analyzed ingredients for known allergen/irritant keywords
-    const allergenKeywords = ['fragrance', 'parfum', 'paraben', 'methylparaben', 'propylparaben', 'butylparaben', 'formaldehyde', 'phthalate', 'triclosan', 'sodium lauryl sulfate', 'coal tar', 'hydroquinone', 'toluene', 'oxybenzone'];
-    const allIngs = analysis.analyzedIngredients || [];
-    allIngs.forEach(i => {
-      const l = (i.name || '').toLowerCase();
-      if (seen.has(l)) return;
-      const matchedKeyword = allergenKeywords.find(kw => l.includes(kw));
-      if (matchedKeyword) {
-        seen.add(l);
-        w.push({ name: i.name, sub: `Contains ${matchedKeyword} � common allergen/irritant`, badge: 'ALLERGEN', color: C.red });
-      }
-    });
-
-    // 3. Also scan raw ingredient text for keywords the analyzer might have missed
-    const rawIngs = (product?.ingredients_text || '').toLowerCase();
-    allergenKeywords.forEach(kw => {
-      if (!seen.has(kw) && rawIngs.includes(kw)) {
-        seen.add(kw);
-        w.push({ name: kw.charAt(0).toUpperCase() + kw.slice(1), sub: `Detected in ingredients list � potential irritant`, badge: 'ALLERGEN', color: C.red });
-      }
-    });
-
-    // 4. Add moderate concern items
-    const mod = analysis.moderateIngredients || [];
-    mod.forEach(i => {
-      const l = (i.name || '').toLowerCase();
-      if (!seen.has(l) && (l.includes('alcohol') || l.includes('sulfate') || l.includes('peg-'))) {
-        seen.add(l);
-        w.push({ name: i.name, sub: i.concerns || 'May cause mild irritation', badge: 'CAUTION', color: C.amber });
-      }
-    });
-
-    if (w.length === 0) w.push({ name: 'No Major Concerns', sub: 'This product appears generally safe for most skin types', badge: 'OK', color: C.green });
-    return w;
-  }, [analysis, product]);
-
-  const ingredientsList = useMemo(() => {
-    if (!product?.ingredients_text) return [];
-    return product.ingredients_text.toLowerCase().split(/[,;.]/).map(i => i.trim()).filter(i => i.length > 2);
-  }, [product]);
-
-  // "What Should I Do?" action cards
-  const wsdActions = useMemo(() => {
-    if (hasAIAccess && aiAnalysis?.recommendations?.length > 0) {
-      const iconSets = [
-        { icon: 'refresh-outline', iconBg: C.greenLight, iconColor: C.green },
-        { icon: 'cart-outline', iconBg: C.amberLight, iconColor: C.amber },
-        { icon: 'pricetag-outline', iconBg: C.redLight, iconColor: C.red },
-      ];
-      return aiAnalysis.recommendations.slice(0, 3).map((rec, i) => ({
-        ...iconSets[i % iconSets.length],
-        title: rec.length > 45 ? rec.slice(0, 43) + '\u2026' : rec,
-        desc: '',
-      }));
-    }
-    // Infer cosmetic category for personalised recommendations
-    const _pName = (product?.product_name || '').toLowerCase();
-    const _cats = (Array.isArray(product?.categories_tags)
-      ? product.categories_tags.join(' ')
-      : String(product?.categories || ''))
-      .toLowerCase();
-    const _all = _pName + ' ' + _cats;
-    const _cat = _all.match(/moisturiz|cream|lotion|hydrat/) ? 'moisturizer'
-      : _all.match(/shampoo/) ? 'shampoo'
-      : _all.match(/conditioner/) ? 'conditioner'
-      : _all.match(/serum|essence|ampoule/) ? 'serum'
-      : _all.match(/sunscreen|spf|sun\s?block/) ? 'sunscreen'
-      : _all.match(/cleanse|wash|foam|micellar/) ? 'cleanser'
-      : _all.match(/mask|masque|peel/) ? 'face mask'
-      : _all.match(/toner|astringent/) ? 'toner'
-      : _all.match(/deodorant|antiperspirant/) ? 'deodorant'
-      : _all.match(/body\s?wash|shower\s?gel|soap/) ? 'body wash'
-      : _all.match(/lipstick|lip\s?balm|lip\s?gloss/) ? 'lip product'
-      : _all.match(/foundation|concealer/) ? 'foundation'
-      : 'skincare product';
-    const _displayName = product?.product_name
-      ? product.product_name.length > 28
-        ? product.product_name.slice(0, 26) + '�'
-        : product.product_name
-      : 'This product';
-    const actions = [];
-    if (score < 70 || badIngs.length > 0) {
-      actions.push({
-        icon: 'refresh-outline', iconBg: C.greenLight, iconColor: C.green,
-        title: `Find a Cleaner ${_cat.charAt(0).toUpperCase() + _cat.slice(1)}`,
-        desc: badIngs.length > 0
-          ? `Try a ${_cat} without ${badIngs[0]?.name || 'harsh ingredients'} for safer use.`
-          : `Look for a ${_cat} with a higher safety score and gentler formula.`,
-      });
-    }
-    actions.push({
-      icon: 'flask-outline', iconBg: C.amberLight, iconColor: C.amber,
-      title: score >= 70
-        ? `${_displayName} is a Safe Choice`
-        : score >= 50
-        ? `Use ${_displayName} Occasionally`
-        : `Limit ${_displayName}`,
-      desc: score >= 70
-        ? `Safety score ${score}/100 � this ${_cat} is appropriate for regular use.`
-        : score >= 50
-        ? `Moderate score (${score}/100) � use this ${_cat} cautiously, especially on sensitive skin.`
-        : `Low score (${score}/100) � consider switching to a cleaner ${_cat}.`,
-    });
-    if (badIngs.length > 0 || score < 60) {
-      actions.push({
-        icon: 'pricetag-outline', iconBg: C.redLight, iconColor: C.red,
-        title: 'Ingredients to Avoid Next Time',
-        desc: badIngs.length > 0
-          ? `When buying a ${_cat}, avoid ${badIngs.slice(0, 2).map(i => i.name).join(' and ')}.`
-          : `Look for a ${_cat} free from parabens, sulfates, and synthetic fragrances.`,
-      });
-    }
-    return actions.slice(0, 3);
-  }, [hasAIAccess, aiAnalysis, score, badIngs, product]);
-
-  const altProducts = useMemo(() => {
-    // Category-specific real product alternatives as fallback when API returns nothing
-    if (badIngs.length > 0 || moderateIngs.length > 0 || score < 80) {
-      const categoryAlternatives = {
-        'Moisturizer': [
-          { name: 'CeraVe Moisturizing Cream', icon: 'water-outline', chips: [{ label: 'Dermatologist Pick', type: 'good' }], brand: 'CeraVe', score: Math.min(95, score + 28) },
-          { name: 'Vanicream Moisturizing Cream', icon: 'flower-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'Vanicream', score: Math.min(95, score + 30) },
-          { name: 'La Roche-Posay Toleriane', icon: 'heart-outline', chips: [{ label: 'Sensitive Skin', type: 'good' }], brand: 'La Roche-Posay', score: Math.min(95, score + 25) },
-          { name: 'Weleda Skin Food', icon: 'leaf-outline', chips: [{ label: 'Natural', type: 'good' }], brand: 'Weleda', score: Math.min(95, score + 22) },
-          { name: 'First Aid Beauty Ultra Repair', icon: 'sunny-outline', chips: [{ label: 'Clean Beauty', type: 'good' }], brand: 'First Aid Beauty', score: Math.min(95, score + 26) },
-        ],
-        'Cleanser': [
-          { name: 'CeraVe Hydrating Cleanser', icon: 'water-outline', chips: [{ label: 'Gentle', type: 'good' }], brand: 'CeraVe', score: Math.min(95, score + 28) },
-          { name: 'Vanicream Gentle Facial Cleanser', icon: 'flower-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'Vanicream', score: Math.min(95, score + 30) },
-          { name: 'La Roche-Posay Toleriane Cleanser', icon: 'heart-outline', chips: [{ label: 'Sensitive Skin', type: 'good' }], brand: 'La Roche-Posay', score: Math.min(95, score + 25) },
-          { name: 'Bioderma Sensibio Micellar Water', icon: 'sunny-outline', chips: [{ label: 'Micellar', type: 'good' }], brand: 'Bioderma', score: Math.min(95, score + 22) },
-          { name: 'Krave Beauty Matcha Cleanser', icon: 'leaf-outline', chips: [{ label: 'Clean Beauty', type: 'good' }], brand: 'Krave Beauty', score: Math.min(95, score + 26) },
-        ],
-        'Serum': [
-          { name: 'The Ordinary Niacinamide 10%', icon: 'leaf-outline', chips: [{ label: 'Clean Formula', type: 'good' }], brand: 'The Ordinary', score: Math.min(95, score + 28) },
-          { name: 'Paula\'s Choice BHA Exfoliant', icon: 'flower-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'Paula\'s Choice', score: Math.min(95, score + 25) },
-          { name: 'CeraVe Vitamin C Serum', icon: 'sunny-outline', chips: [{ label: 'Dermatologist Pick', type: 'good' }], brand: 'CeraVe', score: Math.min(95, score + 22) },
-          { name: 'Cos De BAHA Azelaic Acid', icon: 'heart-outline', chips: [{ label: 'Gentle', type: 'good' }], brand: 'Cos De BAHA', score: Math.min(95, score + 30) },
-          { name: 'Naturium Vitamin C Serum', icon: 'water-outline', chips: [{ label: 'Clean Beauty', type: 'good' }], brand: 'Naturium', score: Math.min(95, score + 26) },
-        ],
-        'Sunscreen': [
-          { name: 'EltaMD UV Clear SPF 46', icon: 'sunny-outline', chips: [{ label: 'Derm Recommended', type: 'good' }], brand: 'EltaMD', score: Math.min(95, score + 30) },
-          { name: 'La Roche-Posay Anthelios', icon: 'heart-outline', chips: [{ label: 'Sensitive Skin', type: 'good' }], brand: 'La Roche-Posay', score: Math.min(95, score + 28) },
-          { name: 'Supergoop Unseen Sunscreen', icon: 'leaf-outline', chips: [{ label: 'Clean Formula', type: 'good' }], brand: 'Supergoop', score: Math.min(95, score + 25) },
-          { name: 'Blue Lizard Mineral Sunscreen', icon: 'water-outline', chips: [{ label: 'Mineral Only', type: 'good' }], brand: 'Blue Lizard', score: Math.min(95, score + 26) },
-          { name: 'CeraVe Hydrating Sunscreen SPF 30', icon: 'flower-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'CeraVe', score: Math.min(95, score + 22) },
-        ],
-        'Shampoo': [
-          { name: 'Vanicream Free & Clear Shampoo', icon: 'water-outline', chips: [{ label: 'Sulfate-Free', type: 'good' }], brand: 'Vanicream', score: Math.min(95, score + 30) },
-          { name: 'Neutrogena T/Sal Shampoo', icon: 'flower-outline', chips: [{ label: 'Derm Tested', type: 'good' }], brand: 'Neutrogena', score: Math.min(95, score + 22) },
-          { name: 'Briogeo Don\'t Despair Repair', icon: 'leaf-outline', chips: [{ label: 'Clean Beauty', type: 'good' }], brand: 'Briogeo', score: Math.min(95, score + 25) },
-          { name: 'Pureology Hydrate Shampoo', icon: 'heart-outline', chips: [{ label: 'Vegan', type: 'good' }], brand: 'Pureology', score: Math.min(95, score + 28) },
-          { name: 'Native Hair Shampoo', icon: 'sunny-outline', chips: [{ label: 'No Sulfates', type: 'good' }], brand: 'Native', score: Math.min(95, score + 20) },
-        ],
-        'Conditioner': [
-          { name: 'Vanicream Free & Clear Conditioner', icon: 'water-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'Vanicream', score: Math.min(95, score + 30) },
-          { name: 'Briogeo Don\'t Despair Conditioner', icon: 'leaf-outline', chips: [{ label: 'Clean Beauty', type: 'good' }], brand: 'Briogeo', score: Math.min(95, score + 25) },
-          { name: 'SheaMoisture Coconut Conditioner', icon: 'flower-outline', chips: [{ label: 'Natural', type: 'good' }], brand: 'SheaMoisture', score: Math.min(95, score + 22) },
-          { name: 'Pureology Hydrate Conditioner', icon: 'heart-outline', chips: [{ label: 'Vegan', type: 'good' }], brand: 'Pureology', score: Math.min(95, score + 28) },
-          { name: 'Native Hair Conditioner', icon: 'sunny-outline', chips: [{ label: 'No Sulfates', type: 'good' }], brand: 'Native', score: Math.min(95, score + 20) },
-        ],
-        'Deodorant': [
-          { name: 'Native Deodorant', icon: 'leaf-outline', chips: [{ label: 'Aluminum-Free', type: 'good' }], brand: 'Native', score: Math.min(95, score + 28) },
-          { name: 'Schmidt\'s Natural Deodorant', icon: 'flower-outline', chips: [{ label: 'Plant-Based', type: 'good' }], brand: 'Schmidt\'s', score: Math.min(95, score + 25) },
-          { name: 'Lume Whole Body Deodorant', icon: 'heart-outline', chips: [{ label: 'Clean Formula', type: 'good' }], brand: 'Lume', score: Math.min(95, score + 30) },
-          { name: 'Each & Every Natural Deodorant', icon: 'sunny-outline', chips: [{ label: 'EWG Verified', type: 'good' }], brand: 'Each & Every', score: Math.min(95, score + 26) },
-          { name: 'Ursa Major Hoppin\' Fresh Deo', icon: 'water-outline', chips: [{ label: 'No Aluminium', type: 'good' }], brand: 'Ursa Major', score: Math.min(95, score + 22) },
-        ],
-        'Body Wash': [
-          { name: 'Vanicream Gentle Body Wash', icon: 'water-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'Vanicream', score: Math.min(95, score + 30) },
-          { name: 'Dr. Bronner\'s Castile Soap', icon: 'leaf-outline', chips: [{ label: 'Organic', type: 'good' }], brand: 'Dr. Bronner\'s', score: Math.min(95, score + 28) },
-          { name: 'Dove Sensitive Skin Body Wash', icon: 'flower-outline', chips: [{ label: 'Hypoallergenic', type: 'good' }], brand: 'Dove', score: Math.min(95, score + 22) },
-          { name: 'Everyone 3-in-1 Soap', icon: 'heart-outline', chips: [{ label: 'EWG Verified', type: 'good' }], brand: 'Everyone', score: Math.min(95, score + 26) },
-          { name: 'Alaffia Everyday Shea Body Wash', icon: 'sunny-outline', chips: [{ label: 'Fair Trade', type: 'good' }], brand: 'Alaffia', score: Math.min(95, score + 25) },
-        ],
-      };
-      const defaultAlts = [
-        { name: 'CeraVe Daily Moisturizer', icon: 'water-outline', chips: [{ label: 'Dermatologist Pick', type: 'good' }], brand: 'CeraVe', score: Math.min(95, score + 25) },
-        { name: 'Vanicream Gentle Cleanser', icon: 'flower-outline', chips: [{ label: 'Fragrance-Free', type: 'good' }], brand: 'Vanicream', score: Math.min(95, score + 28) },
-        { name: 'The Ordinary Hyaluronic Acid', icon: 'leaf-outline', chips: [{ label: 'Clean Formula', type: 'good' }], brand: 'The Ordinary', score: Math.min(95, score + 22) },
-        { name: 'La Roche-Posay Toleriane', icon: 'heart-outline', chips: [{ label: 'Sensitive Skin', type: 'good' }], brand: 'La Roche-Posay', score: Math.min(95, score + 26) },
-        { name: 'Weleda Skin Food', icon: 'sunny-outline', chips: [{ label: 'Natural', type: 'good' }], brand: 'Weleda', score: Math.min(95, score + 20) },
-      ];
-      return categoryAlternatives[productCategory] || defaultAlts;
-    }
-    return [];
-  }, [score, badIngs, moderateIngs, productCategory]);
-
-  const toggleAcc = (key) => setOpenAccordions(prev => ({ ...prev, [key]: !prev[key] }));
-
-  // Score ring constants � match food screen (90px ring)
-  const RING_R = 37;
-  const RING_CIRC = 2 * Math.PI * RING_R;
-  const ringOffset = RING_CIRC - (RING_CIRC * score) / 100;
-  const animatedRingOffset = ringAnim.interpolate({
-    inputRange: [0, 100],
-    outputRange: [RING_CIRC, RING_CIRC - (RING_CIRC * score) / 100],
-  });
-
-  const verdictLabel = score >= 85 ? 'Very Safe' : score >= 70 ? 'Safe' : score >= 45 ? 'Fairly Safe' : score >= 30 ? 'Moderate' : score >= 15 ? 'Concerning' : 'Risky';
-
-  // All ingredients from raw text
-  const allIngredients = (product?.ingredients_text || '').split(',').map(i => i.trim()).filter(Boolean);
-
-  // Safety bar data
-  const safetyBars = [
-    { label: 'Ingredient Safety', value: Math.min(100, Math.round(score * 1.05)) },
-    { label: 'Clean Label Index', value: Math.min(100, goodIngs.length > 0 ? Math.round((goodIngs.length / Math.max(1, analyzedList.length)) * 100) : score) },
-    { label: 'Skin Compatibility', value: score },
-  ];
+  const additivesList = useMemo(() => analyzedList.filter(i => ADDITIVE_FUNCTIONS.has((i.function || '').toLowerCase())), [analyzedList]);
 
   // \u2500\u2500 Derived render data \u2500\u2500
   const productName = product?.product_name || product?.name || 'Unknown Product';
   const brandName   = product?.brands || '';
   const verdict     = getVerdict(score);
-  const verdictDesc =
-    score >= 70 ? 'This product has a safe ingredient profile suitable for most skin types.'
-    : score >= 40 ? 'This product contains some concerning ingredients. Use with caution on sensitive skin.'
-    : 'Multiple concerning ingredients detected. Consider safer alternatives.';
 
-  const handleShare = async () => {
-    try {
-      await Share.share({ message: `Check out ${product?.product_name || 'this product'} on HealthyScan! Score: ${score}/100` });
-    } catch (e) { /* ignore */ }
+  // Names the actual ingredients driving the score, instead of a generic
+  // canned sentence — so this reads as product-specific, not boilerplate.
+  const verdictDesc = useMemo(() => {
+    const namesOf = (list) => list.map(i => i.name).filter(Boolean).slice(0, 2);
+    const totalAnalyzed = analyzedList.length;
+
+    if (badIngs.length > 0) {
+      const names = namesOf(badIngs);
+      const rest = badIngs.length - names.length;
+      const list = names.join(' and ') + (rest > 0 ? `, and ${rest} more` : '');
+      return `Contains ${badIngs.length} ingredient${badIngs.length === 1 ? '' : 's'} flagged as a safety concern, including ${list}.`;
+    }
+    if (moderateIngs.length > 0) {
+      const names = namesOf(moderateIngs);
+      const rest = moderateIngs.length - names.length;
+      const list = names.join(' and ') + (rest > 0 ? `, and ${rest} more` : '');
+      return `No high-risk ingredients found, but ${moderateIngs.length} — including ${list} — may cause irritation for sensitive skin.`;
+    }
+    if (totalAnalyzed > 0) {
+      return `All ${totalAnalyzed} analyzed ingredients rated safe or beneficial — no concerning ingredients found.`;
+    }
+    return 'Ingredient list unavailable for this product.';
+  }, [badIngs, moderateIngs, analyzedList]);
+
+  const handleShare = () => setShowShareSheet(true);
+
+  const handleToggleSave = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const newState = await toggleSavedProduct({
+      barcode,
+      name: productName,
+      brand: brandName,
+      image: product.image_url || null,
+      productType: 'cosmetic',
+      score,
+      ingredients: product.ingredients_text || '',
+    });
+    if (newState !== null) setIsSaved(newState);
   };
 
   const allIngredientsForDisplay = [
@@ -1055,13 +691,22 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     ...moderateIngs.map(i => ({ ...i, _t: 'moderate' })),
     ...badIngs.map(i => ({ ...i, _t: 'bad' })),
   ];
-  const displayed = showAllIngredients ? allIngredientsForDisplay : allIngredientsForDisplay.slice(0, 5);
+  const displayed = allIngredientsForDisplay;
+  const activeIngredient = expandedIngredient
+    ? allIngredientsForDisplay.find(i => (i.name || '').toLowerCase().trim() === expandedIngredient)
+    : null;
 
-  const ingStyle = (_t, name) => {
-    const icon = getIngIcon(name || '');
-    if (_t === 'good')     return { icon, color: PRIMARY,   bg: 'rgba(6,122,79,0.08)',  tag: 'GOOD'     };
-    if (_t === 'bad')      return { icon, color: ERROR_C,   bg: 'rgba(239,68,68,0.10)', tag: 'AVOID'    };
-    return                        { icon, color: WARNING_C, bg: 'rgba(245,158,11,0.10)', tag: 'MODERATE' };
+  const ingStyle = (_t) => {
+    if (_t === 'good')     return { color: PRIMARY,   bg: C.greenBg, tag: 'GOOD'     };
+    if (_t === 'bad')      return { color: ERROR_C,   bg: C.redBg,   tag: 'AVOID'    };
+    return                        { color: WARNING_C, bg: C.amberBg, tag: 'MODERATE' };
+  };
+
+  const additiveRiskTier = (item) => {
+    const sc = item?.score;
+    if (sc != null && sc >= 70) return { label: 'Low risk',      color: PRIMARY,   bg: C.greenBg, icon: 'checkmark-circle' };
+    if (sc != null && sc < 45)  return { label: 'Poor',          color: ERROR_C,   bg: C.redBg,   icon: 'alert-circle'     };
+    return                             { label: 'Moderate risk', color: WARNING_C, bg: C.amberBg, icon: 'warning'          };
   };
 
   const fallbackAlts = [
@@ -1083,7 +728,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     <View style={{ flex: 1, backgroundColor: BG, alignItems: 'center', justifyContent: 'center', paddingTop: safeAreaInsets.top + 50 }}>
       <Ionicons name="alert-circle-outline" size={48} color={ERROR_C} />
       <Text style={{ fontSize: 13, color: ON_SURFACE_VAR, marginTop: 14, fontWeight: '500' }}>{error || 'Missing data'}</Text>
-      <TouchableOpacity style={{ marginTop: 24, borderRadius: 12, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 }} onPress={handleGoBack}>
+      <TouchableOpacity style={{ marginTop: 24, borderRadius: 24, borderWidth: 1, borderColor: OUTLINE, paddingVertical: 12, paddingHorizontal: 32 }} onPress={handleGoBack}>
         <Text style={{ color: ON_SURFACE, fontSize: 14, fontWeight: '600' }}>Go Back</Text>
       </TouchableOpacity>
     </View>
@@ -1096,31 +741,13 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     <View style={{ flex: 1, backgroundColor: BG }}>
       <StatusBar barStyle="dark-content" backgroundColor={BG} />
 
-      {/* FIXED HEADER */}
-      <View style={[st.header, { paddingTop: safeAreaInsets.top + 8 }]}>
-        <View style={st.headerLeft}>
-          <TouchableOpacity onPress={handleGoBack} style={st.iconBtn}>
-            <Ionicons name="arrow-back" size={22} color={PRIMARY} />
-          </TouchableOpacity>
-          <Text style={st.headerTitle}>Scan Results</Text>
-        </View>
-        <View style={st.headerRight}>
-          <TouchableOpacity onPress={handleShare} style={st.iconBtn}>
-            <Ionicons name="share-outline" size={22} color={ON_SURFACE_VAR} />
-          </TouchableOpacity>
-          <View style={st.avatarCircle}>
-            <Ionicons name="person" size={14} color={PRIMARY} />
-          </View>
-        </View>
-      </View>
-
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingTop: safeAreaInsets.top + 56, paddingBottom: safeAreaInsets.bottom + 100 }}
+        contentContainerStyle={{ paddingBottom: safeAreaInsets.bottom + 100 }}
       >
         <Animated.View style={{ opacity: fadeAnim }}>
 
-          {/* HERO: Product Image with centered Gauge */}
+          {/* HERO: Product Image with brand/name overlay */}
           <View style={st.heroContainer}>
             {product.image_url ? (
               <Image source={{ uri: product.image_url }} style={st.heroImage} resizeMode="cover" />
@@ -1129,141 +756,167 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                 <Ionicons name="flask-outline" size={80} color={OUTLINE} />
               </View>
             )}
-            <View style={st.heroScrim} />
-            <View style={st.gaugeCenterWrap}>
-              <ScoreGauge score={score} scoreColor={scoreColor} />
+            <LinearGradient
+              colors={['rgba(0,0,0,0.10)', 'transparent', 'rgba(0,0,0,0.35)']}
+              locations={[0, 0.45, 1]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={StyleSheet.absoluteFillObject}
+            />
+            <View style={st.heroTextWrap}>
+              {!!brandName && <Text style={st.heroBrand} numberOfLines={1}>{brandName}</Text>}
+              <Text style={st.heroName} numberOfLines={1}>{productName}</Text>
             </View>
           </View>
 
-          {/* PRODUCT SUMMARY */}
-          <View style={st.summarySection}>
-            <Text style={[st.ratingLabel, { color: scoreToColor(score) }]}>
-              {scoreToLabel(score).toUpperCase()} SAFETY RATING
-            </Text>
-            <Text style={st.productNameText} numberOfLines={2}>{productName}</Text>
-            {brandName ? <Text style={st.brandLabel}>{brandName}</Text> : null}
-            <Text style={st.verdictDesc}>{verdictDesc}</Text>
+          {/* FLOATING NAV BUTTONS (over hero) */}
+          <View style={[st.floatingNav, { top: safeAreaInsets.top + 8 }]} pointerEvents="box-none">
+            <TouchableOpacity
+              onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); handleGoBack(); }}
+              style={st.floatingBtn}
+            >
+              <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+              <Ionicons name="arrow-back" size={20} color={ON_SURFACE} />
+            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity onPress={handleShare} style={st.floatingBtn}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+                <Ionicons name="share-social-outline" size={19} color={ON_SURFACE} />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleToggleSave} style={st.floatingBtn}>
+                <BlurView intensity={40} tint="light" style={StyleSheet.absoluteFillObject} />
+                <Ionicons name={isSaved ? 'bookmark' : 'bookmark-outline'} size={19} color={ON_SURFACE} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* SCORE GAUGE (overlaps hero / content boundary) */}
+          <View style={st.gaugeOverlapWrap}>
+            <ScoreGauge score={score} scoreColor={scoreColor} verdict={verdict} />
+          </View>
+          <Text style={st.scoreCaption}>Safety score · /100</Text>
+
+          {/* WHY THIS RATING card */}
+          <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+            <TouchableOpacity style={st.whyCard} activeOpacity={0.85} onPress={openWhySheet}>
+              <View style={st.whyCardIcon}>
+                <Ionicons name="information-circle" size={16} color={PRIMARY} />
+              </View>
+              <Text style={st.whyCardText}>Why this rating?</Text>
+              <Ionicons name="chevron-forward" size={17} color={NEUTRAL_300} />
+            </TouchableOpacity>
+          </View>
+
+          {/* SEGMENTED TABS: Ingredients / Additives */}
+          <View style={{ paddingHorizontal: 20, marginBottom: 20 }}>
+            <View style={st.tabBar}>
+              {[
+                { key: 'ingredients', label: 'Ingredients', icon: 'leaf' },
+                { key: 'additives',   label: 'Additives',   icon: 'flask' },
+              ].map(tab => {
+                const active = activeTab === tab.key;
+                return (
+                  <TouchableOpacity
+                    key={tab.key}
+                    style={[st.tabBtn, active && st.tabBtnActive]}
+                    activeOpacity={0.8}
+                    onPress={() => { Haptics.selectionAsync(); setActiveTab(tab.key); }}
+                  >
+                    <Ionicons name={tab.icon} size={14} color={active ? PRIMARY : ON_SURFACE_VAR} style={{ marginRight: 6 }} />
+                    <Text style={[st.tabBtnText, active && st.tabBtnTextActive]}>{tab.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
           </View>
 
           {/* INGREDIENT BREAKDOWN */}
-          {displayed.length > 0 && (
+          {activeTab === 'ingredients' && displayed.length === 0 && (
+            <View style={st.emptyTabBox}>
+              <Text style={st.emptyTabText}>No ingredient list available.</Text>
+            </View>
+          )}
+          {activeTab === 'ingredients' && displayed.length > 0 && (
             <View style={st.section}>
-              <View style={st.sectionHeader}>
-                <Text style={st.sectionTitle}>Ingredient Breakdown</Text>
-                <Text style={st.viewLabels}>{allIngredientsForDisplay.length} ITEMS</Text>
-              </View>
-              <View style={st.ingList}>
+              <View style={st.ingListCard}>
                 {displayed.map((ing, idx) => {
-                  const s = ingStyle(ing._t, ing.name);
-                  const description = ing.notes || ing.concerns || null;
-                  const key = (ing.name || '').toLowerCase().trim();
-                  const isExpanded = expandedIngredient === key;
-                  const isLoadingThis = usdaLoading === key;
-                  const usdaInfo = usdaCache[key];
+                  const isGood      = ing._t === 'good';
+                  const statusIcon  = isGood ? 'checkmark' : 'warning';
+                  const statusColor = isGood ? PRIMARY : WARNING_C;
+                  const statusBg    = isGood ? C.greenBg : C.amberBg;
                   return (
                     <TouchableOpacity
                       key={idx}
                       activeOpacity={0.75}
                       onPress={() => handleIngredientTap(ing)}
                     >
-                      <View style={[st.ingRow, isExpanded && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomWidth: 0 }]}>
-                        <View style={[st.ingIconBox, { backgroundColor: s.bg }]}>
-                          <Ionicons name={s.icon} size={18} color={s.color} />
+                      <View style={[st.ingRow, idx > 0 && st.ingRowDivider]}>
+                        <View style={[st.ingStatusCircle, { backgroundColor: statusBg }]}>
+                          <Ionicons name={statusIcon} size={13} color={statusColor} />
                         </View>
                         <View style={st.ingCardMeta}>
                           <Text style={st.ingCardName} numberOfLines={1}>{ing.name || 'Unknown'}</Text>
-                          {description ? <Text style={st.ingCardDesc} numberOfLines={1}>{description}</Text> : null}
                         </View>
                         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <View style={[st.ingBadge, { backgroundColor: s.bg, borderColor: s.color + '33' }]}>
-                            <Text style={[st.ingBadgeText, { color: s.color }]}>{s.tag}</Text>
-                          </View>
-                          <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={13} color="#A3A3A3" />
+                          {ADDITIVE_FUNCTIONS.has((ing.function || '').toLowerCase()) && <Text style={st.ingTagText}>additive</Text>}
+                          <Ionicons name="chevron-forward" size={16} color={NEUTRAL_300} />
                         </View>
                       </View>
-
-                      {isExpanded && (
-                        <View style={st.ingDetailPanel}>
-                          {isLoadingThis ? (
-                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                              <ActivityIndicator size="small" color={PRIMARY} />
-                              <Text style={st.ingDetailLabel}>Looking up database...</Text>
-                            </View>
-                          ) : usdaInfo ? (
-                            <>
-                              {usdaInfo.healthVerdict && (() => {
-                                const vMap = {
-                                  good:     { bg: 'rgba(6,122,79,0.10)',   text: '#067A4F', label: 'Generally Safe' },
-                                  moderate: { bg: 'rgba(245,158,11,0.10)', text: '#F59E0B', label: 'Moderate' },
-                                  concern:  { bg: 'rgba(245,158,11,0.18)', text: '#B45309', label: 'Use With Caution' },
-                                  avoid:    { bg: 'rgba(239,68,68,0.10)',  text: '#EF4444', label: 'Avoid' },
-                                };
-                                const vc = vMap[usdaInfo.healthVerdict] || vMap.moderate;
-                                return (
-                                  <View style={[st.ingVerdictBadge, { backgroundColor: vc.bg }]}>
-                                    <Text style={[st.ingVerdictText, { color: vc.text }]}>{vc.label}</Text>
-                                  </View>
-                                );
-                              })()}
-                              <View style={st.ingDetailRow}>
-                                <Ionicons name="information-circle-outline" size={16} color={PRIMARY} />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={st.ingDetailLabel}>What is it?</Text>
-                                  <Text style={st.ingDetailText}>{usdaInfo.whatItIs}</Text>
-                                </View>
-                              </View>
-                              <View style={[st.ingDetailRow, { marginTop: 10 }]}>
-                                <Ionicons name="flash-outline" size={16} color={PRIMARY} />
-                                <View style={{ flex: 1 }}>
-                                  <Text style={st.ingDetailLabel}>What does it do?</Text>
-                                  <Text style={st.ingDetailText}>{usdaInfo.whatItDoes}</Text>
-                                </View>
-                              </View>
-                              {usdaInfo.whoSays ? (
-                                <View style={[st.ingDetailRow, { marginTop: 10 }]}>
-                                  <Ionicons name="globe-outline" size={16} color="#1565c0" />
-                                  <View style={{ flex: 1 }}>
-                                    <Text style={[st.ingDetailLabel, { color: '#1565c0' }]}>WHO / JECFA</Text>
-                                    <Text style={st.ingDetailText}>{usdaInfo.whoSays}</Text>
-                                  </View>
-                                </View>
-                              ) : null}
-                              <Text style={st.ingDetailSource}>Source: {usdaInfo.source}</Text>
-                            </>
-                          ) : (
-                            <Text style={st.ingDetailText}>No information available for this ingredient.</Text>
-                          )}
-                        </View>
-                      )}
                     </TouchableOpacity>
                   );
                 })}
-                {allIngredientsForDisplay.length > 5 && (
-                  <TouchableOpacity
-                    style={st.showMore}
-                    onPress={() => setShowAllIngredients(!showAllIngredients)}
-                  >
-                    <Text style={st.showMoreText}>
-                      {showAllIngredients ? 'Show less' : `+ ${allIngredientsForDisplay.length - 5} more ingredients`}
-                    </Text>
-                  </TouchableOpacity>
-                )}
               </View>
+            </View>
+          )}
+
+          {/* ADDITIVES */}
+          {activeTab === 'additives' && additivesList.length === 0 && (
+            <View style={st.section}>
+              <View style={st.cleanBox}>
+                <Ionicons name="leaf" size={18} color={PRIMARY} />
+                <Text style={st.cleanBoxText}>No additives detected — clean product.</Text>
+              </View>
+            </View>
+          )}
+          {activeTab === 'additives' && additivesList.length > 0 && (
+            <View style={[st.section, { gap: 8 }]}>
+              {additivesList.map((item, idx) => {
+                const risk = additiveRiskTier(item);
+                const desc = item.notes || item.concerns || getShortDesc(item.name || '');
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    activeOpacity={0.75}
+                    onPress={() => handleIngredientTap(item)}
+                  >
+                    <View style={st.additiveCard}>
+                      <View style={[st.additiveCardCircle, { backgroundColor: risk.bg }]}>
+                        <Ionicons name={risk.icon} size={16} color={risk.color} />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={st.additiveCardName} numberOfLines={1}>{item.name || 'Unknown'}</Text>
+                        <Text style={[st.additiveCardRisk, { color: risk.color }]}>{risk.label}</Text>
+                        {desc ? <Text style={st.additiveCardDesc} numberOfLines={2}>{desc}</Text> : null}
+                      </View>
+                      <Ionicons name="chevron-forward" size={16} color={NEUTRAL_300} style={{ marginTop: 8 }} />
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
           {/* BETTER ALTERNATIVES */}
           <View style={st.altSection}>
-            <View style={st.altHeader}>
-              <Text style={st.sectionTitle}>Better Alternatives</Text>
-              <TouchableOpacity>
-                <Text style={st.altViewAll}>View all</Text>
-              </TouchableOpacity>
-            </View>
+            <Text style={st.altSectionLabel}>BETTER CHOICES</Text>
             {altsLoading && realAlternatives.length === 0 ? (
               <View style={{ paddingVertical: 28, alignItems: 'center' }}>
                 <ActivityIndicator size="small" color={PRIMARY} />
                 <Text style={{ color: ON_SURFACE_VAR, fontSize: 11, marginTop: 10 }}>Finding alternatives...</Text>
+              </View>
+            ) : altsData.length === 0 ? (
+              <View style={{ paddingVertical: 20, paddingHorizontal: 20 }}>
+                <Text style={{ color: ON_SURFACE_VAR, fontSize: 12 }}>No alternatives found yet.</Text>
               </View>
             ) : (
               <FlatList
@@ -1271,26 +924,21 @@ export default function CosmeticResultsScreen({ route, navigation }) {
                 keyExtractor={(_, i) => String(i)}
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 28, gap: 14 }}
+                contentContainerStyle={{ paddingHorizontal: 20, gap: 14 }}
                 renderItem={({ item }) => {
                   const altScoreColor = getScoreColor(item.score);
                   return (
                     <TouchableOpacity
                       style={st.altCard}
-                      activeOpacity={0.82}
+                      activeOpacity={item.barcode ? 0.85 : 1}
                       onPress={() => item.barcode && navigation.push('CosmeticResults', { barcode: item.barcode })}
                     >
                       <View style={st.altImgBox}>
                         <CosmeticAltImg uri={item.image} imgStyle={st.altImg} />
-                        <View style={[st.altScoreBadge, { backgroundColor: altScoreColor }]}>
-                          <Text style={st.altScoreBadgeText}>{item.score}/100</Text>
-                        </View>
                       </View>
                       <Text style={st.altName} numberOfLines={1}>{item.name || ''}</Text>
                       <Text style={st.altBrand} numberOfLines={1}>{item.brand || ''}</Text>
-                      <View style={st.altViewBtn}>
-                        <Text style={st.altViewBtnText}>VIEW ITEM</Text>
-                      </View>
+                      <Text style={[st.altScoreText, { color: altScoreColor }]}>{item.score}/100</Text>
                     </TouchableOpacity>
                   );
                 }}
@@ -1298,59 +946,47 @@ export default function CosmeticResultsScreen({ route, navigation }) {
             )}
           </View>
 
-          {/* AURA AI CARD */}
-          <View style={st.aiCardWrap}>
-            <TouchableOpacity
-              style={st.aiCard}
-              activeOpacity={0.82}
-              onPress={async () => {
-                if (isPremium || hasAIAccess) {
-                  setShowAIChat(true);
-                } else if (freeRecUsage.remaining > 0) {
-                  const result = await useFreeRecommendation();
-                  if (result.success) { setFreeRecUsage(result.usage); setHasAIAccess(true); setShowAIChat(true); }
-                } else {
-                  navigation.navigate('Subscription', { returnTo: 'results', productName: product?.product_name });
-                }
-              }}
-            >
-              <View style={st.aiCardIcon}>
-                <Ionicons name="sparkles" size={22} color={PRIMARY} />
-              </View>
-              <View style={{ flex: 1, marginLeft: 16 }}>
-                <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
-                <Text style={st.aiCardSub}>Ask about these{`\n`}ingredients</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Text style={st.aiCardConnect}>CONNECT</Text>
-                <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
-              </View>
-            </TouchableOpacity>
-          </View>
+          {/* PRODUCT CODE */}
+          {!!(product.code || product.barcode || barcode) && (
+            <Text style={st.barcodeFooter}>{product.code || product.barcode || barcode}</Text>
+          )}
 
-          {/* SAVE TO HISTORY */}
-          <View style={st.saveWrap}>
-            <TouchableOpacity
-              style={st.saveBtn}
-              activeOpacity={0.9}
-              onPress={() => saveToHistory({
-                barcode,
-                productName: product.product_name,
-                productImage: product.image_url,
-                productType: 'cosmetic',
-                score,
-                ingredients: product.ingredients_text || '',
-                source: product.source || 'Unknown',
-              })}
-            >
-              <Text style={st.saveBtnText}>Save to History</Text>
-            </TouchableOpacity>
-          </View>
+          {/* AURA AI CARD */}
+          {AI_CHAT_ENABLED && (
+            <View style={st.aiCardWrap}>
+              <TouchableOpacity
+                style={st.aiCard}
+                activeOpacity={0.82}
+                onPress={async () => {
+                  if (isPremium || hasAIAccess) {
+                    setShowAIChat(true);
+                  } else if (freeRecUsage.remaining > 0) {
+                    const result = await useFreeRecommendation();
+                    if (result.success) { setFreeRecUsage(result.usage); setHasAIAccess(true); setShowAIChat(true); }
+                  } else {
+                    navigation.navigate('Subscription', { returnTo: 'results', productName: product?.product_name });
+                  }
+                }}
+              >
+                <View style={st.aiCardIcon}>
+                  <Ionicons name="sparkles" size={22} color={PRIMARY} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 16 }}>
+                  <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
+                  <Text style={st.aiCardSub}>Ask about these{`\n`}ingredients</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                  <Text style={st.aiCardConnect}>CONNECT</Text>
+                  <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
+                </View>
+              </TouchableOpacity>
+            </View>
+          )}
 
         </Animated.View>
       </ScrollView>
 
-      {showAIChat && product && (
+      {AI_CHAT_ENABLED && showAIChat && product && (
         <ProductAIChat
           product={product}
           analysis={analysis}
@@ -1359,6 +995,129 @@ export default function CosmeticResultsScreen({ route, navigation }) {
           onClose={() => setShowAIChat(false)}
         />
       )}
+
+      {/* ── WHY THIS RATING — bottom sheet ────────────────────────── */}
+      <Modal
+        visible={showWhyRating}
+        transparent
+        animationType="none"
+        onRequestClose={closeWhySheet}
+      >
+        <TouchableOpacity style={st.ingSheetOverlay} activeOpacity={1} onPress={closeWhySheet}>
+          <Animated.View style={[st.ingSheet, { transform: [{ translateY: whySheetY }] }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={st.ingSheetHandle} />
+              <View style={st.ingSheetHeader}>
+                <Text style={st.ingSheetTitle}>Why this rating</Text>
+                <TouchableOpacity style={st.ingSheetClose} onPress={closeWhySheet}>
+                  <Ionicons name="close" size={18} color={ON_SURFACE} />
+                </TouchableOpacity>
+              </View>
+              <ScrollView style={st.ingSheetBody} showsVerticalScrollIndicator={false}>
+                <Text style={st.ingSheetText}>{verdictDesc}</Text>
+                <View style={[st.whyDotList, { marginTop: 16 }]}>
+                  {goodIngs.length > 0 && (
+                    <View style={st.whyDotRow}>
+                      <View style={[st.whyDot, { backgroundColor: PRIMARY }]} />
+                      <Text style={st.whyDotText}>{goodIngs.length} ingredient{goodIngs.length === 1 ? '' : 's'} rated safe / beneficial</Text>
+                    </View>
+                  )}
+                  {moderateIngs.length > 0 && (
+                    <View style={st.whyDotRow}>
+                      <View style={[st.whyDot, { backgroundColor: WARNING_C }]} />
+                      <Text style={st.whyDotText}>{moderateIngs.length} ingredient{moderateIngs.length === 1 ? '' : 's'} with moderate concern</Text>
+                    </View>
+                  )}
+                  {badIngs.length > 0 && (
+                    <View style={st.whyDotRow}>
+                      <View style={[st.whyDot, { backgroundColor: ERROR_C }]} />
+                      <Text style={st.whyDotText}>{badIngs.length} ingredient{badIngs.length === 1 ? '' : 's'} flagged as a safety concern</Text>
+                    </View>
+                  )}
+                </View>
+              </ScrollView>
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      {/* ── INGREDIENT DETAIL — bottom sheet ──────────────────────── */}
+      <Modal
+        visible={!!expandedIngredient}
+        transparent
+        animationType="none"
+        onRequestClose={closeIngredientSheet}
+      >
+        <TouchableOpacity style={st.ingSheetOverlay} activeOpacity={1} onPress={closeIngredientSheet}>
+          <Animated.View style={[st.ingSheet, { transform: [{ translateY: ingSheetY }] }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={st.ingSheetHandle} />
+              {activeIngredient && (() => {
+                const s = ingStyle(activeIngredient._t);
+                const usdaInfo = usdaCache[expandedIngredient];
+                const isLoadingThis = usdaLoading === expandedIngredient;
+                return (
+                  <>
+                    <View style={st.ingSheetHeader}>
+                      <Text style={st.ingSheetTitle}>{activeIngredient.name || 'Unknown'}</Text>
+                      <TouchableOpacity style={st.ingSheetClose} onPress={closeIngredientSheet}>
+                        <Ionicons name="close" size={18} color={ON_SURFACE} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={[st.ingSheetPill, { backgroundColor: s.bg }]}>
+                      <Text style={[st.ingSheetPillText, { color: s.color }]}>{s.tag.toLowerCase()}</Text>
+                    </View>
+                    <ScrollView style={st.ingSheetBody} showsVerticalScrollIndicator={false}>
+                      {isLoadingThis ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 }}>
+                          <ActivityIndicator size="small" color={PRIMARY} />
+                          <Text style={st.ingDetailLabel}>Looking up database...</Text>
+                        </View>
+                      ) : usdaInfo ? (
+                        <>
+                          <Text style={st.ingSheetText}>{usdaInfo.whatItIs}</Text>
+                          {usdaInfo.whatItDoes ? (
+                            <>
+                              <Text style={[st.ingDetailLabel, { marginTop: 16 }]}>What does it do?</Text>
+                              <Text style={st.ingSheetText}>{usdaInfo.whatItDoes}</Text>
+                            </>
+                          ) : null}
+                          {usdaInfo.whoSays ? (
+                            <>
+                              <Text style={[st.ingDetailLabel, { color: '#1565c0', marginTop: 16 }]}>WHO / JECFA</Text>
+                              <Text style={st.ingSheetText}>{usdaInfo.whoSays}</Text>
+                            </>
+                          ) : null}
+                          <Text style={st.ingDetailSource}>Source: {usdaInfo.source}</Text>
+                        </>
+                      ) : (
+                        <View style={st.ingEmptyCard}>
+                          <View style={st.ingEmptyIconWrap}>
+                            <Ionicons name="information-outline" size={22} color={ON_SURFACE_VAR} />
+                          </View>
+                          <Text style={st.ingEmptyTitle}>No info available</Text>
+                          <Text style={st.ingEmptyNote}>
+                            We couldn't find detailed data for this ingredient yet. It's still listed on the product label.
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </>
+                );
+              })()}
+            </TouchableOpacity>
+          </Animated.View>
+        </TouchableOpacity>
+      </Modal>
+
+      <ShareScoreSheet
+        visible={showShareSheet}
+        onClose={() => setShowShareSheet(false)}
+        score={score}
+        productName={productName}
+        brandName={brandName}
+        verdict={verdict}
+      />
     </View>
   );
 }
@@ -1367,134 +1126,168 @@ export default function CosmeticResultsScreen({ route, navigation }) {
 // GAUGE STYLES
 // =============================================================
 const g = StyleSheet.create({
-  container:  { width: 190, height: 190, alignItems: 'center', justifyContent: 'center' },
-  gaugeBg:    {
-    position: 'absolute', width: 170, height: 170, borderRadius: 85,
-    backgroundColor: 'rgba(255,255,255,0.88)',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.05, shadowRadius: 16, elevation: 2,
+  container:    { width: 128, height: 128, alignItems: 'center', justifyContent: 'center' },
+  gaugeBg:      {
+    position: 'absolute', width: 128, height: 128, borderRadius: 64,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.08, shadowRadius: 16, elevation: 4,
   },
-  center:     { position: 'absolute', alignItems: 'center' },
-  scoreNum:   { fontSize: 52, fontWeight: '800', letterSpacing: -2, lineHeight: 56 },
-  scoreDenom: { fontSize: 16, fontWeight: '500', color: ON_SURFACE_VAR, marginTop: -2 },
+  center:       { position: 'absolute', alignItems: 'center' },
+  scoreNum:     { fontSize: 30, fontWeight: '800', letterSpacing: -0.5, lineHeight: 34 },
+  scoreVerdict: { fontSize: 12, fontWeight: '600', marginTop: 1 },
 });
 
 // =============================================================
 // MAIN STYLES \u2014 Light Wellness
 // =============================================================
 const st = StyleSheet.create({
-  header: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50,
-    backgroundColor: SURFACE,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingBottom: 12,
-    borderBottomWidth: 1, borderBottomColor: 'rgba(0,0,0,0.06)',
-  },
-  headerLeft:   { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  headerRight:  { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  headerTitle:  { fontSize: 17, fontWeight: '700', color: ON_SURFACE },
-  iconBtn:      { padding: 8 },
-  avatarCircle: { width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(6,122,79,0.1)', alignItems: 'center', justifyContent: 'center' },
-
-  heroContainer:   { width: '100%', height: 280, position: 'relative', backgroundColor: SURFACE_HIGH },
+  // Hero — full-bleed image with gradient scrim + brand/name overlay (matches food)
+  heroContainer:   { width: '100%', height: 288, position: 'relative', backgroundColor: SURFACE_HIGH, overflow: 'hidden' },
   heroImage:       { width: '100%', height: '100%' },
   heroPlaceholder: { backgroundColor: SURFACE_HIGH, alignItems: 'center', justifyContent: 'center' },
-  heroScrim:       { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(251,251,249,0.18)' },
-  gaugeCenterWrap: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' },
+  heroTextWrap:    { position: 'absolute', left: 20, right: 20, bottom: 16 },
+  heroBrand:       { fontSize: 12, fontWeight: '600', color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
+  heroName:        { fontSize: 20, fontWeight: '800', color: WHITE, lineHeight: 24 },
 
-  summarySection:   { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 4 },
-  ratingLabel:      { fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 8 },
-  verdictBadge:     { paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20, borderWidth: 1, marginBottom: 16 },
-  verdictBadgeText: { fontSize: 12, fontWeight: '600' },
-  productNameText:  { fontSize: 20, fontWeight: '700', color: ON_SURFACE, lineHeight: 26, marginBottom: 4 },
-  brandLabel:       { fontSize: 13, fontWeight: '400', color: ON_SURFACE_VAR, marginBottom: 8 },
-  verdictDesc:      { fontSize: 13, color: ON_SURFACE_VAR, lineHeight: 20, marginBottom: 4 },
+  // Floating nav buttons over the hero
+  floatingNav: { position: 'absolute', left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', zIndex: 50 },
+  floatingBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.85)',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+  },
 
-  gaugeSection: { alignItems: 'center', paddingTop: 32, paddingBottom: 12 },
+  // Score gauge — overlaps hero/content boundary
+  gaugeOverlapWrap: { alignItems: 'center', marginTop: -40 },
+  scoreCaption:     { textAlign: 'center', fontSize: 12, color: NEUTRAL_400, marginTop: 10, marginBottom: 20 },
+
+  // "Why this rating" card
+  whyCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: SURFACE_LOW, borderRadius: 16, borderWidth: 1, borderColor: NEUTRAL_100,
+    padding: 16,
+  },
+  whyCardIcon: {
+    width: 36, height: 36, borderRadius: 10, backgroundColor: C.greenBg,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  whyCardText: { flex: 1, fontSize: 14, fontWeight: '600', color: ON_SURFACE },
+  whyDotList:  { gap: 14 },
+  whyDotRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
+  whyDot:      { width: 10, height: 10, borderRadius: 5, marginTop: 4, flexShrink: 0 },
+  whyDotText:  { flex: 1, fontSize: 14, lineHeight: 20, color: ON_SURFACE },
+
+  // Segmented tab bar
+  tabBar: { flexDirection: 'row', height: 44, backgroundColor: NEUTRAL_100, borderRadius: 16, padding: 4 },
+  tabBtn: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderRadius: 12,
+  },
+  tabBtnActive:     { backgroundColor: SURFACE_LOW },
+  tabBtnText:       { fontSize: 12, fontWeight: '500', color: ON_SURFACE_VAR },
+  tabBtnTextActive: { color: PRIMARY, fontWeight: '600' },
+  emptyTabBox:  { paddingVertical: 32, paddingHorizontal: 20, alignItems: 'center' },
+  emptyTabText: { fontSize: 14, color: NEUTRAL_400, textAlign: 'center' },
 
   section:       { paddingHorizontal: 20, paddingBottom: 12 },
-  sectionTitle:  { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 0 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-  viewLabels:    { fontSize: 11, fontWeight: '700', color: PRIMARY, letterSpacing: 0.5 },
 
-  ingList:       { gap: 8 },
+  cleanBox: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingVertical: 18, paddingHorizontal: 20,
+    borderRadius: 16, backgroundColor: C.greenBg,
+  },
+  cleanBoxText: { fontSize: 13, color: PRIMARY, fontWeight: '500', flex: 1 },
+
+  additiveCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    backgroundColor: SURFACE_LOW, borderRadius: 16, borderWidth: 1, borderColor: NEUTRAL_100,
+    padding: 16,
+  },
+  additiveCardCircle: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  additiveCardName:   { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 2 },
+  additiveCardRisk:   { fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  additiveCardDesc:   { fontSize: 12, color: NEUTRAL_400, lineHeight: 17 },
+
+  // Ingredients — one continuous card, rows separated by hairline dividers (matches food)
+  ingListCard: {
+    backgroundColor: SURFACE_LOW, borderRadius: 16,
+    borderWidth: 1, borderColor: NEUTRAL_100,
+    overflow: 'hidden',
+  },
   ingRow: {
     flexDirection: 'row', alignItems: 'center',
-    padding: 16,
-    backgroundColor: SURFACE_LOW,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
+    paddingVertical: 12, paddingHorizontal: 16,
   },
-  ingIconBox:    { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginRight: 12, flexShrink: 0 },
+  ingRowDivider: {
+    borderTopWidth: 1, borderTopColor: NEUTRAL_100,
+  },
+  ingStatusCircle: { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginRight: 12 },
   ingCardMeta:   { flex: 1, marginRight: 10 },
-  ingCardName:   { fontSize: 14, fontWeight: '600', color: ON_SURFACE, marginBottom: 2 },
-  ingCardDesc:   { fontSize: 12, color: ON_SURFACE_VAR, lineHeight: 16 },
-  ingBadge:      { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 99, borderWidth: 1, flexShrink: 0 },
-  ingBadgeText:  { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, textTransform: 'uppercase' },
-  showMore:      { paddingTop: 12, alignItems: 'center' },
-  showMoreText:  { fontSize: 12, fontWeight: '600', color: PRIMARY },
+  ingCardName:   { fontSize: 14, fontWeight: '600', color: NEUTRAL_800 },
+  ingTagText:    { fontSize: 12, fontWeight: '600', color: AMBER_600 },
 
-  ingDetailPanel: {
-    backgroundColor: '#f0f5f0',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-    borderWidth: 1,
-    borderTopWidth: 0,
-    borderColor: 'rgba(6,122,79,0.15)',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  ingVerdictBadge: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 99, marginBottom: 12 },
-  ingVerdictText:  { fontSize: 12, fontWeight: '700', letterSpacing: 0.4 },
   ingDetailRow:    { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   ingDetailLabel:  { fontSize: 11, fontWeight: '700', color: PRIMARY, textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 3 },
   ingDetailText:   { fontSize: 13, color: '#1a1c19', lineHeight: 19 },
   ingDetailSource: { fontSize: 10, color: '#6b7c69', marginTop: 10, textAlign: 'right', fontStyle: 'italic' },
 
+  // Empty state — ingredient/additive sheet has no matched data
+  ingEmptyCard: { alignItems: 'center', paddingVertical: 20, paddingHorizontal: 8 },
+  ingEmptyIconWrap: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: NEUTRAL_100,
+    alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12,
+  },
+  ingEmptyTitle: { fontSize: 15, fontWeight: '700', color: ON_SURFACE, marginBottom: 6 },
+  ingEmptyNote: { fontSize: 13, color: ON_SURFACE_VAR, lineHeight: 19, textAlign: 'center' },
+
+  // Ingredient detail — bottom sheet
+  ingSheetOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' },
+  ingSheet: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    maxHeight: '75%',
+    backgroundColor: WHITE,
+    borderTopLeftRadius: 28, borderTopRightRadius: 28,
+    paddingTop: 12, paddingHorizontal: 24,
+    paddingBottom: 34,
+  },
+  ingSheetHandle: {
+    alignSelf: 'center', width: 36, height: 4, borderRadius: 2,
+    backgroundColor: 'rgba(0,0,0,0.15)', marginBottom: 20,
+  },
+  ingSheetHeader: {
+    flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14,
+  },
+  ingSheetTitle: { flex: 1, fontSize: 22, fontWeight: '800', color: ON_SURFACE, letterSpacing: -0.4, marginRight: 12 },
+  ingSheetClose: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: SURFACE_HIGH,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  ingSheetPill: { alignSelf: 'flex-start', paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999, marginBottom: 18 },
+  ingSheetPillText: { fontSize: 12, fontWeight: '700' },
+  ingSheetBody: { marginBottom: 4 },
+  ingSheetText: { fontSize: 15, color: ON_SURFACE, lineHeight: 23 },
+
   aiCardWrap: { paddingHorizontal: 20, marginBottom: 16 },
   aiCard: {
-    backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: OUTLINE,
-    borderRadius: 16, padding: 20,
+    backgroundColor: SURFACE_LOW, borderWidth: 1, borderColor: 'rgba(0,0,0,0.07)',
+    borderRadius: 20, padding: 20,
     flexDirection: 'row', alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, shadowRadius: 2, elevation: 1,
   },
   aiCardLabel:   { fontSize: 10, fontWeight: '700', letterSpacing: 1, color: ON_SURFACE_VAR, textTransform: 'uppercase', marginBottom: 4 },
   aiCardSub:     { fontSize: 15, fontWeight: '500', color: ON_SURFACE, lineHeight: 21 },
   aiCardIcon:    { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(6,122,79,0.1)', alignItems: 'center', justifyContent: 'center' },
   aiCardConnect: { fontSize: 11, fontWeight: '700', letterSpacing: 1, color: PRIMARY },
 
-  altSection:        { marginBottom: 32 },
-  altHeader:         { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, marginBottom: 16 },
-  altViewAll:        { fontSize: 12, fontWeight: '600', color: PRIMARY },
-  altCard: {
-    width: 180,
-    backgroundColor: SURFACE_LOW,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.06)',
-    padding: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  altImgBox:         { width: '100%', aspectRatio: 1, borderRadius: 12, backgroundColor: SURFACE_HIGH, overflow: 'hidden', marginBottom: 8 },
+  altSection:        { marginBottom: 28 },
+  altSectionLabel:   { fontSize: 12, fontWeight: '600', color: NEUTRAL_400, letterSpacing: 1, textTransform: 'uppercase', paddingHorizontal: 20, marginBottom: 14, marginTop: 8 },
+  altCard:           { width: 112 },
+  altImgBox:         { width: 112, height: 112, backgroundColor: SURFACE_HIGH, borderRadius: 16, overflow: 'hidden', marginBottom: 8 },
   altImg:            { width: '100%', height: '100%' },
-  altImgPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  altScoreBadge:     { position: 'absolute', top: 8, right: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 99 },
-  altScoreBadgeText: { fontSize: 10, fontWeight: '700', color: WHITE },
-  altName:      { fontSize: 14, fontWeight: '700', color: ON_SURFACE, paddingHorizontal: 4, marginBottom: 2 },
-  altBrand:     { fontSize: 12, color: ON_SURFACE_VAR, paddingHorizontal: 4, marginBottom: 8 },
-  altViewBtn:   { backgroundColor: SURFACE_HIGH, paddingVertical: 8, borderRadius: 8, alignItems: 'center' },
-  altViewBtnText: { fontSize: 11, fontWeight: '700', color: ON_SURFACE, textTransform: 'uppercase', letterSpacing: 0.5 },
+  altName:      { fontSize: 12, fontWeight: '600', color: ON_SURFACE, lineHeight: 16, marginBottom: 2 },
+  altBrand:     { fontSize: 12, fontWeight: '400', color: NEUTRAL_400, marginBottom: 4 },
+  altScoreText: { fontSize: 12, fontWeight: '700' },
 
-  saveWrap:    { paddingHorizontal: 20, marginBottom: 8 },
-  saveBtn:     { width: '100%', backgroundColor: PRIMARY, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  saveBtnText: { color: WHITE, fontSize: 15, fontWeight: '700', letterSpacing: 0.5 },
+  barcodeFooter: { textAlign: 'center', fontSize: 12, color: ON_SURFACE_VAR, letterSpacing: 1, marginBottom: 24 },
 });

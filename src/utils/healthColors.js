@@ -1,29 +1,29 @@
-// Centralized Color Configuration for HealthyScan App
+﻿// Centralized Color Configuration for HealthyScan App
 // Updated color scheme: Medium->Good (green), Excellent->Very Dark Green
 
 export const HEALTH_COLORS = {
   // Score-based colors
-  EXCELLENT: '#1B5E20',      // Very dark green (90-100)
-  GOOD: '#4CAF50',           // Green (70-89) - was "Medium/Orange"  
+  EXCELLENT: '#067A4F',      // Very dark green (90-100)
+  GOOD: '#067A4F',           // Green (70-89) - was "Medium/Orange"  
   AVERAGE: '#FF9800',        // Orange (50-69) - was "Good"
   POOR: '#FF5722',           // Red-orange (25-49)
   VERY_POOR: '#F44336',      // Red (0-24)
   
   // Legacy colors for compatibility
-  GREEN: '#4CAF50',
-  DARK_GREEN: '#1B5E20',
+  GREEN: '#067A4F',
+  DARK_GREEN: '#067A4F',
   ORANGE: '#FF9800',
   RED: '#F44336',
   
   // Status colors
-  SAFE: '#4CAF50',
-  MODERATE: '#4CAF50',       // Changed from orange to green
+  SAFE: '#067A4F',
+  MODERATE: '#067A4F',       // Changed from orange to green
   RISKY: '#F44336',
   
   // UI colors
-  PRIMARY: '#4CAF50',
-  LOADING: '#4CAF50',
-  SUCCESS: '#1B5E20',
+  PRIMARY: '#067A4F',
+  LOADING: '#067A4F',
+  SUCCESS: '#067A4F',
   WARNING: '#FF9800',
   ERROR: '#F44336',
   

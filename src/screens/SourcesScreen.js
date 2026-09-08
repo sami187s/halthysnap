@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import {
   View,
   Text,
@@ -54,7 +54,7 @@ const SourcesScreen = ({ navigation }) => {
         <View style={st.card}>
           <View style={st.cardHeader}>
             <View style={[st.cardIcon, { backgroundColor: 'rgba(76,175,80,0.1)' }]}>
-              <Ionicons name="globe-outline" size={20} color="#4CAF50" />
+              <Ionicons name="globe-outline" size={20} color="#067A4F" />
             </View>
             <Text style={st.cardTitle}>Open Food Facts</Text>
           </View>
@@ -63,7 +63,7 @@ const SourcesScreen = ({ navigation }) => {
           </Text>
           <TouchableOpacity style={st.linkRow} onPress={() => openURL('https://world.openfoodfacts.org')}>
             <Text style={st.linkText}>Visit openfoodfacts.org</Text>
-            <Ionicons name="open-outline" size={14} color="#4CAF50" />
+            <Ionicons name="open-outline" size={14} color="#067A4F" />
           </TouchableOpacity>
           <View style={st.detailBlock}>
             <Text style={st.detailLabel}>API Endpoint</Text>
@@ -89,7 +89,7 @@ const SourcesScreen = ({ navigation }) => {
             <Text style={st.detailValue}>0–100 (Higher = Healthier)</Text>
             <Text style={[st.detailLabel, { marginTop: 10 }]}>Color Coding</Text>
             {[
-              { color: '#4CAF50', label: 'Green (70–100): Healthy'  },
+              { color: '#067A4F', label: 'Green (70–100): Healthy'  },
               { color: '#FF9800', label: 'Orange (40–69): Moderate' },
               { color: '#F44336', label: 'Red (0–39): Risky'        },
             ].map((c) => (
@@ -209,7 +209,7 @@ const st = StyleSheet.create({
     paddingVertical: 8,
   },
   linkText: {
-    color: '#4CAF50',
+    color: '#067A4F',
     fontSize: 13,
     fontWeight: '500',
   },

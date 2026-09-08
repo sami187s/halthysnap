@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+﻿import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { 
   createSmoothAnimation, 
@@ -68,8 +68,8 @@ const SimpleElegantScoreReveal = ({
   };
 
   const getScoreColor = (score) => {
-    if (score >= 90) return '#1B5E20'; // Excellent - Deep Green
-    if (score >= 75) return '#4CAF50'; // Good - Green
+    if (score >= 90) return '#067A4F'; // Excellent - Deep Green
+    if (score >= 75) return '#067A4F'; // Good - Green
     if (score >= 55) return '#FF9800'; // Average - Orange
     if (score >= 35) return '#FF5722'; // Poor - Red-orange
     return '#F44336'; // Very Poor - Red

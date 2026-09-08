@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Test Script: Enhanced Additive Analysis for All Products
  * This script verifies that both food and cosmetic products show individual additives with detailed information
  */
@@ -69,7 +69,7 @@ const safetyColors = [
   "'good'",
   "'moderate'",
   "'poor'",
-  "#2E7D32", // Green for excellent/good
+  "#067A4F", // Green for excellent/good
   "#F57C00", // Orange for moderate
   "#C62828"  // Red for poor
 ];

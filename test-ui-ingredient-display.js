@@ -1,4 +1,4 @@
-// Test the cosmetic results screen ingredient analysis fix
+﻿// Test the cosmetic results screen ingredient analysis fix
 const { analyzeIngredients } = require('./src/utils/enhancedIngredientAnalyzer');
 
 console.log('🧪 Testing Cosmetic Ingredient Display Fix\n');
@@ -43,11 +43,11 @@ const analyzeIndividualIngredient = (ingredient, analysis) => {
       reason = 'Ingredient not in database';
     } else if (existingAnalysis.score >= 90) {
       status = 'EXCELLENT';
-      color = '#1B5E20';
+      color = '#067A4F';
       reason = existingAnalysis.notes || `Safe ingredient (${existingAnalysis.function || 'cosmetic use'})`;
     } else if (existingAnalysis.score >= 75) {
       status = 'GOOD';
-      color = '#4CAF50';
+      color = '#067A4F';
       reason = existingAnalysis.notes || `Generally safe (${existingAnalysis.function || 'cosmetic use'})`;
     } else if (existingAnalysis.score >= 45) {
       status = 'MODERATE';

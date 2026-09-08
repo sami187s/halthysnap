@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,8 +9,8 @@ const formatScans = (count) => {
 };
 
 const getPopularityInfo = (count) => {
-  if (count >= 100000) return { label: 'Very Popular', color: '#1B5E20', bg: '#E8F5E9', icon: 'flame' };
-  if (count >= 10000) return { label: 'Popular', color: '#2E7D32', bg: '#F1F8E9', icon: 'trending-up' };
+  if (count >= 100000) return { label: 'Very Popular', color: '#067A4F', bg: '#E5F2EC', icon: 'flame' };
+  if (count >= 10000) return { label: 'Popular', color: '#067A4F', bg: '#EEF6F2', icon: 'trending-up' };
   if (count >= 1000) return { label: 'Known Product', color: '#FF9800', bg: '#FFF3E0', icon: 'people' };
   if (count >= 100) return { label: 'Scanned Online', color: '#78909C', bg: '#ECEFF1', icon: 'people-outline' };
   return { label: 'Rarely Scanned', color: '#9E9E9E', bg: '#F5F5F5', icon: 'people-outline' };

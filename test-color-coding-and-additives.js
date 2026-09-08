@@ -1,4 +1,4 @@
-// Test Color Coding and AI Additive Analysis
+﻿// Test Color Coding and AI Additive Analysis
 console.log('🎨 Testing Enhanced Color Coding and AI Additive Analysis\n');
 
 // Test the new color coding system
@@ -7,8 +7,8 @@ const testColorCoding = () => {
   console.log('');
   
   const colorScheme = {
-    'EXCELLENT': { color: '#1B5E20', description: 'Dark Green - Outstanding ingredients' },
-    'GOOD': { color: '#4CAF50', description: 'Green - Beneficial ingredients' },
+    'EXCELLENT': { color: '#067A4F', description: 'Dark Green - Outstanding ingredients' },
+    'GOOD': { color: '#067A4F', description: 'Green - Beneficial ingredients' },
     'MODERATE': { color: '#8D6E63', description: 'Brown - Standard ingredients' },
     'POOR': { color: '#D32F2F', description: 'Red - Avoid these ingredients' },
     'UNKNOWN': { color: '#757575', description: 'Gray - Needs analysis' }

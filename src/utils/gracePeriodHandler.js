@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+﻿import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Alert } from 'react-native';
 
 export class GracePeriodHandler {
@@ -67,7 +67,7 @@ export class GracePeriodHandler {
   static getGracePeriodColor(daysRemaining) {
     if (daysRemaining <= 1) return '#F44336'; // 🔴 Red - urgent
     if (daysRemaining <= 2) return '#FF9800'; // 🟡 Yellow - warning  
-    return '#4CAF50'; // 🟢 Green - still time
+    return '#067A4F'; // 🟢 Green - still time
   }
 
   // Store grace period information when payment fails

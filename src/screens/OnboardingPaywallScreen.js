@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+﻿import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -34,7 +34,7 @@ export default function OnboardingPaywallScreen({ navigation }) {
   }, []);
 
   const handleStartFree = async () => {
-    await AsyncStorage.setItem('hasCompletedPaywall', 'true');
+    await AsyncStorage.multiSet([['hasCompletedPaywall', 'true'], ['chatbotAccess', 'enabled']]);
     navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
   };
 
@@ -51,8 +51,8 @@ export default function OnboardingPaywallScreen({ navigation }) {
           {/* Header */}
           <View style={s.header}>
             <View style={s.logoRow}>
-              <Ionicons name="leaf" size={18} color="#4CAF50" />
-              <Text style={s.logoText}>HealthyScan</Text>
+              <Ionicons name="leaf" size={18} color="#067A4F" />
+              <Text style={s.logoText}>Vee</Text>
             </View>
             <View style={s.stepBadge}>
               <Text style={s.stepText}>STEP 02 OF 02</Text>
@@ -91,10 +91,10 @@ export default function OnboardingPaywallScreen({ navigation }) {
                 ]}
               >
                 <View style={s.featureIconWrap}>
-                  <Ionicons name={f.icon} size={17} color="#4CAF50" />
+                  <Ionicons name={f.icon} size={17} color="#067A4F" />
                 </View>
                 <Text style={s.featureText}>{f.label}</Text>
-                <Ionicons name="checkmark-circle" size={18} color="#4CAF50" />
+                <Ionicons name="checkmark-circle" size={18} color="#067A4F" />
               </View>
             ))}
           </View>
@@ -183,7 +183,7 @@ const s = StyleSheet.create({
   },
   priceLabel: {
     fontSize: 9, fontWeight: '700', letterSpacing: 3,
-    color: '#4CAF50', marginBottom: 8,
+    color: '#067A4F', marginBottom: 8,
   },
   priceRow: { flexDirection: 'row', alignItems: 'flex-start' },
   priceCurrency: {

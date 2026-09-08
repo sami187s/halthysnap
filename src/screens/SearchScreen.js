@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,126 +11,169 @@ import {
   StatusBar,
   Alert,
   Platform,
-  Dimensions,
   KeyboardAvoidingView,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
 import { searchProductByName } from '../services/reliableAPI';
-import { getProductTypeFromCategories } from '../utils/enhancedIngredientAnalyzer';
+import { fetchCuratedProducts } from '../services/tursoDB';
+import { getProductTypeFromCategories, analyzeIngredients } from '../utils/enhancedIngredientAnalyzer';
+import { calculateHealthScore } from '../utils/enhancedScoring';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
-import { useTheme } from '../contexts/ThemeContext';
 
-// ── Purely-inspired light theme tokens ────────────────────────────────
-const BG           = '#FBFBF9';
-const SURFACE_LOW  = '#FFFFFF';
-const SURFACE_MID  = '#F5F5F1';
-const SURFACE_HIGH = '#EFEFEA';
-const ON_SURFACE   = '#171717';
-const ON_SURF_VAR  = '#737373';
-const OUTLINE_VAR  = 'rgba(0,0,0,0.08)';
+const ON_SURFACE  = '#171717';
+const ON_SURF_VAR = '#8E8E93';
+const PRIMARY     = '#22A06B';
+const GREEN_SOFT  = '#E7F5EE';
+const GREEN_DARK  = '#1F7A50';
 
-const FILTER_TABS = [
-  { key: 'all',      label: 'All',      icon: 'grid-outline'      },
-  { key: 'food',     label: 'Food',     icon: 'nutrition-outline' },
-  { key: 'cosmetic', label: 'Cosmetic', icon: 'sparkles-outline'  },
+// Only "Good" products are shown in Search.
+const MIN_SCORE = 70;
+
+const kw = (p) => `${p?.name || ''} ${p?.categories || ''} ${p?.brand || ''}`.toLowerCase();
+const isDrink = (p) => /drink|beverage|soda|juice|water|tea|coffee|cola|smoothie/.test(kw(p));
+const isSnack = (p) => /snack|chip|crisp|cracker|biscuit|cookie|candy|chocolate|\bbar\b|popcorn|pretzel/.test(kw(p));
+const isDairy = (p) => /dairy|milk|yogurt|yoghurt|cheese|kefir|skyr|cream/.test(kw(p));
+
+const CHIPS = [
+  { key: 'all',      label: 'All',        match: () => true },
+  { key: 'cosmetic', label: 'Cosmetics',  match: (p) => p.productType === 'cosmetic' },
+  { key: 'dairy',    label: 'Dairy',      match: (p) => p.productType === 'food' && isDairy(p) },
+  { key: 'snack',    label: 'Snacks',     match: (p) => p.productType === 'food' && isSnack(p) },
+  { key: 'drink',    label: 'Beverages',  match: (p) => p.productType === 'food' && isDrink(p) },
 ];
 
-// Renders a product image with onError fallback to the type icon placeholder
-const ProductImg = React.memo(({ uri, typeIcon, theme: t }) => {
-  const [err, setErr] = React.useState(false);
-  if (!uri || err) {
+// Client-side score from data the search API already returned (no extra call).
+const computeItemScore = (item) => {
+  try {
+    if (item.productType === 'cosmetic') {
+      if (!item.ingredients_text) return null;
+      const analysis = analyzeIngredients(item.ingredients_text, 'cosmetic');
+      return analysis?.score != null ? Math.round(analysis.score) : null;
+    }
+    if (!item.nutriments || Object.keys(item.nutriments).length === 0) return null;
+    const result = calculateHealthScore({
+      product_name: item.name,
+      nutriments: item.nutriments,
+      ingredients_text: item.ingredients_text || '',
+      categories: item.categories || '',
+    }, null, null);
+    return result?.score != null ? Math.round(result.score) : null;
+  } catch {
+    return null;
+  }
+};
+
+// Product thumbnail: real image → seeded stock photo → plain box.
+const ProductImg = React.memo(({ uri, seed }) => {
+  const [stage, setStage] = React.useState(uri ? 0 : 1);
+  const next = () => setStage((s) => Math.min(2, s + 1));
+  if (stage === 2) {
     return (
-      <View style={[st.productImg, st.productImgPlaceholder, { backgroundColor: t?.bgIcon || '#F5F5F1' }]}>
-        <Ionicons name={typeIcon} size={24} color={t?.textMuted || '#737373'} />
+      <View style={[st.thumb, st.thumbBox]}>
+        <Ionicons name="cube-outline" size={20} color="#c7cdc7" />
       </View>
     );
   }
+  const src =
+    stage === 0
+      ? uri
+      : `https://picsum.photos/seed/${encodeURIComponent(String(seed || 'vee'))}/120/120`;
   return (
-    <Image
-      source={{ uri }}
-      style={st.productImg}
-      resizeMode="cover"
-      onError={() => setErr(true)}
-    />
+    <Image source={{ uri: src }} style={st.thumb} resizeMode="cover" onError={next} />
   );
 });
 
+const ScoreBadge = ({ score }) => (
+  <View style={st.badge}>
+    <Text style={st.badgeNum}>{score}</Text>
+    <Text style={st.badgeLabel}>Good</Text>
+  </View>
+);
+
 const SearchScreen = ({ navigation }) => {
-  const [searchQuery, setSearchQuery]       = useState('');
-  const [searchResults, setSearchResults]   = useState([]);
-  const [loading, setLoading]               = useState(false);
-  const [hasSearched, setHasSearched]       = useState(false);
-  const [isPremium, setIsPremium]           = useState(true);
-  const [remainingSearches, setRemainingSearches] = useState(2);
-  const [activeFilter, setActiveFilter]     = useState('all');
-  const [resultCounts, setResultCounts]     = useState({ food: 0, cosmetic: 0 });
+  const insets = useSafeAreaInsetsWithFallback();
+  const [query, setQuery] = useState('');
+  const [feed, setFeed] = useState([]);
+  const [results, setResults] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [feedLoading, setFeedLoading] = useState(true);
+  const [chip, setChip] = useState('all');
+  const [topRated, setTopRated] = useState(true);
 
-  const safeAreaInsets = useSafeAreaInsetsWithFallback();
-  const { theme, isDark } = useTheme();
+  const debounceRef = useRef(null);
+  const requestIdRef = useRef(0);
+  const searching = query.trim().length >= 3;
 
-  useEffect(() => { checkSearchStatus(); }, []);
-  useFocusEffect(React.useCallback(() => { checkSearchStatus(); }, []));
-
-  const checkSearchStatus = async () => {
-    try {
-      const subType = await AsyncStorage.getItem('subscriptionType');
-      const isPrem  = subType === 'Premium';
-      setIsPremium(isPrem);
-      if (isPrem) {
-        setRemainingSearches(999);
-      } else {
-        const usedStr = await AsyncStorage.getItem('premiumTrialUsedToday');
-        const used = usedStr ? parseInt(usedStr) : 0;
-        setRemainingSearches(Math.max(0, 2 - used));
+  // ── Default feed (curated "Top Picks", Good only) ───────────────────────
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const curated = await fetchCuratedProducts();
+        const good = (curated || [])
+          .map((p) => ({
+            barcode: p.barcode,
+            name: p.name,
+            brand: p.brand,
+            image: p.image || null,
+            productType: p.productType || 'food',
+            categories: p.category || '',
+            score: Number(p.defaultScore) || 0,
+          }))
+          .filter((p) => p.score >= MIN_SCORE);
+        if (alive) setFeed(good);
+      } catch {
+        if (alive) setFeed([]);
+      } finally {
+        if (alive) setFeedLoading(false);
       }
-    } catch (e) { /* ignore */ }
-  };
+    })();
+    return () => { alive = false; };
+  }, []);
 
-  const handleSearch = async () => {
-    if (searchQuery.trim().length < 3) {
-      Alert.alert('Search Error', 'Please enter at least 3 characters to search.');
+  // ── Search-as-you-type ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    const q = query.trim();
+    if (q.length < 3) {
+      setResults([]);
       return;
     }
+    debounceRef.current = setTimeout(() => runSearch(q), 500);
+    return () => clearTimeout(debounceRef.current);
+  }, [query]);
 
-    // Check connectivity before making any network calls — on iOS this
-    // gives a clear error instead of a confusing timeout/connection failure.
-    // Note: isConnected can be null or false even when connected on iOS/Android,
-    // so only block if BOTH isConnected and isInternetReachable are definitively false.
-    try {
-      const net = await NetInfo.fetch();
-      if (net.isConnected === false && net.isInternetReachable === false) {
-        Alert.alert(
-          'No Internet',
-          'Your device is not connected to the internet. Please check your Wi-Fi or mobile data and try again.'
-        );
-        return;
-      }
-    } catch { /* NetInfo unavailable — proceed anyway */ }
-
+  const runSearch = async (q) => {
+    const id = ++requestIdRef.current;
     setLoading(true);
-    setHasSearched(true);
+    setChip('all');
     try {
-      const result = await searchProductByName(searchQuery.trim());
-      if (result.success) {
-        setSearchResults(result.data);
-        setResultCounts(result.counts || { food: 0, cosmetic: 0 });
-        setActiveFilter('all');
-      } else {
-        setSearchResults([]);
-        Alert.alert('No Results', result.error);
-      }
-    } catch (e) {
-      Alert.alert('Search Error', 'Failed to search products. Please try again.');
-      setSearchResults([]);
+      const res = await searchProductByName(q);
+      if (id !== requestIdRef.current) return;
+      const scored = (res.success ? res.data : [])
+        .map((item) => ({ ...item, score: computeItemScore(item) }))
+        .filter((item) => item.score != null && item.score >= MIN_SCORE)
+        .map((item) => ({
+          barcode: item.barcode,
+          name: item.name,
+          brand: item.brand,
+          image: item.image || null,
+          productType: item.productType,
+          categories: item.categories || '',
+          source: item.source || '',
+          score: item.score,
+        }));
+      setResults(scored);
+    } catch {
+      if (id === requestIdRef.current) setResults([]);
     } finally {
-      setLoading(false);
+      if (id === requestIdRef.current) setLoading(false);
     }
   };
 
-  const handleProductSelect = async (product) => {
+  const openProduct = async (product) => {
     try {
       if (!product.barcode) {
         Alert.alert('Error', 'Product barcode not available.');
@@ -144,495 +187,248 @@ const SearchScreen = ({ navigation }) => {
       }
       const isFood = productType === 'food';
       const subType = await AsyncStorage.getItem('subscriptionType');
-      const isPrem  = subType === 'Premium';
-      if (isPrem) {
+      if (subType === 'Premium') {
         navigation.navigate(isFood ? 'Results' : 'CosmeticResults', {
           barcode: product.barcode, fromSearch: true, freeAIAccess: true,
         });
         return;
       }
       const usedStr = await AsyncStorage.getItem('premiumTrialUsedToday');
-      let used = usedStr ? parseInt(usedStr) : 0;
+      const used = usedStr ? parseInt(usedStr, 10) : 0;
       const hasAI = used < 2;
       if (used < 2) {
-        const newUsed = used + 1;
-        await AsyncStorage.setItem('premiumTrialUsedToday', newUsed.toString());
-        setRemainingSearches(2 - newUsed);
-        if (newUsed >= 2) {
-          setTimeout(() => {
-            Alert.alert(
-              'Premium Trial Complete',
-              "You've used your 2 free premium searches.\n\nUpgrade to Premium for unlimited AI analysis!",
-              [
-                { text: 'Continue Free', style: 'cancel' },
-                { text: 'Upgrade', onPress: () => navigation.navigate('Subscription') },
-              ]
-            );
-          }, 1500);
-        }
+        await AsyncStorage.setItem('premiumTrialUsedToday', String(used + 1));
       }
       navigation.navigate(isFood ? 'Results' : 'CosmeticResults', {
         barcode: product.barcode, fromSearch: true, freeAIAccess: hasAI,
       });
-    } catch (e) {
+    } catch {
       Alert.alert('Error', 'Failed to open product. Please try again.');
     }
   };
 
-  const filteredResults = activeFilter === 'all'
-    ? searchResults
-    : searchResults.filter(i => i.productType === activeFilter);
+  // ── Derived list ───────────────────────────────────────────────────────
+  const source = searching ? results : feed;
+  const matcher = CHIPS.find((c) => c.key === chip)?.match || (() => true);
+  let list = source.filter(matcher);
+  if (topRated) list = [...list].sort((a, b) => b.score - a.score);
 
-  const renderProductItem = ({ item, index }) => {
-    const isFood    = item.productType === 'food';
-    const typeIcon  = isFood ? 'nutrition-outline' : 'sparkles-outline';
-    const typeLabel = isFood ? 'Food' : 'Cosmetic';
-    const isLast    = index === filteredResults.length - 1;
+  const busy = searching ? loading : feedLoading;
 
-    return (
-      <TouchableOpacity
-        style={[st.productItem, { backgroundColor: theme.bgCard, borderColor: theme.border }, isLast && { borderBottomWidth: 0 }]}
-        onPress={() => handleProductSelect(item)}
-        activeOpacity={0.7}
-      >
-        {/* Product image */}
-        <View style={st.productImgWrap}>
-          <ProductImg uri={item.image} typeIcon={typeIcon} theme={theme} />
-          <View style={[st.typeDot, { backgroundColor: isFood ? '#067A4F' : '#6B3FA0', borderColor: theme.bgCard }]}>
-            <Ionicons name={typeIcon} size={8} color="#fff" />
-          </View>
-        </View>
-
-        {/* Product details */}
-        <View style={st.productDetails}>
-          <Text style={[st.productName, { color: theme.text }]} numberOfLines={2}>{item.name}</Text>
-          {item.brand ? (
-            <Text style={[st.productBrand, { color: theme.textMuted }]} numberOfLines={1}>{item.brand}</Text>
-          ) : null}
-          <View style={[st.typeChip, { backgroundColor: isFood ? 'rgba(6,122,79,0.08)' : 'rgba(107,63,160,0.12)' }]}>
-            <Ionicons name={typeIcon} size={11} color={isFood ? '#067A4F' : '#9C6ADE'} />
-            <Text style={[st.typeChipText, { color: isFood ? '#067A4F' : '#9C6ADE' }]}>{typeLabel}</Text>
-          </View>
-        </View>
-
-        <Ionicons name="chevron-forward" size={18} color={theme.textMuted} />
-      </TouchableOpacity>
-    );
-  };
-
-  const renderEmpty = () => {
-    if (loading) return null;
-    return (
-      <View style={st.emptyState}>
-        <Ionicons
-          name={hasSearched ? 'search-outline' : 'leaf-outline'}
-          size={52}
-          color={theme.textDim}
-        />
-        <Text style={[st.emptyTitle, { color: theme.text }]}>
-          {hasSearched ? 'No products found' : 'Search for products'}
-        </Text>
-        <Text style={[st.emptyDesc, { color: theme.textMuted }]}>
-          {hasSearched
-            ? 'Try different keywords or check the spelling'
-            : 'Enter a product name to check its health score and ingredients'}
-        </Text>
+  const renderItem = ({ item }) => (
+    <TouchableOpacity style={st.card} onPress={() => openProduct(item)} activeOpacity={0.75}>
+      <ProductImg uri={item.image} seed={item.barcode || item.name} />
+      <View style={st.cardMid}>
+        <Text style={st.cardName} numberOfLines={1}>{item.name}</Text>
+        {item.brand ? <Text style={st.cardBrand} numberOfLines={1}>{item.brand}</Text> : null}
       </View>
-    );
-  };
+      <ScoreBadge score={item.score} />
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: theme.bg }}
+      style={st.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
     >
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={theme.bg} />
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
 
-      {/* ── FIXED HEADER ─────────────────────────────────── */}
-      <View style={[st.header, { paddingTop: safeAreaInsets.top + 12, height: safeAreaInsets.top + 52, backgroundColor: theme.headerBg, borderBottomColor: theme.headerBorder }]}>
-        <View style={st.headerLeft}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          >
-            <Ionicons name="arrow-back" size={22} color={theme.textMuted} />
-          </TouchableOpacity>
-          <Text style={[st.headerTitle, { color: theme.text }]}>Search Products</Text>
-        </View>
-      </View>
-
-      {/* ── SEARCH BAR ──────────────────────────────────── */}
-      <View style={[st.searchBar, { marginTop: safeAreaInsets.top + 52, backgroundColor: theme.bg }]}>
-        <View style={[st.searchInputWrap, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-          <Ionicons name="search-outline" size={20} color={theme.textMuted} />
-          <TextInput
-            style={[st.searchInput, { color: theme.text }]}
-            placeholder="Search food, cosmetics..."
-            placeholderTextColor={theme.textMuted}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            onSubmitEditing={handleSearch}
-            returnKeyType="search"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')} activeOpacity={0.7}>
-              <Ionicons name="close-circle" size={18} color={theme.textMuted} />
-            </TouchableOpacity>
-          )}
-        </View>
+      {/* Header */}
+      <View style={[st.header, { paddingTop: insets.top + 14 }]}>
         <TouchableOpacity
-          style={[st.searchBtn, { opacity: searchQuery.trim().length < 3 ? 0.4 : 1 }]}
-          onPress={handleSearch}
-          disabled={searchQuery.trim().length < 3 || loading}
-          activeOpacity={0.85}
+          style={st.plusBtn}
+          onPress={() => navigation.navigate('Home', { startScanning: true })}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          activeOpacity={0.8}
         >
-          {loading
-            ? <ActivityIndicator size="small" color="#FFFFFF" />
-            : <Text style={st.searchBtnText}>Search</Text>
-          }
+          <Ionicons name="add" size={22} color={ON_SURFACE} />
         </TouchableOpacity>
+        <Text style={st.headerTitle}>Search</Text>
       </View>
 
-      {/* ── PREMIUM STATUS PILL ─────────────────────────── */}
-      <View style={[st.statusPill, { backgroundColor: theme.bgCard, borderColor: theme.border }]}>
-        <Ionicons
-          name={isPremium ? 'star' : remainingSearches > 0 ? 'sparkles' : 'infinite'}
-          size={13}
-          color={theme.textMuted}
+      {/* Search input */}
+      <View style={st.searchWrap}>
+        <Ionicons name="search" size={18} color={ON_SURF_VAR} />
+        <TextInput
+          style={st.searchInput}
+          placeholder="Product name or barcode"
+          placeholderTextColor={ON_SURF_VAR}
+          value={query}
+          onChangeText={setQuery}
+          returnKeyType="search"
+          autoCapitalize="none"
+          autoCorrect={false}
         />
-        <Text style={[st.statusText, { color: theme.textMuted }]}>
-          {isPremium
-            ? 'Premium · Unlimited AI searches'
-            : remainingSearches > 0
-              ? `${remainingSearches} AI trial search${remainingSearches === 1 ? '' : 'es'} left`
-              : 'Unlimited free searches · Upgrade for AI'}
-        </Text>
+        {loading ? (
+          <ActivityIndicator size="small" color={PRIMARY} />
+        ) : query.length > 0 ? (
+          <TouchableOpacity onPress={() => setQuery('')} activeOpacity={0.7}>
+            <Ionicons name="close-circle" size={18} color={ON_SURF_VAR} />
+          </TouchableOpacity>
+        ) : null}
       </View>
 
-      {/* ── FILTER TABS ─────────────────────────────────── */}
-      {hasSearched && searchResults.length > 0 && (
-        <View style={st.filterRow}>
-          {FILTER_TABS.map(tab => {
-            const isActive = activeFilter === tab.key;
-            const count = tab.key === 'all'
-              ? searchResults.length
-              : tab.key === 'food'
-                ? resultCounts.food
-                : resultCounts.cosmetic;
+      {/* Category pills — single scrolling row. The wrapper clips the scroll
+          area below its own height, so the horizontal scrollbar can never show. */}
+      <View style={st.chipClip}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={st.chipScroll}
+          contentContainerStyle={st.chipRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {CHIPS.map((c) => {
+            const active = chip === c.key;
             return (
               <TouchableOpacity
-                key={tab.key}
-                style={[st.filterTab, { backgroundColor: theme.bgCard, borderColor: theme.border }, isActive && st.filterTabActive]}
-                onPress={() => setActiveFilter(tab.key)}
-                activeOpacity={0.7}
+                key={c.key}
+                style={[st.chip, active && st.chipActive]}
+                onPress={() => setChip(c.key)}
+                activeOpacity={0.8}
               >
-                <Ionicons name={tab.icon} size={13} color={isActive ? '#FFFFFF' : theme.textMuted} />
-                <Text style={[st.filterTabText, { color: theme.textMuted }, isActive && st.filterTabTextActive]}>
-                  {tab.label}
-                </Text>
-                <View style={[st.filterBadge, { backgroundColor: theme.bgIcon }, isActive && st.filterBadgeActive]}>
-                  <Text style={[st.filterBadgeText, { color: theme.textMuted }, isActive && st.filterBadgeTextActive]}>
-                    {count}
-                  </Text>
-                </View>
+                <Text style={[st.chipText, active && st.chipTextActive]}>{c.label}</Text>
               </TouchableOpacity>
             );
           })}
-        </View>
-      )}
+        </ScrollView>
+      </View>
 
-      {/* ── RESULTS LIST ────────────────────────────────── */}
+      {/* Sub-header: count + sort */}
+      <View style={st.subRow}>
+        <Text style={st.countText}>
+          {busy ? 'Loading…' : `${list.length} product${list.length === 1 ? '' : 's'}`}
+        </Text>
+        <TouchableOpacity
+          style={[st.sortBadge, topRated && st.sortBadgeActive]}
+          onPress={() => setTopRated((v) => !v)}
+          activeOpacity={0.8}
+        >
+          <Ionicons
+            name="trending-up"
+            size={13}
+            color={topRated ? PRIMARY : ON_SURF_VAR}
+          />
+          <Text style={[st.sortText, topRated && st.sortTextActive]}>Top rated</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* List */}
       <FlatList
-        data={filteredResults}
-        renderItem={renderProductItem}
-        keyExtractor={(item, i) => item.barcode || i.toString()}
+        data={list}
+        renderItem={renderItem}
+        keyExtractor={(item, i) => item.barcode || String(i)}
         style={{ flex: 1 }}
-        contentContainerStyle={st.listContent}
-        ListEmptyComponent={renderEmpty}
+        contentContainerStyle={[st.listContent, { paddingBottom: insets.bottom + 90 }]}
+        ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
+        ListEmptyComponent={
+          busy ? null : (
+            <View style={st.empty}>
+              <Ionicons name="leaf-outline" size={30} color="#d4d4d4" />
+              <Text style={st.emptyText}>
+                {searching ? 'No highly-rated products match that search.' : 'No products to show yet.'}
+              </Text>
+            </View>
+          )
+        }
       />
-
-      {/* ── BOTTOM HINT ─────────────────────────────────── */}
-      <View style={[st.bottomHint, { backgroundColor: theme.bg, borderTopColor: theme.border }]}>
-        <Text style={[st.bottomHintText, { color: theme.textMuted }]}>Can't find it? </Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Home')} activeOpacity={0.7}>
-          <Text style={[st.bottomHintLink, { color: theme.text }]}>Try scanning the barcode</Text>
-        </TouchableOpacity>
-      </View>
     </KeyboardAvoidingView>
   );
 };
 
 const st = StyleSheet.create({
-  // Header — safe area applied inline via safeAreaInsets.top
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+
   header: {
-    position: 'absolute',
-    top: 0, left: 0, right: 0,
-    zIndex: 50,
     paddingHorizontal: 24,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  plusBtn: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#F3F3F3',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  headerTitle: { fontSize: 24, fontWeight: '800', color: ON_SURFACE, letterSpacing: -0.3 },
+
+  searchWrap: {
+    marginHorizontal: 24,
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: 50,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: PRIMARY,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFFFFF',
+  },
+  searchInput: { flex: 1, fontSize: 15, fontWeight: '500', color: ON_SURFACE, padding: 0 },
+
+  chipClip: { height: 40, marginTop: 16, overflow: 'hidden' },
+  chipScroll: { height: 62 }, // taller than the clip → scrollbar sits in the hidden zone
+  chipRow: { paddingHorizontal: 24, gap: 8, alignItems: 'flex-start' },
+  chip: {
+    height: 36,
+    paddingHorizontal: 18,
+    borderRadius: 9999,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipActive: { backgroundColor: PRIMARY },
+  chipText: { fontSize: 13, fontWeight: '600', color: '#3F3F46' },
+  chipTextActive: { color: '#FFFFFF', fontWeight: '700' },
+
+  subRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(251,251,249,0.92)',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
+    paddingHorizontal: 24,
+    marginTop: 18,
+    marginBottom: 4,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
+  countText: { fontSize: 13, fontWeight: '500', color: ON_SURF_VAR },
+  sortBadge: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 12, paddingVertical: 7, borderRadius: 999, backgroundColor: '#F2F2F2',
   },
-  headerTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#171717',
-    letterSpacing: 3,
-    textTransform: 'uppercase',
-  },
+  sortBadgeActive: { backgroundColor: GREEN_SOFT },
+  sortText: { fontSize: 12.5, fontWeight: '600', color: ON_SURF_VAR },
+  sortTextActive: { color: PRIMARY },
 
-  // Search bar
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    gap: 10,
-    backgroundColor: BG,
-  },
-  searchInputWrap: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: SURFACE_LOW,
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 10,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 15,
-    color: ON_SURFACE,
-  },
-  searchBtn: {
-    backgroundColor: '#067A4F',
-    borderRadius: 24,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-  },
-  searchBtnText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-  },
+  listContent: { flexGrow: 1, paddingHorizontal: 24, paddingTop: 14 },
 
-  // Status pill
-  statusPill: {
+  card: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    backgroundColor: SURFACE_LOW,
-    borderRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: ON_SURF_VAR,
-    letterSpacing: 0.5,
-  },
-
-  // Filter row
-  filterRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-  },
-  filterTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    gap: 5,
-    backgroundColor: SURFACE_LOW,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
-  },
-  filterTabActive: {
-    backgroundColor: '#067A4F',
-    borderColor: '#067A4F',
-  },
-  filterTabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: ON_SURF_VAR,
-    letterSpacing: 0.5,
-  },
-  filterTabTextActive: {
-    color: '#FFFFFF',
-  },
-  filterBadge: {
-    backgroundColor: SURFACE_HIGH,
-    borderRadius: 8,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  filterBadgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-  },
-  filterBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: ON_SURF_VAR,
-  },
-  filterBadgeTextActive: {
-    color: '#FFFFFF',
-  },
-
-  // Results list
-  listContent: {
-    flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-
-  // Product item
-  productItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.06)',
-    backgroundColor: SURFACE_LOW,
-    gap: 14,
+    gap: 12,
+    padding: 12,
     borderRadius: 16,
-    marginBottom: 8,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(0,0,0,0.08)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 16,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    backgroundColor: '#FFFFFF',
   },
-  productImgWrap: { position: 'relative' },
-  productImg: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-  },
-  productImgPlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: 12,
-    backgroundColor: SURFACE_MID,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  typeDot: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: SURFACE_LOW,
-  },
-  productDetails: { flex: 1 },
-  productName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: ON_SURFACE,
-    marginBottom: 3,
-    lineHeight: 20,
-  },
-  productBrand: {
-    fontSize: 12,
-    color: ON_SURF_VAR,
-    marginBottom: 6,
-  },
-  typeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-    alignSelf: 'flex-start',
-  },
-  typeChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
+  thumb: { width: 56, height: 56, borderRadius: 12, backgroundColor: '#F5F5F5' },
+  thumbBox: { alignItems: 'center', justifyContent: 'center' },
+  cardMid: { flex: 1 },
+  cardName: { fontSize: 15.5, fontWeight: '700', color: ON_SURFACE, marginBottom: 2 },
+  cardBrand: { fontSize: 13, fontWeight: '500', color: ON_SURF_VAR },
 
-  // Empty state
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 40,
-    paddingVertical: 80,
+  badge: {
+    width: 48, height: 48, borderRadius: 12, backgroundColor: GREEN_SOFT,
+    alignItems: 'center', justifyContent: 'center',
   },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: ON_SURFACE,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  emptyDesc: {
-    fontSize: 14,
-    color: ON_SURF_VAR,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
+  badgeNum: { fontSize: 16, fontWeight: '800', color: GREEN_DARK, lineHeight: 18 },
+  badgeLabel: { fontSize: 9.5, fontWeight: '700', color: GREEN_DARK },
 
-  // Bottom hint
-  bottomHint: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(0,0,0,0.06)',
-    backgroundColor: BG,
-  },
-  bottomHintText: {
-    fontSize: 13,
-    color: ON_SURF_VAR,
-  },
-  bottomHintLink: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: ON_SURFACE,
-    letterSpacing: 0.5,
-  },
+  empty: { alignItems: 'center', justifyContent: 'center', paddingVertical: 70, gap: 10 },
+  emptyText: { fontSize: 13.5, color: ON_SURF_VAR, textAlign: 'center', maxWidth: 260 },
 });
 
 export default SearchScreen;

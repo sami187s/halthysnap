@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../config/asyncStorageConfig';
+import { markScanQualified } from '../services/referral';
 
 const MAX_HISTORY_ITEMS = 1000; // Maximum number of scans to keep
 const MAX_HISTORY_AGE_DAYS = 7; // Auto-delete scans older than 7 days (free/trial only)
@@ -92,6 +93,7 @@ export const saveToHistory = async (product) => {
       id: existingIndex >= 0 ? history[existingIndex].id : `scan_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       barcode: product.barcode,
       productName: product.productName,
+      productBrand: product.brand || '',
       productImage: product.productImage || null,
       productType: product.productType || 'food',
       score: product.score || 0,
@@ -121,6 +123,9 @@ export const saveToHistory = async (product) => {
     // Save updated history
     await AsyncStorage.setItem(STORAGE_KEYS.SCAN_HISTORY, JSON.stringify(history));
     console.log(`✅ History saved (${history.length} items)`);
+
+    // 🎁 A completed scan qualifies a pending referral (no-op if not referred)
+    markScanQualified().catch(() => {});
 
     return { success: true, count: history.length };
   } catch (error) {

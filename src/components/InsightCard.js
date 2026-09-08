@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -25,10 +25,10 @@ const STATUS_CONFIG = {
   good: {
     icon: 'checkmark-circle',
     label: 'Good',
-    color: '#4CAF50',
-    barColor: '#4CAF50',
+    color: '#067A4F',
+    barColor: '#067A4F',
     bgTint: 'rgba(76, 175, 80, 0.06)',
-    textColor: '#1B5E20',
+    textColor: '#067A4F',
   },
   moderate: {
     icon: 'alert-circle',

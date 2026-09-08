@@ -52,8 +52,8 @@ import { BlurView } from 'expo-blur';
 
 // Helper functions for scoring and colors
 const getScoreColor = (score) => {
-  if (score >= 90) return '#1B5E20';      // Excellent - Very Dark Green
-  if (score >= 70) return '#4CAF50';      // Good - Green (was Medium/Orange)
+  if (score >= 90) return '#067A4F';      // Excellent - Very Dark Green
+  if (score >= 70) return '#067A4F';      // Good - Green (was Medium/Orange)
   if (score >= 50) return '#FF9800';      // Average - Orange (was Good)
   if (score >= 25) return '#FF5722';      // Poor - Red-orange
   return '#F44336';                       // Very Poor - Red
@@ -102,7 +102,7 @@ const analyzeIndividualIngredient = (ingredient, analysis) => {
     if (existingAnalysis.category) {
       const cat = existingAnalysis.category.toLowerCase();
       if (cat === 'excellent' || cat === 'good') {
-        return { status: cat === 'excellent' ? 'EXCELLENT' : 'GOOD', color: '#4CAF50', textColor: '#2E7D32', reason: existingAnalysis.notes || existingAnalysis.function || 'Safe ingredient' };
+        return { status: cat === 'excellent' ? 'EXCELLENT' : 'GOOD', color: '#067A4F', textColor: '#067A4F', reason: existingAnalysis.notes || existingAnalysis.function || 'Safe ingredient' };
       } else if (cat === 'bad' || cat === 'poor') {
         return { status: 'POOR', color: '#D32F2F', textColor: '#C62828', reason: existingAnalysis.concerns || existingAnalysis.notes || 'Potential safety concern' };
       } else if (cat === 'moderate') {
@@ -113,7 +113,7 @@ const analyzeIndividualIngredient = (ingredient, analysis) => {
     // Check score field
     if (existingAnalysis.score != null) {
       const sc = existingAnalysis.score;
-      if (sc >= 70) return { status: 'GOOD', color: '#4CAF50', textColor: '#2E7D32', reason: existingAnalysis.notes || 'Generally safe' };
+      if (sc >= 70) return { status: 'GOOD', color: '#067A4F', textColor: '#067A4F', reason: existingAnalysis.notes || 'Generally safe' };
       if (sc >= 45) return { status: 'MODERATE', color: '#FF9800', textColor: '#F57C00', reason: existingAnalysis.concerns || existingAnalysis.notes || 'Use with caution' };
       return { status: 'POOR', color: '#D32F2F', textColor: '#C62828', reason: existingAnalysis.concerns || existingAnalysis.notes || 'Potential safety concern' };
     }
@@ -124,14 +124,14 @@ const analyzeIndividualIngredient = (ingredient, analysis) => {
     switch(existingAnalysis.riskLevel) {
       case 'excellent':
         status = 'EXCELLENT';
-        color = '#1B5E20'; // Dark Green
-        textColor = '#1B5E20';
+        color = '#067A4F'; // Dark Green
+        textColor = '#067A4F';
         reason = existingAnalysis.description;
         break;
       case 'low':
         status = 'GOOD';
-        color = '#4CAF50'; // Regular Green
-        textColor = '#66BB6A';
+        color = '#067A4F'; // Regular Green
+        textColor = '#067A4F';
         reason = existingAnalysis.description;
         break;
       case 'moderate':
@@ -209,15 +209,15 @@ const analyzeIndividualIngredient = (ingredient, analysis) => {
   if (isExcellent) {
     return {
       status: 'EXCELLENT',
-      color: '#1B5E20', // Dark Green
-      textColor: '#1B5E20',
+      color: '#067A4F', // Dark Green
+      textColor: '#067A4F',
       reason: 'Highly beneficial natural ingredient'
     };
   } else if (isGood) {
     return {
       status: 'GOOD',
-      color: '#4CAF50', // Regular Green
-      textColor: '#66BB6A',
+      color: '#067A4F', // Regular Green
+      textColor: '#067A4F',
       reason: 'Safe and beneficial ingredient'
     };
   } else if (isBad) {
@@ -1147,7 +1147,7 @@ const ResultsScreen = ({ route, navigation }) => {
   };
 
   const renderIngredientItem = (ingredient, isGood) => {
-    const color = isGood ? '#4CAF50' : '#F44336';
+    const color = isGood ? '#067A4F' : '#F44336';
     const icon = isGood ? 'checkmark-circle' : 'close-circle';
     
     return (
@@ -1289,7 +1289,7 @@ const ResultsScreen = ({ route, navigation }) => {
             Product: {product ? 'Ã¢Å“â€¦' : 'Ã¢ÂÅ’'} | Analysis: {analysis ? 'Ã¢Å“â€¦' : 'Ã¢ÂÅ’'}
           </Text>
           <TouchableOpacity 
-            style={{ backgroundColor: '#4CAF50', padding: 15, borderRadius: 25, marginTop: 20 }}
+            style={{ backgroundColor: '#067A4F', padding: 15, borderRadius: 25, marginTop: 20 }}
             onPress={() => navigation.navigate('Home')}
           >
             <Text style={{ color: '#fff', fontWeight: 'bold' }}>Try Again</Text>
@@ -1302,9 +1302,9 @@ const ResultsScreen = ({ route, navigation }) => {
   // Vee design color palette
   const C = {
     greenDark: '#1B3A2A',
-    green: '#4CAF72',
-    greenMid: '#4CAF7C',
-    greenLight: '#E8F5EE',
+    green: '#067A4F',
+    greenMid: '#067A4F',
+    greenLight: '#E5F2EC',
     amber: '#F5A623',
     amberLight: '#FEF3E7',
     red: '#E05252',
@@ -1586,13 +1586,13 @@ const ResultsScreen = ({ route, navigation }) => {
   const getNutLevelLabel = (label, pct) => {
     const isPositive = label === 'Protein' || label === 'Fiber';
     if (isPositive) {
-      if (pct >= 20) return { text: 'High Source', color: '#4CAF50' };
+      if (pct >= 20) return { text: 'High Source', color: '#067A4F' };
       if (pct >= 10) return { text: 'Moderate', color: '#FF9800' };
       return { text: 'Low', color: '#999' };
     }
     if (pct >= 40) return { text: 'High Content', color: '#E05252' };
     if (pct >= 15) return { text: 'Moderate', color: '#FF9800' };
-    return { text: 'Low', color: '#4CAF50' };
+    return { text: 'Low', color: '#067A4F' };
   };
 
   // Scan count (deterministic from score)
@@ -1725,7 +1725,7 @@ const ResultsScreen = ({ route, navigation }) => {
                   { label: 'Processing', pct: 10, value: enhancedHealthScore.breakdown.processingScore, icon: 'construct-outline' },
                   { label: 'Positives', pct: 5, value: enhancedHealthScore.breakdown.positiveBonus, icon: 'add-circle-outline' },
                 ].map((item, idx) => {
-                  const itemColor = item.value >= 70 ? '#4CAF50' : item.value >= 40 ? '#FF9800' : '#E05252';
+                  const itemColor = item.value >= 70 ? '#067A4F' : item.value >= 40 ? '#FF9800' : '#E05252';
                   return (
                     <View key={idx} style={vs.whyCell}>
                       <View style={[vs.whyCellIcon, { backgroundColor: itemColor + '18' }]}>
@@ -1745,7 +1745,7 @@ const ResultsScreen = ({ route, navigation }) => {
                   {enhancedHealthScore.scoreReasons.map((reason, idx) => {
                     const isPenalty = reason.type === 'penalty';
                     const isBonus = reason.type === 'bonus';
-                    const reasonColor = isPenalty ? '#E05252' : isBonus ? '#4CAF50' : '#FF9800';
+                    const reasonColor = isPenalty ? '#E05252' : isBonus ? '#067A4F' : '#FF9800';
                     const reasonIcon = isPenalty ? 'remove-circle' : isBonus ? 'add-circle' : 'information-circle';
                     const impactText = typeof reason.impact === 'number'
                       ? (reason.impact > 0 ? '+' + reason.impact : '' + reason.impact)
@@ -1860,7 +1860,7 @@ const ResultsScreen = ({ route, navigation }) => {
                   const description = getShortDescription(ingredient, analysis);
                   const isGoodStatus = ingAnalysis.status === 'GOOD' || ingAnalysis.status === 'EXCELLENT';
                   const isPoorStatus = ingAnalysis.status === 'POOR';
-                  const dotColor = isGoodStatus ? '#4CAF50' : isPoorStatus ? '#E05252' : '#FF9800';
+                  const dotColor = isGoodStatus ? '#067A4F' : isPoorStatus ? '#E05252' : '#FF9800';
                   return (
                     <View key={idx} style={vs.ingRow}>
                       <View style={[vs.ingDot, { backgroundColor: dotColor }]} />
@@ -1888,7 +1888,7 @@ const ResultsScreen = ({ route, navigation }) => {
               </View>
               {altsLoading ? (
                 <View style={{ paddingVertical: 24, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color="#4CAF50" />
+                  <ActivityIndicator size="small" color="#067A4F" />
                   <Text style={{ fontSize: 12, color: '#999', marginTop: 8 }}>Finding alternatives...</Text>
                 </View>
               ) : (
@@ -1900,8 +1900,8 @@ const ResultsScreen = ({ route, navigation }) => {
                   snapToInterval={164}
                 >
                   {(realAlternatives.length > 0 ? realAlternatives : altProducts).map((alt, i) => {
-                    const altScoreColor = alt.score >= 70 ? '#4CAF50' : alt.score >= 50 ? '#FF9800' : '#E05252';
-                    const bgColors = ['#E8F5E9', '#FFF3E0', '#E3F2FD', '#F3E5F5', '#FBE9E7', '#E0F7FA'];
+                    const altScoreColor = alt.score >= 70 ? '#067A4F' : alt.score >= 50 ? '#FF9800' : '#E05252';
+                    const bgColors = ['#E5F2EC', '#FFF3E0', '#E3F2FD', '#F3E5F5', '#FBE9E7', '#E0F7FA'];
                     return (
                       <TouchableOpacity
                         key={i}
@@ -2311,7 +2311,7 @@ const vs = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.5,
-    color: '#4CAF50',
+    color: '#067A4F',
     backgroundColor: '#F0F8F0',
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -2365,7 +2365,7 @@ const vs = StyleSheet.create({
   ingFullListLink: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   ingListWrap: {
     gap: 0,
@@ -2410,7 +2410,7 @@ const vs = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
-    color: '#4CAF50',
+    color: '#067A4F',
   },
   altCard: {
     width: 152,
@@ -2489,7 +2489,7 @@ const vs = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#067A4F',
     alignItems: 'center',
     justifyContent: 'center',
   },

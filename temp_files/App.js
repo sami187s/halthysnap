@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBar } from 'expo-status-bar';
@@ -126,7 +126,7 @@ export default function App() {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ fontSize: 24, color: '#4CAF50', fontWeight: 'bold', marginBottom: 20 }}>
+          <Text style={{ fontSize: 24, color: '#067A4F', fontWeight: 'bold', marginBottom: 20 }}>
             Vee: Product Check
           </Text>
           <Text style={{ fontSize: 16, color: '#666' }}>
@@ -146,7 +146,7 @@ export default function App() {
             fallback={
               <SafeAreaView style={{ flex: 1, backgroundColor: '#f8f9fa' }}>
                 <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                  <Text style={{ fontSize: 24, color: '#4CAF50', fontWeight: 'bold', marginBottom: 20 }}>
+                  <Text style={{ fontSize: 24, color: '#067A4F', fontWeight: 'bold', marginBottom: 20 }}>
                     Vee: Product Check
                   </Text>
                   <Text style={{ fontSize: 16, color: '#666' }}>

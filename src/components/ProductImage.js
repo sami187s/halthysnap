@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { View, Image, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -20,7 +20,7 @@ const ProductImage = ({ imageUrl, productType, style, forceIcon = false }) => {
   const getProductColor = (type) => {
     switch (type) {
       case 'food':
-        return '#4CAF50';
+        return '#067A4F';
       case 'beauty':
         return '#9C27B0';
       default:

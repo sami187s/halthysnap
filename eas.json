@@ -27,10 +27,7 @@
         "buildType": "apk",
         "gradleCommand": ":app:assembleRelease",
         "env": {
-          "NODE_ENV": "production",
-          "KOTLIN_VERSION": "2.1.0",
-          "ORG_GRADLE_PROJECT_kotlinVersion": "2.1.0",
-          "ORG_GRADLE_PROJECT_kotlin_version": "2.1.0"
+          "NODE_ENV": "production"
         }
       },
       "ios": {

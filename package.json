@@ -7,6 +7,9 @@
     "expo-firebase-crashlytics": "4.1.1",
     "expo-iap": "2.9.7"
   },
+  "overrides": {
+    "@react-native/gradle-plugin": "0.76.9"
+  },
   "scripts": {
     "start": "expo start --dev-client",
     "go": "expo start --go",

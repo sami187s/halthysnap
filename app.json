@@ -8,7 +8,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "description": "Scan barcodes to analyze food nutrition and cosmetic ingredient safety. Get instant health scores and detailed ingredient analysis for both food and personal care products.",
-    "privacy": "public",
     "splash": {
       "image": "./assets/logo.png",
       "resizeMode": "contain",
@@ -125,7 +124,6 @@
         }
       ],
       "./plugins/withIOSDeploymentTarget",
-      "./plugins/fix-gradle-plugin",
       "./plugins/withAndroidVariantFix",
       [
         "expo-camera",

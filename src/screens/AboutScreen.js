@@ -101,8 +101,8 @@ export default function AboutScreen({ navigation }) {
               <Text style={styles.sourcePrimary}>PRIMARY</Text>
             </View>
             <Text style={styles.sourceCardDesc}>
-              A collaborative database of food products from around the world.
-              We utilize their live API for real-time ingredient analysis.
+              A collaborative, open database of food products from around the world, built by
+              thousands of volunteers. Vee combines it with USDA data in its own database.
             </Text>
             <TouchableOpacity
               style={styles.sourceLink}
@@ -128,6 +128,29 @@ export default function AboutScreen({ navigation }) {
               onPress={() => openURL('https://world.openbeautyfacts.org')}
             >
               <Text style={styles.sourceLinkText}>Visit Database</Text>
+              <Ionicons name="open-outline" size={14} color={PRIMARY} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Licence credits (required by the Open Database License) */}
+          <View style={[styles.sourceCard, { marginTop: 12 }]}>
+            <Text style={styles.sourceCardName}>Data credits & licences</Text>
+            <Text style={[styles.sourceCardDesc, { marginTop: 8 }]}>
+              Contains information from Open Food Facts and Open Beauty Facts, made available under the
+              Open Database License (ODbL). Individual data contents are under the Database Contents
+              License. Product photos are shared by contributors under the CC BY-SA licence. Thank you
+              to the thousands of contributors who make this data possible.
+            </Text>
+            <Text style={[styles.sourceCardDesc, { marginTop: 8 }]}>
+              Nutrition details also come from USDA FoodData Central (U.S. Department of Agriculture,
+              public domain). Vee's scores, analysis and wording are our own and are not endorsed by
+              Open Food Facts, Open Beauty Facts or the USDA.
+            </Text>
+            <TouchableOpacity
+              style={styles.sourceLink}
+              onPress={() => openURL('https://opendatacommons.org/licenses/odbl/1-0/')}
+            >
+              <Text style={styles.sourceLinkText}>Read the ODbL licence</Text>
               <Ionicons name="open-outline" size={14} color={PRIMARY} />
             </TouchableOpacity>
           </View>
@@ -177,9 +200,9 @@ export default function AboutScreen({ navigation }) {
 
           <View style={[styles.bentoCard, { marginTop: 12 }]}>
             {[
-              { label: 'Optimal',  range: '70–100', color: PRIMARY },
-              { label: 'Moderate', range: '40–69',  color: SECONDARY },
-              { label: 'Avoid',    range: '0–39',   color: ERROR },
+              { label: 'Good', range: '70–100', color: PRIMARY },
+              { label: 'Fair', range: '50–69',  color: SECONDARY },
+              { label: 'Poor', range: '0–49',   color: ERROR },
             ].map((item, i, arr) => (
               <View key={item.label}>
                 <View style={styles.scoreRow}>
@@ -197,16 +220,23 @@ export default function AboutScreen({ navigation }) {
 
         {/* ── 4. Data Limitations ── */}
         <View style={styles.section}>
-          <SectionHeader icon="warning-outline" title="Data Limitations" accentColor={OUTLINE} />
+          <SectionHeader icon="warning-outline" title="Health Disclaimer" accentColor={OUTLINE} />
           <View style={styles.limitationCard}>
             <View style={styles.limitationInner}>
-              <Ionicons name="shield-checkmark-outline" size={24} color={OUTLINE} style={{ marginTop: 2 }} />
+              <Ionicons name="medkit-outline" size={24} color={OUTLINE} style={{ marginTop: 2 }} />
               <View style={{ flex: 1, marginLeft: 14 }}>
-                <Text style={styles.limitationTitle}>Verified Intelligence</Text>
+                <Text style={styles.limitationTitle}>Not medical advice</Text>
                 <Text style={styles.limitationBody}>
-                  While we strive for 100% accuracy, users should verify critical information
-                  directly on physical packaging. Vee is a nutritional guidance tool,
-                  not a medical device.
+                  Vee gives general information about food and cosmetic ingredients for education only.
+                  It is not medical advice, and it does not replace a doctor, registered dietitian,
+                  pharmacist or other qualified health professional.
+                </Text>
+                <Text style={[styles.limitationBody, { marginTop: 10 }]}>
+                  Scores are estimates based on public product data (for example Open Food Facts and USDA)
+                  and on our own scoring method. Product data can be incomplete, out of date or wrong, and
+                  recipes change. Always check the label on the physical package — especially if you have
+                  an allergy, intolerance or medical condition, are pregnant or nursing, or are choosing
+                  products for a child.
                 </Text>
               </View>
             </View>

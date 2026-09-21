@@ -3,6 +3,49 @@
 // Starts at 100 and subtracts penalties — harder to manipulate
 
 import { analyzeIngredients } from './enhancedIngredientAnalyzer';
+import { findRiskyAdditives } from './additiveRisk';
+
+// Drinks are judged per 100 ml with stricter sugar limits (liquid sugar is absorbed fast).
+const DRINK_WORDS = /\b(beverage|beverages|drink|drinks|soda|sodas|cola|colas|juice|juices|nectar|lemonade|smoothie|kombucha)\b/i;
+export const isDrinkProduct = (p) => DRINK_WORDS.test(`${p?.categories || ''} ${p?.product_name || ''}`);
+
+const numOrNull = (v) => {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
+
+// Energy in kcal. 'energy_100g' / 'energy' are kilojoules in Open Food Facts data.
+export const getEnergyKcal = (n = {}) => {
+  const kcal = numOrNull(n['energy-kcal_100g']) ?? numOrNull(n['energy-kcal']) ?? numOrNull(n.energy_kcal_100g);
+  if (kcal !== null) return kcal;
+  const kj = numOrNull(n.energy_100g) ?? numOrNull(n.energy);
+  return kj !== null ? kj / 4.184 : null;
+};
+
+const NUTRITION_PRESENCE_KEYS = [
+  (n) => getEnergyKcal(n),
+  (n) => numOrNull(n.fat_100g),
+  (n) => numOrNull(n['saturated-fat_100g']),
+  (n) => numOrNull(n.sugars_100g),
+  (n) => numOrNull(n.salt_100g) ?? numOrNull(n.sodium_100g),
+  (n) => numOrNull(n.proteins_100g),
+  (n) => numOrNull(n.fiber_100g),
+];
+
+// Real nutrition data = at least 3 of the 7 main fields are actually present.
+// Missing values are NOT zero — they must never be scored as "perfect".
+export const hasNutritionData = (nutriments) => {
+  if (!nutriments || typeof nutriments !== 'object') return false;
+  return NUTRITION_PRESENCE_KEYS.filter((get) => get(nutriments) !== null).length >= 3;
+};
+
+export const hasIngredientData = (product) =>
+  typeof product?.ingredients_text === 'string' && product.ingredients_text.trim().length >= 3;
+
+// A product can be scored only if it has real nutrition or a real ingredient list.
+export const hasScorableData = (product) =>
+  hasNutritionData(product?.nutriments) || hasIngredientData(product);
 
 export const calculateHealthScore = (product, adjustedNutrition = null, portion = null) => {
   
@@ -10,20 +53,37 @@ export const calculateHealthScore = (product, adjustedNutrition = null, portion 
   const scoreReasons = []; // Tracks human-readable reasons for the score
   
   // Step 1: Nutrition Score (55% weight) — start at 100, subtract penalties
-  const nutritionResult = calculateNutritionScore(nutritionData, portion, product?.nutriments);
+  const nutritionAvailable = hasNutritionData(nutritionData);
+  const ingredientAvailable = hasIngredientData(product);
+  if (!nutritionAvailable && !ingredientAvailable) {
+    // Nothing real to score — never invent a number.
+    return {
+      score: null,
+      grade: null,
+      color: '#9E9E9E',
+      letter: null,
+      insufficientData: true,
+      breakdown: { nutritionScore: null, ingredientScore: null, processingScore: null, positiveBonus: 0, finalScore: null },
+      scoreReasons: [],
+      details: { penalties: [], bonuses: [], portionInfo: null, harmfulIngredientCap: null },
+    };
+  }
+  const nutritionResult = nutritionAvailable
+    ? calculateNutritionScore(nutritionData, portion, product?.nutriments, isDrinkProduct(product))
+    : { score: null, reasons: [] };
   const nutritionScore = nutritionResult.score;
   scoreReasons.push(...nutritionResult.reasons);
   
   // Step 2: Ingredient Risk Score (30% weight) — start at 100, subtract per ingredient
   const ingredientAnalysis = analyzeEnhancedIngredientRisks(product);
   const ingredientResult = calculateIngredientScore(ingredientAnalysis);
-  const ingredientScore = ingredientResult.score;
-  scoreReasons.push(...ingredientResult.reasons);
+  const ingredientScore = ingredientAvailable ? ingredientResult.score : null;
+  if (ingredientAvailable) scoreReasons.push(...ingredientResult.reasons);
   
   // Step 3: Processing Score (10% weight) — NOVA-style classification
   const processingResult = calculateProcessingScore(product);
-  const processingScore = processingResult.score;
-  scoreReasons.push(...processingResult.reasons);
+  const processingScore = ingredientAvailable ? processingResult.score : null;
+  if (ingredientAvailable) scoreReasons.push(...processingResult.reasons);
   
   // Step 4: Positive Nutrient Bonus (5% weight) — rewards fiber, protein, whole grains
   const positiveResult = calculatePositiveNutrientBonus(nutritionData, product);
@@ -31,21 +91,19 @@ export const calculateHealthScore = (product, adjustedNutrition = null, portion 
   scoreReasons.push(...positiveResult.reasons);
   
   // Step 5: Weighted final score
-  let finalScore = Math.round(
-    (nutritionScore * 0.55) + 
-    (ingredientScore * 0.30) + 
-    (processingScore * 0.10) + 
-    (positiveBonus * 0.05)
-  );
-  
-  // Step 6: Critical Safety Cap — carcinogens/endocrine disruptors cap at 49
-  const hasHighRiskIngredients = ingredientAnalysis.penalties.some(p => p.type === 'harmful-chemical');
-  if (hasHighRiskIngredients) {
-    finalScore = Math.min(finalScore, 49);
-    scoreReasons.push({ text: 'Capped at 49 — harmful chemical detected', type: 'penalty', impact: 'cap' });
-  }
-  
-  // Step 7: Clamp 0–100
+  // Only the parts that have REAL data count. With full data the weights sum to
+  // 0.95 (+ up to 5 bonus points), exactly as before; with a part missing, the
+  // remaining weights are re-normalised instead of filling the gap with a guess.
+  const parts = [];
+  if (nutritionScore !== null) parts.push([nutritionScore, 0.55]);
+  if (ingredientScore !== null) parts.push([ingredientScore, 0.30]);
+  if (processingScore !== null) parts.push([processingScore, 0.10]);
+  const weightSum = parts.reduce((s, [, w]) => s + w, 0);
+  const weighted = parts.reduce((s, [v, w]) => s + v * w, 0) / weightSum;
+  const bonusPoints = nutritionAvailable ? positiveBonus * 0.05 : 0;
+  let finalScore = Math.round(weighted * 0.95 + bonusPoints);
+
+  // Step 6: Clamp 0–100
   finalScore = Math.max(0, Math.min(100, finalScore));
 
   // Step 8: Nutriscore adjustment — use official grade when Turso/OFF data is available
@@ -69,8 +127,25 @@ export const calculateHealthScore = (product, adjustedNutrition = null, portion 
     scoreReasons.push({ text: 'Nutri-Score E — very poor nutritional quality', type: 'penalty', impact: -pen });
   }
   // grade 'c' and unknown → no adjustment (neutral)
-  
+
+  // Step 9: Critical Safety Cap — applied LAST so no bonus can lift a product
+  // with carcinogens/endocrine disruptors back above 49.
+  const hasHighRiskIngredients = ingredientAnalysis.penalties.some(p => p.type === 'harmful-chemical');
+  if (hasHighRiskIngredients && finalScore > 49) {
+    finalScore = 49;
+    scoreReasons.push({ text: 'Capped at 49 — harmful chemical detected', type: 'penalty', impact: 'cap' });
+  }
+  // A high-risk additive (azo dyes, nitrites, BHA, titanium dioxide…) means "not Good", whatever
+  // the nutrition looks like.
+  const hasHighRiskAdditive = ingredientAnalysis.penalties.some((p) => p.type === 'additive' && p.level === 'high');
+  if (hasHighRiskAdditive && finalScore > 59) {
+    finalScore = 59;
+    scoreReasons.push({ text: 'Capped at 59 — high-risk additive detected', type: 'penalty', impact: 'cap' });
+  }
+
   const result = {
+    // Which real data the score is built from — shown to the user when it's partial.
+    dataBasis: nutritionAvailable && ingredientAvailable ? 'full' : nutritionAvailable ? 'nutrition' : 'ingredients',
     score: finalScore,
     grade: getScoreGrade(finalScore),
     color: getScoreColor(finalScore),
@@ -98,7 +173,7 @@ export const calculateHealthScore = (product, adjustedNutrition = null, portion 
 
 // Nutrition Score (0-100) — starts at 100, subtracts tiered penalties
 // Based on research-grade thresholds similar to Nutri-Score
-const calculateNutritionScore = (nutritionData, portion = null, originalNutrition = null) => {
+const calculateNutritionScore = (nutritionData, portion = null, originalNutrition = null, isDrink = false) => {
   let score = 100;
   const reasons = [];
   
@@ -108,7 +183,12 @@ const calculateNutritionScore = (nutritionData, portion = null, originalNutritio
   
   // Sugar penalties (per 100g)
   const sugar = nutritionData.sugars_100g || 0;
-  if (sugar > 35) { score -= 35; reasons.push({ text: `Very high sugar (${sugar.toFixed(1)}g)`, type: 'penalty', impact: -35 }); }
+  if (isDrink) {
+    if (sugar > 8) { score -= 35; reasons.push({ text: `Very high sugar for a drink (${sugar.toFixed(1)}g/100ml)`, type: 'penalty', impact: -35 }); }
+    else if (sugar > 5) { score -= 25; reasons.push({ text: `High sugar for a drink (${sugar.toFixed(1)}g/100ml)`, type: 'penalty', impact: -25 }); }
+    else if (sugar > 2.5) { score -= 15; reasons.push({ text: `Moderate sugar for a drink (${sugar.toFixed(1)}g/100ml)`, type: 'penalty', impact: -15 }); }
+    else if (sugar > 0.5) { score -= 5; reasons.push({ text: `Some sugar (${sugar.toFixed(1)}g/100ml)`, type: 'penalty', impact: -5 }); }
+  } else if (sugar > 35) { score -= 35; reasons.push({ text: `Very high sugar (${sugar.toFixed(1)}g)`, type: 'penalty', impact: -35 }); }
   else if (sugar > 20) { score -= 20; reasons.push({ text: `High sugar (${sugar.toFixed(1)}g)`, type: 'penalty', impact: -20 }); }
   else if (sugar > 10) { score -= 10; reasons.push({ text: `Moderate sugar (${sugar.toFixed(1)}g)`, type: 'penalty', impact: -10 }); }
   else if (sugar > 5) { score -= 5; reasons.push({ text: `Slight sugar (${sugar.toFixed(1)}g)`, type: 'penalty', impact: -5 }); }
@@ -134,7 +214,7 @@ const calculateNutritionScore = (nutritionData, portion = null, originalNutritio
   else if (satFat > 3) { score -= 5; reasons.push({ text: `Moderate saturated fat (${satFat.toFixed(1)}g)`, type: 'penalty', impact: -5 }); }
   
   // Calorie density penalty (per 100g)
-  const calories = nutritionData['energy-kcal_100g'] || nutritionData.energy_100g || 0;
+  const calories = getEnergyKcal(nutritionData) || 0;
   if (calories > 500) { score -= 15; reasons.push({ text: `Very high calories (${Math.round(calories)} kcal)`, type: 'penalty', impact: -15 }); }
   else if (calories > 350) { score -= 8; reasons.push({ text: `High calories (${Math.round(calories)} kcal)`, type: 'penalty', impact: -8 }); }
   
@@ -488,6 +568,24 @@ const analyzeEnhancedIngredientRisks = (product) => {
       });
     }
     
+    // E-numbers (from Open Food Facts tags and from the label text). Additives already
+    // penalised by NAME above (e.g. "aspartame") are not counted a second time for "E951".
+    const alreadyPenalised = penalties.map((p) => String(p.ingredient || '').toLowerCase()).join(' | ');
+    findRiskyAdditives(product).forEach((add) => {
+      if (alreadyPenalised.includes(add.keyword)) return;
+      const high = add.level === 'high';
+      const penalty = high ? 20 : 10;
+      penalties.push({
+        type: 'additive',
+        ingredient: `${add.name} (${add.code.toUpperCase()})`,
+        penalty,
+        reason: add.why,
+        eNumber: add.code.toUpperCase(),
+        level: add.level,
+      });
+      totalPenalty += penalty;
+    });
+
     // Analyze moderate ingredients
     if (analysis.moderateIngredients && analysis.moderateIngredients.length > 0) {
       analysis.moderateIngredients.forEach(ingredient => {

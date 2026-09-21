@@ -19,6 +19,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { fetchCuratedProducts } from '../services/tursoDB';
+import { fetchProductByBarcode } from '../services/reliableAPI';
+import { calculateHealthScore, hasScorableData } from '../utils/enhancedScoring';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 
 const CACHE_KEY = '@vee_curated_cache';
@@ -31,96 +33,62 @@ const RED          = '#e74c3c';
 const RED_TINT     = 'rgba(231,76,60,0.10)';
 
 const scoreBand = (score) => {
-  if (score >= 75) return { color: PRIMARY, bg: PRIMARY_TINT };
+  if (score >= 70) return { color: PRIMARY, bg: PRIMARY_TINT };
   if (score >= 50) return { color: AMBER,   bg: AMBER_TINT   };
   return { color: RED, bg: RED_TINT };
 };
 
-// Products from user's personal scan history — images confirmed from database
+// Starter picks — REAL products only (real barcodes). Nothing here is typed-in data:
+// name/brand/image are labels; the score is computed live from the product's real
+// database data when the list loads, and a pick is hidden if it can't be scored honestly.
 const ELITE_PRODUCTS = [
   {
     id: '4056489491217',
     barcode: '4056489491217',
-    name: 'Skyr Natural Fat Free',
+    name: "Skyr Natural Fat Free",
     brand: 'MILBONA',
     category: 'FOOD',
     filterCat: 'Food',
     tag: 'HIGH PROTEIN',
-    defaultScore: 90,
     image: 'https://images.openfoodfacts.org/images/products/405/648/949/1217/front_en.3.400.jpg',
     productType: 'food',
-    ingredients: 'Pasteurized skimmed milk, live cultures (Streptococcus thermophilus, Lactobacillus bulgaricus, Lactobacillus acidophilus, Bifidobacterium lactis). No added sugar. No fat. High in protein.',
-    nutriments: { 'energy-kcal_100g': 64, fat_100g: 0.2, 'saturated-fat_100g': 0.1, carbohydrates_100g: 4.0, sugars_100g: 4.0, fiber_100g: 0, proteins_100g: 11.0, salt_100g: 0.1 },
+    isElite: true,
   },
   {
     id: '3228857000166',
     barcode: '3228857000166',
-    name: '100% Mie Complète',
+    name: "100% Mie Complète",
     brand: 'HARRYS',
     category: 'FOOD',
     filterCat: 'Food',
     tag: 'WHOLE WHEAT',
-    defaultScore: 88,
     image: 'https://images.openfoodfacts.org/images/products/322/885/700/0166/front_fr.1858.400.jpg',
     productType: 'food',
-    ingredients: 'Whole wheat flour 36%, water, wheat flour 24%, rapeseed oil, sugar, flavoring (contains alcohol), salt, vinegar, malted rye flour, yeast, wheat gluten, acerola extract.',
-    nutriments: { 'energy-kcal_100g': 249, fat_100g: 3.5, 'saturated-fat_100g': 0.4, carbohydrates_100g: 42.0, sugars_100g: 3.8, fiber_100g: 5.2, proteins_100g: 9.0, salt_100g: 1.1 },
-  },
-  {
-    id: 'elite-kiehl',
-    barcode: 'elite-kiehl',
-    name: "Ultra Facial Cream",
-    brand: "KIEHL'S",
-    category: 'COSMETIC',
-    filterCat: 'Cosmetic',
-    tag: 'SKIN BARRIER',
-    defaultScore: 88,
-    image: 'https://images.openbeautyfacts.org/images/products/360/597/502/8799/front_en.4.400.jpg',
-    productType: 'cosmetic',
-    ingredients: 'Aqua/Water, Glycerin, Cetyl Alcohol, Stearyl Alcohol, PEG-100 Stearate, Glyceryl Stearate, Petrolatum, Phenoxyethanol, Polysorbate 60, Cholesterol, Benzyl Alcohol, Stearic Acid, Carbomer, Sodium Hydroxide, Methylparaben, Propylparaben. Free of parabens alternative. Dermatologist tested.',
-    nutriments: {},
-  },
-  {
-    id: 'elite-aveeno',
-    barcode: 'elite-aveeno',
-    name: 'Daily Moisturizing Lotion',
-    brand: 'AVEENO',
-    category: 'COSMETIC',
-    filterCat: 'Cosmetic',
-    tag: 'OAT FORMULA',
-    defaultScore: 88,
-    image: 'https://images.openbeautyfacts.org/images/products/038/137/003/8443/front_en.16.400.jpg',
-    productType: 'cosmetic',
-    ingredients: 'Active Ingredient: Dimethicone 1.2%. Water, Glycerin, Distearyldimonium Chloride, Petrolatum, Isopropyl Palmitate, Cetyl Alcohol, Avena Sativa (Oat) Kernel Flour, Benzyl Alcohol, Sodium Chloride. Colloidal oatmeal soothes and moisturizes dry skin. Fragrance free. Non-comedogenic.',
-    nutriments: {},
+    isElite: true,
   },
   {
     id: '7300400481008',
     barcode: '7300400481008',
-    name: 'Fibres Crispbread',
+    name: "Fibres Crispbread",
     brand: 'WASA',
     category: 'FOOD',
     filterCat: 'Food',
     tag: 'HIGH FIBER',
-    defaultScore: 88,
     image: 'https://images.openfoodfacts.org/images/products/730/040/048/1588/front_en.269.400.jpg',
     productType: 'food',
-    ingredients: 'Whole grain rye flour 95%, water, yeast, salt. Rich in dietary fiber. Low in fat. Suitable for vegan diet. No artificial additives.',
-    nutriments: { 'energy-kcal_100g': 330, fat_100g: 2.5, 'saturated-fat_100g': 0.3, carbohydrates_100g: 62.0, sugars_100g: 1.5, fiber_100g: 20.0, proteins_100g: 10.0, salt_100g: 0.8 },
+    isElite: true,
   },
   {
     id: '20724696',
     barcode: '20724696',
-    name: 'Almendra Natural',
+    name: "Almendra Natural",
     brand: 'ALESTO',
     category: 'FOOD',
     filterCat: 'Food',
     tag: 'HEART HEALTHY',
-    defaultScore: 89,
     image: 'https://images.openfoodfacts.org/images/products/000/002/072/4696/front_en.384.400.jpg',
     productType: 'food',
-    ingredients: '100% California almonds. Natural, unsalted, unroasted. Rich in vitamin E, magnesium, calcium and healthy monounsaturated fats. No added oil, no salt, no sugar.',
-    nutriments: { 'energy-kcal_100g': 575, fat_100g: 49.9, 'saturated-fat_100g': 3.8, carbohydrates_100g: 19.5, sugars_100g: 4.8, fiber_100g: 12.5, proteins_100g: 21.2, salt_100g: 0 },
+    isElite: true,
   },
 ];
 
@@ -238,10 +206,28 @@ const VeeListScreen = () => {
     }, [])
   );
 
-  // Merge curated picks first, then hardcoded elite list (no duplicates)
+  // Live scores for the starter picks, computed from each product's real data.
+  const [liveScores, setLiveScores] = useState({});
+  useEffect(() => {
+    let alive = true;
+    ELITE_PRODUCTS.forEach(async (e) => {
+      let score = null;
+      try {
+        const p = await fetchProductByBarcode(e.barcode);
+        if (p && hasScorableData(p)) score = calculateHealthScore(p, null, null)?.score ?? null;
+      } catch { /* leave null → hidden */ }
+      if (alive) setLiveScores((prev) => ({ ...prev, [e.barcode]: score }));
+    });
+    return () => { alive = false; };
+  }, []);
+
+  // Merge curated picks first, then starter picks that have a real computed score (no duplicates)
+  const scoredElite = ELITE_PRODUCTS
+    .filter((e) => typeof liveScores[e.barcode] === 'number')
+    .map((e) => ({ ...e, defaultScore: liveScores[e.barcode] }));
   const allProducts = [
     ...customProducts,
-    ...ELITE_PRODUCTS.filter(e => !customProducts.some(c => c.barcode === e.barcode)),
+    ...scoredElite.filter(e => !customProducts.some(c => c.barcode === e.barcode)),
   ];
 
   // Category chips derived from whatever categories actually exist in the data
@@ -263,6 +249,12 @@ const VeeListScreen = () => {
   }
 
   const handleProductPress = (product) => {
+    // Starter picks carry no stored data: open them like a normal scan so the
+    // screen loads and scores the real product itself.
+    if (product.isElite) {
+      navigation.navigate('Results', { barcode: product.barcode, fromSearch: true, freeAIAccess: true });
+      return;
+    }
     const curatedScore = product.defaultScore;
     const hasNutriments = product.nutriments && Object.keys(product.nutriments).length > 0;
     const preloadedData = {

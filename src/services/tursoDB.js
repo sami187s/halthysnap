@@ -180,10 +180,26 @@ async function resolveAndPersistImage(barcode) {
  * If image_url is missing, fetches it from Open Food Facts (1 extra call per scan — acceptable).
  * Returns null if not found.
  */
+// The same product can be stored as UPC-A (12), EAN-13 (with a leading 0) or
+// without leading zeros. Try the scanned code first, then the common variants.
+function barcodeVariants(barcode) {
+  const digits = String(barcode || '').replace(/\D/g, '');
+  if (!digits) return [];
+  const stripped = digits.replace(/^0+/, '');
+  const set = [digits];
+  if (stripped && stripped !== digits) set.push(stripped);
+  if (digits.length === 12) set.push('0' + digits);
+  if (digits.length === 13 && digits[0] === '0') set.push(digits.slice(1));
+  if (stripped && stripped.length < 13) set.push(stripped.padStart(13, '0'));
+  return [...new Set(set)];
+}
+
 export async function fetchProductFromTurso(barcode) {
   try {
-    const result = await tursoAction('getProduct', { barcode });
-
+    const variants = barcodeVariants(barcode);
+    if (!variants.length) return null;
+    // ONE request for every spelling of the barcode (was up to 3 requests).
+    const result = await tursoAction('getProduct', { barcode: variants[0], barcodes: variants });
     const rows = tursoRowsToObjects(result);
     if (!rows.length || !rows[0].product_name) return null;
 
@@ -238,11 +254,14 @@ export async function saveCuratedProduct(entry) {
  * Fetch all curated products from Turso (for VeeList screen).
  * Returns [] on failure so the hardcoded list still shows.
  */
+let _curatedCache = null; // { t, v } — the Top list, remembered for 5 minutes
+
 export async function fetchCuratedProducts() {
+  if (_curatedCache && Date.now() - _curatedCache.t < 5 * 60 * 1000) return _curatedCache.v;
   try {
     const result = await tursoAction('fetchCuratedProducts', {}, 8000);
     const rows = tursoRowsToObjects(result);
-    return rows.map(r => ({
+    const list = rows.map(r => ({
       id: r.barcode,
       barcode: r.barcode,
       name: r.name,
@@ -256,6 +275,8 @@ export async function fetchCuratedProducts() {
       ingredients: r.ingredients || '',
       nutriments: {},
     }));
+    _curatedCache = { t: Date.now(), v: list };
+    return list;
   } catch (e) {
     console.log('⚠️ fetchCuratedProducts error:', e?.message);
     return [];
@@ -299,11 +320,63 @@ export async function updateIngredientsInTurso(barcode, ingredientsText) {
  * Persist USDA-enriched nutrition columns back into Turso — only overwrites NULL columns.
  * Fire-and-forget — never blocks the UI.
  */
-export async function updateNutritionInTurso(barcode, nutriments) {
+export async function updateNutritionInTurso(barcode, nutriments, extra = null) {
   if (!barcode || !nutriments) return;
-  // Only-fill-if-null logic (COALESCE) lives server-side in the proxy Worker now.
+  // Only-fill-if-empty logic (COALESCE) lives server-side in the proxy Worker.
+  // `extra` may carry { nutriscore_grade, nova_group } from Open Food Facts.
   try {
-    await tursoAction('updateNutrition', { barcode, nutriments });
+    await tursoAction('updateNutrition', { barcode, nutriments, extra });
+  } catch { /* non-critical */ }
+}
+
+/**
+ * Cosmetics saved from the public APIs live in their own table (never mixed with food).
+ * Returns a product-shaped object or null.
+ */
+export async function fetchCosmeticFromTurso(barcode) {
+  try {
+    const variants = barcodeVariants(barcode);
+    // ONE request for every spelling of the barcode.
+    for (const candidate of variants.slice(0, 1)) {
+      const result = await tursoAction('getCosmetic', { barcode: candidate, barcodes: variants }, 6000);
+      const rows = tursoRowsToObjects(result);
+      if (rows.length && rows[0].product_name && rows[0].ingredients_text) {
+        const row = rows[0];
+        return {
+          product_name: row.product_name,
+          brands: row.brands || '',
+          categories: row.categories || 'cosmetics',
+          ingredients_text: row.ingredients_text,
+          ingredients: [],
+          image_url: row.image_url || null,
+          nutriments: {},
+          barcode: row.code,
+          source: 'HealthyScan Cosmetic DB',
+          product_type: 'beauty',
+        };
+      }
+    }
+  } catch (error) {
+    console.log('⚠️ TursoDB: cosmetic lookup failed -', error.message);
+  }
+  return null;
+}
+
+/**
+ * The whole scan flow in ONE request: the worker checks our database, fills gaps from
+ * Open Food Facts / USDA, saves whatever it finds, and returns the finished product.
+ * Resolves { status: 'ok', product } | { status: 'notfound' } | { status: 'busy' | 'invalid' };
+ * throws on network errors (the caller then falls back to calling the public APIs directly).
+ */
+export async function lookupProductRemote(barcode) {
+  return tursoAction('lookupProduct', { barcode }, 25000);
+}
+
+export async function saveCosmeticToTurso(barcode, product) {
+  if (!barcode || !product || !product.product_name) return;
+  if (!product.ingredients_text || product.ingredients_text.trim().length < 10) return;
+  try {
+    await tursoAction('saveCosmetic', { barcode, product });
   } catch { /* non-critical */ }
 }
 
@@ -354,7 +427,16 @@ export async function saveIngredientInfoToTurso(info) {
   } catch { /* non-critical */ }
 }
 
+// Remembered for this app session (6 h): the same category is asked for again and
+// again, and every avoided request saves database reads and worker calls.
+const _altCache = new Map();
+
 export async function fetchAlternativesByCategory(categoryKeyword, excludeBarcode, limit = 30) {
+  const cacheKey = `${String(categoryKeyword).toLowerCase()}|${limit}`;
+  const hit = _altCache.get(cacheKey);
+  if (hit && Date.now() - hit.t < 6 * 60 * 60 * 1000) {
+    return hit.v.filter((p) => p.barcode !== excludeBarcode);
+  }
   try {
     // Proxy returns { withImage, fallback } — fallback is only present when
     // withImage had fewer than 5 rows, same condition the merge below used to
@@ -369,10 +451,14 @@ export async function fetchAlternativesByCategory(categoryKeyword, excludeBarcod
         if (!merged.find((x) => x.code === r.code)) merged.push(r);
         if (merged.length >= limit) break;
       }
-      return merged.filter((r) => r.product_name).map(tursoRowToProduct);
+      const out = merged.filter((r) => r.product_name).map(tursoRowToProduct);
+      _altCache.set(cacheKey, { t: Date.now(), v: out });
+      return out;
     }
 
-    return rows.filter((r) => r.product_name).map(tursoRowToProduct);
+    const out = rows.filter((r) => r.product_name).map(tursoRowToProduct);
+    _altCache.set(cacheKey, { t: Date.now(), v: out });
+    return out;
   } catch (error) {
     console.log('⚠️ TursoDB: fetchAlternativesByCategory failed -', error.message);
     return [];

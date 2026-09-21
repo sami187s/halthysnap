@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { useTheme } from '../contexts/ThemeContext';
 
 const NAV_ITEMS = [
@@ -113,7 +114,7 @@ const SettingsScreen = ({ navigation }) => {
               </View>
               <View>
                 <Text style={[st.rowLabel, { color: t.text }]}>Upgrade to Premium</Text>
-                <Text style={[st.rowSub, { color: t.textDim }]}>Unlock all features — $2.99/week</Text>
+                <Text style={[st.rowSub, { color: t.textDim }]}>Unlimited scans, every day</Text>
               </View>
             </View>
             <Ionicons name="chevron-forward" size={18} color={t.chevron} />
@@ -168,7 +169,7 @@ const SettingsScreen = ({ navigation }) => {
         {/* Footer — tap 5× to toggle dev mode */}
         <TouchableOpacity onPress={handleVersionTap} activeOpacity={1}>
           <Text style={[st.version, { color: t.textDim }]}>
-            Vee v3.3.1{isDevMode ? '  🔓' : ''}
+            Vee v{Constants.expoConfig?.version || ''}{isDevMode ? '  🔓' : ''}
           </Text>
         </TouchableOpacity>
 

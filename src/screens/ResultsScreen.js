@@ -13,7 +13,7 @@ import { analyzeIngredients, getProductTypeFromCategories } from '../utils/enhan
 import { calculateHealthScore } from '../utils/enhancedScoring';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import { saveToHistory as saveToHistoryUtil } from '../utils/historyManager';
-import ProductAIChat from '../components/ProductAIChat';
+const ProductAIChat = () => null; // AI feature removed
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFreeRecommendationUsage, useFreeRecommendation } from '../utils/dailyReset';
 import { getIngredientInfo } from '../services/usdaAPI';
@@ -299,10 +299,10 @@ const ResultsScreen = ({ route, navigation }) => {
               brand: p.brands || '',
               image: getAltImage(p),
               barcode: p.code,
-              score: ingResult?.score ?? 50,
+              score: ingResult?.score ?? null, // no ingredients → no score, never a fake 50
             };
           })
-          .filter(alt => alt.score >= 65)
+          .filter(alt => alt.score != null && alt.score >= 65)
           .sort((a, b) => b.score - a.score)
           .slice(0, 8);
         if (alts.length > 0) setRealAlternatives(alts);
@@ -469,12 +469,8 @@ const ResultsScreen = ({ route, navigation }) => {
     : 'This product contains ingredients that may negatively impact your health.';
 
   // Alternatives
-  const fallbackAlts = [
-    { name: 'Pure Spinach Elixir',  brand: 'Premium Cold Press', image: null, barcode: null, score: Math.min(95, score + 20) },
-    { name: 'Wild Celery Essence',  brand: 'Zero Additive · Pure', image: null, barcode: null, score: Math.min(93, score + 18) },
-    { name: 'Organic Green Blend',  brand: 'Cold Pressed · Raw',  image: null, barcode: null, score: Math.min(91, score + 15) },
-  ];
-  const altsData = realAlternatives.length > 0 ? realAlternatives : fallbackAlts;
+  // Real products only — no invented fallback alternatives.
+  const altsData = realAlternatives;
 
   const getAltVerdict = (sc) => {
     if (sc >= 85) return 'Excellent';
@@ -729,6 +725,7 @@ const ResultsScreen = ({ route, navigation }) => {
           )}
 
           {/* ── BETTER ALTERNATIVES ──────────────────────────────────── */}
+          {(altsLoading || realAlternatives.length > 0) && (
           <View style={st.section}>
             <Text style={[st.sectionTitle, { marginBottom: 12 }]}>Better Alternatives</Text>
             {altsLoading && realAlternatives.length === 0 ? (
@@ -777,6 +774,7 @@ const ResultsScreen = ({ route, navigation }) => {
               />
             )}
           </View>
+          )}
 
           {/* ── DNA HELIX DECORATION ─────────────────────────────────── */}
           <View style={st.dnaWrap}>

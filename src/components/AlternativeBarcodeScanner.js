@@ -73,11 +73,6 @@ const AlternativeBarcodeScanner = ({ onBarCodeScanned, onClose, continuousScan =
   const scanLineAnim = useRef(new Animated.Value(0)).current;
   const cornerPulseAnim = useRef(new Animated.Value(1)).current;
 
-  // Show fallback only if camera modules are completely unavailable
-  if (!CameraView || !Camera) {
-    return <CameraFallback onClose={onClose} />;
-  }
-
   useEffect(() => {
     getCameraPermissions();
     
@@ -211,6 +206,12 @@ const AlternativeBarcodeScanner = ({ onBarCodeScanned, onClose, continuousScan =
     onClose();
   };
 
+  // Show fallback only if camera modules are completely unavailable.
+  // (Checked AFTER all hooks so the hook order never changes between renders.)
+  if (!CameraView || !Camera) {
+    return <CameraFallback onClose={onClose} />;
+  }
+
   if (hasPermission === null) {
     return (
       <View style={styles.container}>
@@ -239,7 +240,8 @@ const AlternativeBarcodeScanner = ({ onBarCodeScanned, onClose, continuousScan =
             facing="back"
             onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
             barcodeScannerSettings={{
-              barcodeTypes: ["qr", "pdf417", "ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
+              // Product barcodes only — QR/PDF417/Code39/Code128 are not product codes.
+              barcodeTypes: ["ean13", "ean8", "upc_a", "upc_e"],
             }}
           />
         )}

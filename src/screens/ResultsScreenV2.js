@@ -12,17 +12,15 @@ import * as Haptics from 'expo-haptics';
 import { fetchProductByBarcode } from '../services/reliableAPI';
 import { fetchAlternativesByCategory, updateProductImageInTurso, saveCuratedProduct } from '../services/tursoDB';
 import { analyzeIngredients, getProductTypeFromCategories } from '../utils/enhancedIngredientAnalyzer';
-import { calculateHealthScore } from '../utils/enhancedScoring';
+import { calculateHealthScore, hasScorableData } from '../utils/enhancedScoring';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import { saveToHistory as saveToHistoryUtil } from '../utils/historyManager';
 import { checkAndConsume } from '../utils/scanQuota';
 import { isProductSaved, toggleSavedProduct } from '../utils/curatedProducts';
-import ProductAIChat from '../components/ProductAIChat';
 import ShareScoreSheet from '../components/ShareScoreSheet';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFreeRecommendationUsage, useFreeRecommendation } from '../utils/dailyReset';
 import { getIngredientInfo, getAdditiveInfo } from '../services/usdaAPI';
-import { AI_CHAT_ENABLED } from '../config/featureFlags';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 const AnimatedSvgCircle = Animated.createAnimatedComponent(SvgCircle);
@@ -172,13 +170,13 @@ const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 // ── Helpers ─────────────────────────────────────────────────────────
 // ScanGreen 3-band score scale: Good / Fair / Poor.
 const getScoreColor = (sc) => {
-  if (sc >= 75) return PRIMARY;
+  if (sc >= 70) return PRIMARY;
   if (sc >= 50) return WARNING_C;
   return ERROR_C;
 };
 
 const getVerdict = (sc) => {
-  if (sc >= 75) return 'Good';
+  if (sc >= 70) return 'Good';
   if (sc >= 50) return 'Fair';
   return 'Poor';
 };
@@ -310,7 +308,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
       setIsInBest(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert(
-        '✅ Saved to History!',
+        '✅ Saved to Best!',
         `"${product.product_name || 'This product'}" is now visible in the Best section for every user of the app.`
       );
     } catch (e) { console.log('AddToBest error', e.message); }
@@ -380,13 +378,19 @@ const ResultsScreenV2 = ({ route, navigation }) => {
       const result = await fetchProductByBarcode(barcode, handleLiveUpdate);
       if (!result || result.status === 0) {
         setError('Product not found');
-        navigation.replace('ProductNotFound', { barcode });
+        navigation.replace('ProductNotFound', { barcode, productType: 'unknown' });
         return;
       }
       const prod = result.product || result;
       const productType = getProductTypeFromCategories(prod.categories || '', prod.product_name || '', prod.source || '');
       if (productType !== 'food') {
         navigation.replace('CosmeticResults', { barcode, product: prod });
+        return;
+      }
+      // No real nutrition and no ingredient list → we cannot give an honest score.
+      // Don't count it against the free quota and don't show a made-up number.
+      if (!hasScorableData(prod)) {
+        navigation.replace('ProductNotFound', { barcode, productType: 'food', reason: 'nodata' });
         return;
       }
       // Free-tier daily scan quota — a found product counts; block at the limit.
@@ -406,7 +410,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
         brand: prod.brands || '',
         productImage: prod.image_url || prod.image_front_url || null,
         productType: 'food',
-        score: healthScore?.score || analysisResult?.score || 0,
+        score: healthScore?.score ?? analysisResult?.score ?? 0,
         ingredients: prod.ingredients_text || '',
         source: prod.source || 'Open Food Facts',
       });
@@ -467,7 +471,8 @@ const ResultsScreenV2 = ({ route, navigation }) => {
       const top5 = candidates
         .filter((p) => p.product_name && p.barcode)
         .map((p) => {
-          const score = calculateHealthScore(p, null, null)?.score ?? 60;
+          // No real data → no score (never a default like 60)
+          const score = hasScorableData(p) ? (calculateHealthScore(p, null, null)?.score ?? null) : null;
           return {
             name:    p.product_name,
             brand:   p.brands || '',
@@ -476,7 +481,7 @@ const ResultsScreenV2 = ({ route, navigation }) => {
             score,
           };
         })
-        .filter((p) => p.score >= 80)
+        .filter((p) => p.score != null && p.score >= 80)
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);
 
@@ -521,6 +526,16 @@ const ResultsScreenV2 = ({ route, navigation }) => {
       setLoading(false);
     }
   }, [barcode]);
+
+  // Late-arriving data (e.g. nutrition from USDA after the screen opened) must update
+  // the score too — otherwise the score would stay based on the first, partial data.
+  // Curated/preloaded scores stay locked.
+  useEffect(() => {
+    if (!product || skipFetch || devProduct) return;
+    if (!hasScorableData(product)) return;
+    const hs = calculateHealthScore(product, null, null);
+    if (hs && hs.score != null) setEnhancedHealthScore(hs);
+  }, [product]);
 
   useEffect(() => {
     if (!loading && product && analysis) {
@@ -822,6 +837,12 @@ const ResultsScreenV2 = ({ route, navigation }) => {
               <ScoreGauge score={score} scoreColor={scoreColor} verdict={verdict} />
             </View>
             <Text style={st.scoreCaption}>Health score · /100</Text>
+            {enhancedHealthScore?.dataBasis === 'ingredients' && (
+              <Text style={[st.scoreCaption, { marginTop: 2 }]}>Based on ingredients only — no nutrition data yet</Text>
+            )}
+            {enhancedHealthScore?.dataBasis === 'nutrition' && (
+              <Text style={[st.scoreCaption, { marginTop: 2 }]}>Based on nutrition only — no ingredient list yet</Text>
+            )}
           </Animated.View>
 
           {/* ── WHY THIS SCORE card ───────────────────────────────── */}
@@ -1039,55 +1060,13 @@ const ResultsScreenV2 = ({ route, navigation }) => {
           {!!(product.code || product.barcode || barcode) && (
             <Text style={st.barcodeFooter}>{product.code || product.barcode || barcode}</Text>
           )}
+          <Text style={st.dataCredit}>
+            Product data: Open Food Facts contributors (ODbL) · USDA FoodData Central
+          </Text>
 
-          {/* ── AURA AI CARD ──────────────────────────────────────── */}
-          {AI_CHAT_ENABLED && (
-            <View style={st.aiCardWrap}>
-              <TouchableOpacity
-                style={st.aiCard}
-                activeOpacity={0.82}
-                onPress={async () => {
-                  if (isPremium || hasAIAccess) {
-                    setShowAIChat(true);
-                  } else if (freeRecUsage.remaining > 0) {
-                    const result = await useFreeRecommendation();
-                    if (result.success) { setFreeRecUsage(result.usage); setHasAIAccess(true); setShowAIChat(true); }
-                  } else {
-                    navigation.navigate('Subscription', { returnTo: 'results', productName: product?.product_name });
-                  }
-                }}
-              >
-                {/* Green sparkle icon */}
-                <View style={st.aiCardIcon}>
-                  <Ionicons name="sparkles" size={22} color={PRIMARY} />
-                </View>
-                {/* Text */}
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                  <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
-                  <Text style={st.aiCardSub}>Ask about these{`\n`}ingredients</Text>
-                </View>
-                {/* Connect */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={st.aiCardConnect}>ASK</Text>
-                  <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
 
         </Animated.View>
       </ScrollView>
-
-      {/* ── AI Chat overlay ──────────────────────────────────────── */}
-      {AI_CHAT_ENABLED && showAIChat && product && (
-        <ProductAIChat
-          product={product}
-          analysis={analysis}
-          ingredients={(product.ingredients_text || '').split(',').map(s => s.trim()).filter(Boolean)}
-          visible={showAIChat}
-          onClose={() => setShowAIChat(false)}
-        />
-      )}
 
       {/* ── WHY THIS SCORE — bottom sheet ─────────────────────────── */}
       <Modal
@@ -1530,7 +1509,8 @@ const st = StyleSheet.create({
   altBrand: { fontSize: 12, fontWeight: '400', color: NEUTRAL_400, marginBottom: 4 },
   altScoreText: { fontSize: 12, fontWeight: '700' },
 
-  barcodeFooter: { textAlign: 'center', fontSize: 12, color: ON_SURFACE_VAR, letterSpacing: 1, marginBottom: 24 },
+  barcodeFooter: { textAlign: 'center', fontSize: 12, color: ON_SURFACE_VAR, letterSpacing: 1, marginBottom: 8 },
+  dataCredit: { textAlign: 'center', fontSize: 11, color: ON_SURFACE_VAR, marginBottom: 24, paddingHorizontal: 24 },
 });
 
 export default ResultsScreenV2;

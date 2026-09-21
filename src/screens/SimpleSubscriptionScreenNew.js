@@ -21,6 +21,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NetInfo from '@react-native-community/netinfo';
 import iapManager from '../services/iapManager';
+import { getQuota } from '../utils/scanQuota';
 import {
   syncReferralStatus,
   submitReferralCode,
@@ -55,18 +56,41 @@ const EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeu
 const REFERRAL_LINK =
   Platform.OS === 'android'
     ? 'https://play.google.com/store/apps/details?id=com.healthyscan.app'
-    : 'https://apps.apple.com/app/healthyscan/id123456789';
+    : 'https://apps.apple.com/us/app/vee-product-check/id6751061358';
 
+// Only promise what is actually locked: the daily scan limit. (Additive reports, ingredient
+// details and history are free for everyone — listing them here would be misleading.)
 const PRO_FEATURES = [
-  'Unlimited scans & full history',
-  'Detailed additive risk reports',
-  'Cosmetic ingredient deep-dives',
+  'Unlimited food scans, every day',
+  'Unlimited cosmetic scans, every day',
+  'Support independent, ad-free health scoring',
 ];
 
 const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const fromOnboarding = route?.params?.fromOnboarding === true;
   const limitReached = route?.params?.reason === 'limit';
+  // Shown price comes from the store (localized, always correct); the constant is only a fallback.
+  const [priceLabel, setPriceLabel] = useState(PRICE_LABEL);
+  // When the limit was hit: "5h 12m" until the free scans come back (null = unknown).
+  const [resetIn, setResetIn] = useState(null);
+  useEffect(() => {
+    if (!limitReached) return;
+    (async () => {
+      try {
+        const [food, cosmetic] = await Promise.all([getQuota('food'), getQuota('cosmetic')]);
+        // Soonest reset among the categories that are actually used up.
+        const times = [food, cosmetic]
+          .filter((q) => !q.unlimited && q.remaining <= 0 && q.resetsAt)
+          .map((q) => q.resetsAt - Date.now());
+        if (times.length === 0) return;
+        const ms = Math.max(0, Math.min(...times));
+        const h = Math.floor(ms / 3600000);
+        const m = Math.ceil((ms % 3600000) / 60000);
+        setResetIn(h > 0 ? `${h}h ${m}m` : `${m}m`);
+      } catch { /* leave unknown */ }
+    })();
+  }, [limitReached]);
 
   const [currentTier, setCurrentTier] = useState('free');
   const [loading, setLoading] = useState(false);
@@ -173,6 +197,8 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
     try {
       const success = await iapManager.initialize();
       console.log(success ? '✅ IAP ready' : '⚠️ IAP initialization failed');
+      const storePrice = iapManager.offerings?.current?.availablePackages?.[0]?.product?.priceString;
+      if (storePrice) setPriceLabel(storePrice);
     } catch (error) {
       console.error('❌ IAP init error:', error);
     } finally {
@@ -197,7 +223,7 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
   // ── Navigation helpers ───────────────────────────────────────────────────
   const exitScreen = async () => {
     if (fromOnboarding) {
-      await AsyncStorage.multiSet([['hasCompletedPaywall', 'true'], ['chatbotAccess', 'enabled']]);
+      await AsyncStorage.multiSet([['hasCompletedPaywall', 'true']]);
       navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
     } else if (navigation.canGoBack()) {
       navigation.goBack();
@@ -245,10 +271,10 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
           ]);
 
           if (fromOnboarding) {
-            await AsyncStorage.multiSet([['hasCompletedPaywall', 'true'], ['chatbotAccess', 'enabled']]);
+            await AsyncStorage.multiSet([['hasCompletedPaywall', 'true']]);
             navigation.reset({ index: 0, routes: [{ name: 'MainTabs' }] });
           } else {
-            Alert.alert('Premium Active! 🎉', 'All features unlocked! Unlimited AI analysis available.', [
+            Alert.alert('Premium Active! 🎉', 'Unlimited scans unlocked!', [
               {
                 text: 'Start Scanning!',
                 onPress: () =>
@@ -356,12 +382,12 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
     ? 'Start scanning'
     : TRIAL_DAYS > 0
     ? `Start ${TRIAL_DAYS}-day free trial`
-    : `Subscribe · ${PRICE_LABEL}/${PERIOD_LABEL}`;
+    : `Subscribe · ${priceLabel}/${PERIOD_LABEL}`;
 
   const onCtaPress = isPremium ? exitScreen : handlePurchase;
 
   const heroSubtitle = limitReached
-    ? "You've used today's free scans. Go unlimited to keep checking what's really inside."
+    ? `You've used your free scans.${resetIn ? ` They come back in ${resetIn} — or go` : ' Go'} unlimited to keep checking what's really inside.`
     : "Go unlimited and see what's really inside every product you scan.";
 
   // ── Android: no paywall. Everything is free + unlimited. ─────────────────
@@ -403,7 +429,7 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
               <Text style={s.heroBrand}>Everything unlocked</Text>
             </View>
             <Text style={[s.heroSub, { marginTop: 6 }]}>
-              Vee is completely free on Android — unlimited scans, full history and the AI assistant, all included.
+              Vee is completely free on Android — unlimited scans and full history, all included.
             </Text>
           </LinearGradient>
 
@@ -484,7 +510,7 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
             </View>
 
             <View style={s.priceRow}>
-              <Text style={s.priceAmount}>{PRICE_LABEL}</Text>
+              <Text style={s.priceAmount}>{priceLabel}</Text>
               <Text style={s.pricePer}>/{PERIOD_LABEL}</Text>
             </View>
 
@@ -611,7 +637,7 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
 
           {!isPremium && (
             <Text style={s.ctaFootnote}>
-              {TRIAL_DAYS > 0 ? `Then ${PRICE_LABEL}/${PERIOD_LABEL}` : `${PRICE_LABEL}/${PERIOD_LABEL}`} · cancel anytime
+              {TRIAL_DAYS > 0 ? `Then ${priceLabel}/${PERIOD_LABEL}` : `${priceLabel}/${PERIOD_LABEL}`} · cancel anytime
               {' '}· refer {REFERRAL_GOAL} for lifetime free
             </Text>
           )}
@@ -619,7 +645,7 @@ const SimpleSubscriptionScreenNew = ({ navigation, route }) => {
           {!isPremium && (
             <Text style={s.disclosure}>
               Payment is charged to your {Platform.OS === 'ios' ? 'Apple' : 'Google'} account at confirmation.
-              The subscription auto-renews at {PRICE_LABEL}/{PERIOD_LABEL} unless cancelled at least 24 hours before the
+              The subscription auto-renews at {priceLabel}/{PERIOD_LABEL} unless cancelled at least 24 hours before the
               end of the current period. Manage or cancel anytime in your account settings.
             </Text>
           )}

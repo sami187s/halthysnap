@@ -16,14 +16,18 @@ import ScreenHeader from '../components/shared/ScreenHeader';
 const { width, height } = Dimensions.get('window');
 
 const ProductNotFoundScreen = ({ route, navigation }) => {
-  const { barcode, productType = 'cosmetic' } = route.params || {};
+  const { barcode, productType = 'unknown', reason } = route.params || {};
 
+  const noData = reason === 'nodata'; // product exists but has no ingredient/nutrition data
   const isFood = productType === 'food';
-  const productTypeText = isFood ? 'Food Product' : 'Cosmetic Product';
-  const productIconName = isFood ? 'restaurant-outline' : 'medical-outline';
-  const alternativeText = isFood 
-    ? 'Try searching for similar food items or check if the barcode is correct.' 
-    : 'Try searching for similar cosmetic products or check if the barcode is correct.';
+  const isCosmetic = productType === 'cosmetic';
+  const productTypeText = isFood ? 'Food Product' : isCosmetic ? 'Cosmetic Product' : 'Product';
+  const productIconName = isFood ? 'restaurant-outline' : isCosmetic ? 'medical-outline' : 'help-circle-outline';
+  const alternativeText = isFood
+    ? 'Try searching for similar food items or check if the barcode is correct.'
+    : isCosmetic
+    ? 'Try searching for similar cosmetic products or check if the barcode is correct.'
+    : 'Try searching for a similar product or check if the barcode is correct.';
 
   const handleTryAgain = () => {
     navigation.goBack();
@@ -53,11 +57,13 @@ const ProductNotFoundScreen = ({ route, navigation }) => {
         </View>
 
         <Text style={styles.mainTitle}>
-          {productTypeText} Not Found
+          {noData ? 'Not Enough Data' : `${productTypeText} Not Found`}
         </Text>
 
         <Text style={styles.subtitle}>
-          We couldn't find this product in our database.
+          {noData
+            ? "We found this product, but it has no ingredient or nutrition information yet. We don't guess — so there is no score."
+            : "We couldn't find this product in our database."}
         </Text>
 
         {/* Barcode Display */}
@@ -68,25 +74,11 @@ const ProductNotFoundScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* Database Growth Message */}
+        {/* Honest note — no invented statistics or promises */}
         <View style={styles.growthContainer}>
-          <View style={styles.growthHeader}>
-            <Ionicons name="trending-up" size={24} color="#2196F3" />
-            <Text style={styles.growthTitle}>Our Database is Growing!</Text>
-          </View>
           <Text style={styles.growthText}>
-            We're constantly expanding our product database. Your scans help us learn which products to add next. Together, we're building the most comprehensive health database!
+            Vee only shows scores based on real ingredient and nutrition data. Some products aren't in the open databases we use yet.
           </Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>140+</Text>
-              <Text style={styles.statLabel}>Ingredients</Text>
-            </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statNumber}>Growing</Text>
-              <Text style={styles.statLabel}>Daily</Text>
-            </View>
-          </View>
         </View>
 
         {/* Suggestions */}

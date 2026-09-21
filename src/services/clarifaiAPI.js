@@ -78,7 +78,7 @@ const imageToBase64 = async (imageUri) => {
       });
     } else {
       // Mobile: Use expo-file-system
-      const FileSystem = require('expo-file-system').default;
+      const FileSystem = require('expo-file-system');
       const base64 = await FileSystem.readAsStringAsync(imageUri, {
         encoding: FileSystem.EncodingType.Base64,
       });

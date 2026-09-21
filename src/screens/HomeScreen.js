@@ -70,8 +70,9 @@ const HOME_CARDS_AVAILABLE = screenHeight - HOME_HEADER_APPROX - HOME_GREETING_A
 const SCAN_CARD_H = Math.max(192, Math.min(260, HOME_CARDS_AVAILABLE / 2));
 
 const LOGO_IMG = require('../../assets/leaf-logo.png');
-const SCAN_FOOD_IMG = { uri: 'https://media.base44.com/images/public/6a83ef891bc0c00776a1d051/b6b2fe111_generated_image.png' };
-const SCAN_COSMETIC_IMG = { uri: 'https://media.base44.com/images/public/6a83ef891bc0c00776a1d051/4a6b9b42c_generated_image.png' };
+// Bundled with the app (were loaded from a third-party host, so the cards went blank offline).
+const SCAN_FOOD_IMG = require('../../assets/home-scan-food.jpg');
+const SCAN_COSMETIC_IMG = require('../../assets/home-scan-cosmetic.jpg');
 
 // Wraps any touchable in a spring scale-down for tap feedback (~0.96 on press).
 const AnimatedTouchable = ({ children, style, onPress, scaleTo = 0.96, ...rest }) => {
@@ -164,7 +165,7 @@ const HomeScreen = ({ navigation, route }) => {
       if (route.params?.premiumActivated) {
         Alert.alert(
           '\uD83C\uDF89 Premium Activated!',
-          'You now have unlimited scans and AI-powered analysis!',
+          'You now have unlimited scans!',
           [{ text: 'Got it!', style: 'default' }]
         );
         navigation.setParams({ premiumActivated: undefined });
@@ -343,6 +344,17 @@ const HomeScreen = ({ navigation, route }) => {
     setScanned(false);
   };
 
+  // Free-tier quota used up: leave the scanner and show the paywall.
+  const handlePreviewBlocked = () => {
+    setShowPreview(false);
+    setPreviewBarcode(null);
+    setScanning(false);
+    setIsScanning(false);
+    setScanned(false);
+    refreshQuota();
+    navigation.navigate('Subscription', { reason: 'limit' });
+  };
+
   const handleContinueFreeScan = async (data) => {
     try {
       await smartNavigateToResults(navigation, data);
@@ -384,6 +396,7 @@ const HomeScreen = ({ navigation, route }) => {
           onViewDetails={handlePreviewViewDetails}
           onScanAgain={handlePreviewScanAgain}
           onClose={handlePreviewClose}
+          onBlocked={handlePreviewBlocked}
         />
       </View>
     );
@@ -503,58 +516,6 @@ const HomeScreen = ({ navigation, route }) => {
         onClose={handleClose}
       />
 
-      {/* Trial Complete Modal */}
-      <Modal
-        visible={showTrialCompleteModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowTrialCompleteModal(false)}
-      >
-        <View style={hs.modalOverlay}>
-          <Animated.View style={[hs.modalWrap, { transform: [{ scale: modalScale }] }]}>
-            <View style={hs.modalBody}>
-              <View style={hs.modalIcon}>
-                <Ionicons name="diamond" size={36} color="#067A4F" />
-              </View>
-              <Text style={hs.modalTitle}>Daily Limit Reached</Text>
-              <Text style={hs.modalMsg}>
-                You have used all {DAILY_SCAN_LIMIT} daily scans.{'\n'}
-                They will reset tomorrow, or upgrade for unlimited.
-              </Text>
-              <View style={hs.modalFeatures}>
-                {['Unlimited AI Analysis', 'Advanced Health Insights', 'AI Ingredient Expert'].map((f) => (
-                  <View key={f} style={hs.modalFeatureRow}>
-                    <Ionicons name="checkmark-circle" size={16} color="#067A4F" />
-                    <Text style={hs.modalFeatureLabel}>{f}</Text>
-                  </View>
-                ))}
-              </View>
-              <TouchableOpacity
-                style={hs.modalUpgradeBtn}
-                activeOpacity={0.85}
-                onPress={() => { setShowTrialCompleteModal(false); showSubscriptionOptions(); }}
-              >
-                <Text style={hs.modalUpgradeTxt}>Continue to Premium</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={hs.modalLaterBtn} onPress={() => setShowTrialCompleteModal(false)}>
-                <Text style={hs.modalLaterTxt}>Maybe Later</Text>
-              </TouchableOpacity>
-              <View style={hs.modalLegal}>
-                <Text style={hs.modalLegalPrice}>$0.00/week - Promotional access</Text>
-                <View style={hs.modalLegalRow}>
-                  <TouchableOpacity onPress={() => Linking.openURL('https://sites.google.com/view/vee-privacy-policy').catch(() => {})}>
-                    <Text style={hs.modalLegalLink}>Privacy Policy</Text>
-                  </TouchableOpacity>
-                  <Text style={hs.modalLegalDot}> | </Text>
-                  <TouchableOpacity onPress={() => Linking.openURL('https://www.apple.com/legal/internet-services/itunes/dev/stdeula/').catch(() => {})}>
-                    <Text style={hs.modalLegalLink}>Terms of Use</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Animated.View>
-        </View>
-      </Modal>
     </View>
   );
 };

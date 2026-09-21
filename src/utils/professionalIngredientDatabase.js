@@ -258,6 +258,9 @@ const analyzeUnknownIngredient = (ingredient) => {
   let safety = 60; // Default neutral
   let confidence = 'low';
   let reasoning = 'Ingredient not in database';
+  // Everything below except the paraben/sulfate rule is a GUESS from the name.
+  // Guesses are flagged so callers treat the ingredient as unknown, not "recognized".
+  let guessed = true;
   
   // Pattern analysis
   if (ingredient.includes('extract') || ingredient.includes('oil')) {
@@ -272,6 +275,7 @@ const analyzeUnknownIngredient = (ingredient) => {
     safety = 30;
     reasoning = 'Contains concerning chemical pattern';
     confidence = 'high';
+    guessed = false;
   } else if (ingredient.length > 20) {
     safety = 55;
     reasoning = 'Complex chemical name - needs research';
@@ -285,6 +289,7 @@ const analyzeUnknownIngredient = (ingredient) => {
     pregnancy: safety > 70,
     evidence: confidence,
     function: 'unknown',
-    reasoning
+    reasoning,
+    guessed
   };
 };

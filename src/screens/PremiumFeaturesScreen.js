@@ -18,35 +18,11 @@ import ScreenHeader from '../components/shared/ScreenHeader';
 export default function PremiumFeaturesScreen({ navigation }) {
   const { isActive, refreshSubscription } = useSubscription();
 
-  const handleCancelSubscription = async () => {
-    const doCancel = async () => {
-      await AsyncStorage.multiRemove([
-        'hasSeenOnboarding',
-        'hasCompletedPaywall',
-        'userName',
-        'subscriptionType',
-        'subscriptionExpiresAt',
-        'originalTransactionId',
-        'premiumTrialActivated',
-        'premiumTrialUsedToday',
-      ]);
-      navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] });
-    };
-
-    if (Platform.OS === 'web') {
-      if (window.confirm('Cancel subscription? This will reset the app back to the beginning.')) {
-        await doCancel();
-      }
-    } else {
-      Alert.alert(
-        'Cancel Subscription',
-        'Are you sure you want to cancel? This will reset the app back to the beginning.',
-        [
-          { text: 'Keep Subscription', style: 'cancel' },
-          { text: 'Yes, Cancel', style: 'destructive', onPress: doCancel },
-        ]
-      );
-    }
+  // Subscriptions can only be cancelled in the App Store / Play Store account settings.
+  // (This button used to wipe local data and restart onboarding while the paid
+  // subscription kept billing — it now opens the real store page instead.)
+  const handleCancelSubscription = () => {
+    handleManageSubscription();
   };
 
   const handleManageSubscription = () => {
@@ -62,10 +38,8 @@ export default function PremiumFeaturesScreen({ navigation }) {
 
   const premiumFeatures = [
     { icon: 'infinite', text: 'Unlimited scans' },
-    { icon: 'sparkles', text: 'AI ingredient analysis' },
     { icon: 'shield-checkmark', text: 'Detect hidden dangers' },
     { icon: 'bulb', text: 'Smart recommendations' },
-    { icon: 'chatbubble-ellipses', text: 'AI chatbot assistant', comingSoon: true },
     { icon: 'time', text: 'History & saved products' },
     { icon: 'rocket', text: 'New features', comingSoon: true },
   ];

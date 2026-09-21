@@ -11,17 +11,18 @@ export const processNutritionData = (rawNutriments, productName = '') => {
   const processedNutrition = {};
   
   // ENERGY/CALORIES - handle all possible variations
-  const energyFields = [
+  const kcalFields = [
     'energy-kcal_100g', 'energy_kcal_100g', 'energy-kcal', 'energy_kcal',
-    'energy_100g', 'energy', 'calories_100g', 'calories'
+    'calories_100g', 'calories'
   ];
-  const energyValue = getFirstValidValue(rawNutriments, energyFields);
-  if (energyValue !== null) {
-    // Convert to kcal if it's in kJ
-    if (energyValue > 1000) {
-      processedNutrition['energy-kcal_100g'] = Math.round(energyValue / 4.184); // Convert kJ to kcal
-    } else {
-      processedNutrition['energy-kcal_100g'] = Number(energyValue);
+  const kcalValue = getFirstValidValue(rawNutriments, kcalFields);
+  if (kcalValue !== null) {
+    processedNutrition['energy-kcal_100g'] = Number(kcalValue);
+  } else {
+    // 'energy_100g' / 'energy' are always kilojoules in Open Food Facts data
+    const kjValue = getFirstValidValue(rawNutriments, ['energy_100g', 'energy']);
+    if (kjValue !== null) {
+      processedNutrition['energy-kcal_100g'] = Math.round(Number(kjValue) / 4.184);
     }
   }
 
@@ -36,8 +37,9 @@ export const processNutritionData = (rawNutriments, productName = '') => {
   }
 
   // SALT/SODIUM - handle all variations and conversions
+  // Sodium is NOT salt — it is converted (×2.5) below, never read as salt directly.
   const saltFields = [
-    'salt_100g', 'salt', 'sodium_100g', 'sodium'
+    'salt_100g', 'salt'
   ];
   const saltValue = getFirstValidValue(rawNutriments, saltFields);
   const sodiumValue = getFirstValidValue(rawNutriments, ['sodium_100g', 'sodium']);

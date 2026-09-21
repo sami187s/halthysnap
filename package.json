@@ -1,6 +1,6 @@
 {
   "name": "halthysnap",
-  "version": "3.6.17",
+  "version": "4.1.0",
   "main": "index.js",
   "resolutions": {
     "expo-firebase-analytics": "8.2.2",
@@ -20,6 +20,7 @@
     "build:android:preview": "eas build --platform android --profile preview",
     "build:ios": "eas build --platform ios --profile production",
     "build:all": "eas build --platform all --profile production",
+    "test": "node tests/run-all.mjs",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -76,7 +77,8 @@
     "typescript": "~5.9.2"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0"
+    "@babel/core": "^7.20.0",
+    "babel-plugin-transform-remove-console": "^6.9.4"
   },
   "private": true
 }

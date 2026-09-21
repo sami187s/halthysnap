@@ -65,23 +65,19 @@ const computeItemScore = (item) => {
   }
 };
 
-// Product thumbnail: real image → seeded stock photo → plain box.
-const ProductImg = React.memo(({ uri, seed }) => {
-  const [stage, setStage] = React.useState(uri ? 0 : 1);
-  const next = () => setStage((s) => Math.min(2, s + 1));
-  if (stage === 2) {
+// Product thumbnail: the real product image, or a plain placeholder box.
+// (No stock/random photos — a wrong picture is worse than none.)
+const ProductImg = React.memo(({ uri }) => {
+  const [failed, setFailed] = React.useState(!uri);
+  if (failed) {
     return (
       <View style={[st.thumb, st.thumbBox]}>
         <Ionicons name="cube-outline" size={20} color="#c7cdc7" />
       </View>
     );
   }
-  const src =
-    stage === 0
-      ? uri
-      : `https://picsum.photos/seed/${encodeURIComponent(String(seed || 'vee'))}/120/120`;
   return (
-    <Image source={{ uri: src }} style={st.thumb} resizeMode="cover" onError={next} />
+    <Image source={{ uri }} style={st.thumb} resizeMode="cover" onError={() => setFailed(true)} />
   );
 });
 
@@ -217,7 +213,7 @@ const SearchScreen = ({ navigation }) => {
 
   const renderItem = ({ item }) => (
     <TouchableOpacity style={st.card} onPress={() => openProduct(item)} activeOpacity={0.75}>
-      <ProductImg uri={item.image} seed={item.barcode || item.name} />
+      <ProductImg uri={item.image} />
       <View style={st.cardMid}>
         <Text style={st.cardName} numberOfLines={1}>{item.name}</Text>
         {item.brand ? <Text style={st.cardBrand} numberOfLines={1}>{item.brand}</Text> : null}
@@ -251,7 +247,7 @@ const SearchScreen = ({ navigation }) => {
         <Ionicons name="search" size={18} color={ON_SURF_VAR} />
         <TextInput
           style={st.searchInput}
-          placeholder="Product name or barcode"
+          placeholder="Search product name"
           placeholderTextColor={ON_SURF_VAR}
           value={query}
           onChangeText={setQuery}
@@ -329,7 +325,9 @@ const SearchScreen = ({ navigation }) => {
             <View style={st.empty}>
               <Ionicons name="leaf-outline" size={30} color="#d4d4d4" />
               <Text style={st.emptyText}>
-                {searching ? 'No highly-rated products match that search.' : 'No products to show yet.'}
+                {searching
+                  ? 'No products scoring 70+ match that search. Search only lists healthy picks — scan a barcode to check any other product.'
+                  : 'No products to show yet.'}
               </Text>
             </View>
           )

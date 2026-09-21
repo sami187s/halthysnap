@@ -24,10 +24,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsetsWithFallback } from '../utils/safeAreaUtils';
 import { fetchProductByBarcode } from '../services/reliableAPI';
 import { analyzeIngredients } from '../utils/enhancedIngredientAnalyzer';
-import { AIService } from '../services/aiService';
-import ProductAIChat from '../components/ProductAIChat';
 import ShareScoreSheet from '../components/ShareScoreSheet';
-import { AI_CHAT_ENABLED } from '../config/featureFlags';
 import { saveToHistory } from '../utils/historyManager';
 import { checkAndConsume } from '../utils/scanQuota';
 import { isProductSaved, toggleSavedProduct } from '../utils/curatedProducts';
@@ -86,7 +83,7 @@ const GAUGE_CIRC = 2 * Math.PI * GAUGE_R;
 // Purely-style 4-band score scale — aligned with ScoreRing.getScoreBand
 // so score colors agree across every screen.
 const getScoreColor = (sc) => {
-  if (sc >= 75) return PRIMARY;
+  if (sc >= 70) return PRIMARY;
   if (sc >= 50) return WARNING_C;
   return ERROR_C;
 };
@@ -94,9 +91,8 @@ const getScoreColor = (sc) => {
 const getVerdict = (sc) => {
   if (sc >= 85) return 'Excellent';
   if (sc >= 70) return 'Good';
-  if (sc >= 45) return 'Moderate';
-  if (sc >= 30) return 'Poor';
-  return 'Very Poor';
+  if (sc >= 50) return 'Fair';
+  return 'Poor';
 };
 
 // -- VEE COLOR PALETTE (Purely-aligned) --
@@ -346,6 +342,16 @@ export default function CosmeticResultsScreen({ route, navigation }) {
         navigation.replace('ProductNotFound', { barcode, productType: 'cosmetic' });
         return;
       }
+      // Real ingredient list required. No list (or nothing recognised) = no honest
+      // score, so we don't show a made-up number and it doesn't cost a free scan.
+      const ingredients = productData.ingredients_text || '';
+      const analysisResult = ingredients.trim().length >= 10
+        ? analyzeIngredients(ingredients, 'cosmetic', {}, productData)
+        : null;
+      if (!analysisResult || analysisResult.score === null || analysisResult.score === undefined) {
+        navigation.replace('ProductNotFound', { barcode, productType: 'cosmetic', reason: 'nodata' });
+        return;
+      }
       // Free-tier daily scan quota — a found product counts; block at the limit.
       const quota = await checkAndConsume('cosmetic', barcode);
       if (quota.blocked) {
@@ -353,12 +359,6 @@ export default function CosmeticResultsScreen({ route, navigation }) {
         return;
       }
       setProduct(productData);
-      const ingredients = productData.ingredients_text || '';
-      let analysisResult = ingredients
-        ? analyzeIngredients(ingredients, 'cosmetic', {}, productData)
-        : { score: 60, totalIngredients: 0, goodIngredients: [], badIngredients: [], moderateIngredients: [],
-            excellentIngredients: [], analyzedIngredients: [], productType: 'cosmetic',
-            excellentCount: 0, goodCount: 0, moderateCount: 0, badCount: 0, additives: [] };
       setAnalysis(analysisResult);
       setLoading(false);
 
@@ -419,10 +419,11 @@ export default function CosmeticResultsScreen({ route, navigation }) {
           )
           .map(p => {
             const ingText = p.ingredients_text || '';
-            let altScore = 65;
+            // No default score: only real analysis results count
+            let altScore = null;
             if (ingText) {
               const ingResult = analyzeIngredients(ingText, 'cosmetic', {}, p);
-              altScore = ingResult?.score || 65;
+              altScore = ingResult?.score ?? null;
             }
             return {
               name: p.product_name,
@@ -432,7 +433,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
               score: altScore,
             };
           })
-          .filter(p => p.score >= 80)
+          .filter(p => p.score != null && p.score >= 80)
           .sort((a, b) => b.score - a.score)
           .slice(0, 5);
         if (alts.length > 0) {
@@ -484,7 +485,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
         setIsPremium(false);
         setHasAIAccess(true);
         setPremiumLoading(false);
-        if (product && analysis && !aiAnalysis && !aiLoading) setTimeout(() => generateAIAnalysis(), 500);
+        // (No automatic AI analysis here: its result was never shown, so it only cost money.)
         return true;
       }
       const subscriptionType = await AsyncStorage.getItem('subscriptionType');
@@ -510,7 +511,6 @@ export default function CosmeticResultsScreen({ route, navigation }) {
       setIsPremium(premium);
       setHasAIAccess(hasAccess);
       setPremiumLoading(false);
-      if (hasAccess && product && analysis && !aiAnalysis && !aiLoading) setTimeout(() => generateAIAnalysis(), 500);
       return hasAccess;
     } catch (e) {
       setPremiumLoading(false);
@@ -520,63 +520,6 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     }
   };
 
-  // -- AI ANALYSIS --
-  const generateAIAnalysis = async () => {
-    if (!product || !analysis || aiLoading) return;
-
-    // AI features are globally off ("coming soon") until launch — see App.js.
-    // This auto-triggered analysis must respect that flag too, not just the chat UI.
-    const chatbotAccess = await AsyncStorage.getItem('chatbotAccess');
-    if (chatbotAccess !== 'enabled') return;
-
-    // For non-premium, non-trial, non-search users: the UI button already
-    // decremented freeRecUsage before calling this, so skip the old daily
-    // limit check here. Only block if we are absolutely sure the user has
-    // no access AND the call came from an automatic path (e.g. checkSubscriptionStatus).
-    if (!isPremium && !hasAIAccess && !(fromSearch && freeAIAccess)) {
-      // The button onPress sets hasAIAccess=true before calling us, but React
-      // state is async, so also check freeRecUsage.remaining (already decremented).
-      const usage = await getFreeRecommendationUsage();
-      // If the user just tapped the button, useFreeRecommendation() already decremented,
-      // so usage.remaining may be 0 or 1 � that's fine, we allow the call.
-      // Only block if they truly had 0 remaining BEFORE the tap (i.e. used >= 2).
-      if (usage.used > 2) {
-        return;
-      }
-    }
-
-    // Check premium/trial/search access for paid features
-    // (Free user quota is already handled by the button's onPress via useFreeRecommendation)
-
-    setAiLoading(true);
-    try {
-      const ingredients = analysis.parsedIngredients || analysis.ingredients ||
-        (product.ingredients_text ? product.ingredients_text.split(',').map(i => i.trim()) : []);
-      const aiResult = await AIService.analyzeProduct(product, ingredients);
-      setAiAnalysis(aiResult);
-      setTimeout(async () => {
-        try {
-          const missingResult = await AIService.detectMissingIngredients(product, ingredients);
-          if (missingResult.missingIngredients?.length > 0) {
-            const updated = [...ingredients];
-            const newIng = [];
-            missingResult.missingIngredients.forEach(m => {
-              if (!ingredients.some(i => i.toLowerCase().includes(m.name.toLowerCase()))) {
-                updated.push(`${m.name} (AI detected)`);
-                newIng.push(m);
-              }
-            });
-            if (newIng.length > 0) {
-              const enh = analyzeIngredients(updated.join(', '), 'cosmetic');
-              setAnalysis(prev => ({ ...enh, missingIngredientsDetected: newIng, originalIngredientCount: ingredients.length, totalIngredients: updated.length, aiEnhanced: true }));
-            }
-          }
-        } catch (e) {}
-      }, 100);
-    } catch (e) {
-      Alert.alert('AI Analysis Failed', 'Unable to generate AI analysis. Please try again later.');
-    } finally { setAiLoading(false); }
-  };
 
   useEffect(() => {
     if (product && analysis && !loading) { checkSubscriptionStatus(); }
@@ -631,7 +574,7 @@ export default function CosmeticResultsScreen({ route, navigation }) {
     });
   };
 
-  const score = useMemo(() => analysis?.score || 50, [analysis?.score]);
+  const score = useMemo(() => analysis?.score ?? 0, [analysis?.score]);
   const scoreColor = useMemo(() => getScoreColor(score), [score]);
 
   // Ingredient lists from analyzer
@@ -950,51 +893,10 @@ export default function CosmeticResultsScreen({ route, navigation }) {
           {!!(product.code || product.barcode || barcode) && (
             <Text style={st.barcodeFooter}>{product.code || product.barcode || barcode}</Text>
           )}
-
-          {/* AURA AI CARD */}
-          {AI_CHAT_ENABLED && (
-            <View style={st.aiCardWrap}>
-              <TouchableOpacity
-                style={st.aiCard}
-                activeOpacity={0.82}
-                onPress={async () => {
-                  if (isPremium || hasAIAccess) {
-                    setShowAIChat(true);
-                  } else if (freeRecUsage.remaining > 0) {
-                    const result = await useFreeRecommendation();
-                    if (result.success) { setFreeRecUsage(result.usage); setHasAIAccess(true); setShowAIChat(true); }
-                  } else {
-                    navigation.navigate('Subscription', { returnTo: 'results', productName: product?.product_name });
-                  }
-                }}
-              >
-                <View style={st.aiCardIcon}>
-                  <Ionicons name="sparkles" size={22} color={PRIMARY} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 16 }}>
-                  <Text style={st.aiCardLabel}>AURA ASSISTANT</Text>
-                  <Text style={st.aiCardSub}>Ask about these{`\n`}ingredients</Text>
-                </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                  <Text style={st.aiCardConnect}>CONNECT</Text>
-                  <Ionicons name="arrow-forward" size={14} color={PRIMARY} />
-                </View>
-              </TouchableOpacity>
-            </View>
-          )}
+          <Text style={st.dataCredit}>Product data: Open Beauty Facts contributors (ODbL)</Text>
 
         </Animated.View>
       </ScrollView>
-
-      {AI_CHAT_ENABLED && showAIChat && product && (
-        <ProductAIChat
-          product={product}
-          analysis={analysis}
-          ingredients={(product.ingredients_text || '').split(',').map(s => s.trim()).filter(Boolean)}
-          visible={showAIChat}
-          onClose={() => setShowAIChat(false)}
-        />
-      )}
 
       {/* ── WHY THIS RATING — bottom sheet ────────────────────────── */}
       <Modal
@@ -1289,5 +1191,6 @@ const st = StyleSheet.create({
   altBrand:     { fontSize: 12, fontWeight: '400', color: NEUTRAL_400, marginBottom: 4 },
   altScoreText: { fontSize: 12, fontWeight: '700' },
 
-  barcodeFooter: { textAlign: 'center', fontSize: 12, color: ON_SURFACE_VAR, letterSpacing: 1, marginBottom: 24 },
+  barcodeFooter: { textAlign: 'center', fontSize: 12, color: ON_SURFACE_VAR, letterSpacing: 1, marginBottom: 8 },
+  dataCredit: { textAlign: 'center', fontSize: 11, color: ON_SURFACE_VAR, marginBottom: 24, paddingHorizontal: 24 },
 });

@@ -22,6 +22,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { fetchProductByBarcode } from '../services/reliableAPI';
 import { getProductTypeFromCategories, analyzeIngredients } from '../utils/enhancedIngredientAnalyzer';
 import { calculateHealthScore } from '../utils/enhancedScoring';
+import { checkAndConsume } from '../utils/scanQuota';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
@@ -94,17 +95,16 @@ const GAUGE_RADIUS = (GAUGE_SIZE - GAUGE_STROKE) / 2;
 const GAUGE_CIRCUMFERENCE = 2 * Math.PI * GAUGE_RADIUS;
 
 /* ───── score helpers ───── */
+// Same bands as every other screen: Good ≥70, Fair 50–69, Poor <50.
 const getScoreColor = (s) => {
   if (s >= 70) return '#067A4F';
   if (s >= 50) return '#FF9800';
-  if (s >= 25) return '#FF5722';
   return '#F44336';
 };
 const getScoreLabel = (s) => {
   if (s >= 70) return 'HEALTHY';
   if (s >= 50) return 'MODERATE';
-  if (s >= 25) return 'POOR';
-  return 'UNHEALTHY';
+  return 'POOR';
 };
 
 /* ════════════════════════════════════════════ */
@@ -114,6 +114,7 @@ const ScanResultPreview = ({
   onViewDetails,
   onScanAgain,
   onClose,
+  onBlocked,
 }) => {
   const slideAnim = useRef(new Animated.Value(400)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -123,6 +124,7 @@ const ScanResultPreview = ({
   const [score, setScore] = useState(null);
   const [productType, setProductType] = useState('food');
   const [error, setError] = useState(false);
+  const [noData, setNoData] = useState(false);
 
   /* ── fetch product on barcode change ── */
   useEffect(() => {
@@ -140,6 +142,8 @@ const ScanResultPreview = ({
     (async () => {
       setLoading(true);
       setError(false);
+      setNoData(false);
+      setScore(null);
       try {
         const data = await fetchProductByBarcode(barcode);
         if (cancelled) return;
@@ -159,17 +163,28 @@ const ScanResultPreview = ({
         );
         setProductType(type);
 
-        /* compute score */
+        /* compute score — real data only, never a made-up fallback number */
+        let computed = null;
         if (type === 'food') {
-          const healthScore = calculateHealthScore(data, null, null);
-          setScore(healthScore?.score ?? 70);
+          computed = calculateHealthScore(data, null, null)?.score ?? null;
         } else {
-          const analysis = analyzeIngredients(
-            data.ingredients_text || '',
-            type,
-          );
-          setScore(analysis?.score ?? 50);
+          computed = analyzeIngredients(data.ingredients_text || '', type)?.score ?? null;
         }
+        if (computed === null || computed === undefined) {
+          setNoData(true);
+          setLoading(false);
+          return;
+        }
+
+        /* free-tier quota: the score is only revealed if this scan is allowed */
+        const quota = await checkAndConsume(type === 'food' ? 'food' : 'cosmetic', data.barcode || barcode);
+        if (cancelled) return;
+        if (quota.blocked) {
+          setLoading(false);
+          if (onBlocked) onBlocked();
+          return;
+        }
+        setScore(computed);
       } catch {
         if (!cancelled) setError(true);
       } finally {
@@ -236,13 +251,15 @@ const ScanResultPreview = ({
         {loading ? (
           /* Analyzing state */
           <AnalyzingState loading={loading} resetKey={barcode} />
-        ) : error ? (
-          /* Error / not found state */
+        ) : (error || noData || score === null) ? (
+          /* Error / not found / no-data state */
           <View style={styles.errorWrap}>
             <Ionicons name="alert-circle-outline" size={48} color="#FF9800" />
-            <Text style={styles.errorTitle}>Product not found</Text>
+            <Text style={styles.errorTitle}>{noData ? 'Not enough data' : 'Product not found'}</Text>
             <Text style={styles.errorSub}>
-              We couldn't find this product in our database.
+              {noData
+                ? "We found this product but it has no ingredient or nutrition data yet, so we can't give it an honest score."
+                : "We couldn't find this product in our database."}
             </Text>
             <View style={styles.errorActions}>
               <TouchableOpacity style={styles.scanAgainBtn} onPress={onScanAgain} activeOpacity={0.8}>

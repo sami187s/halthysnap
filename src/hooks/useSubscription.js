@@ -91,7 +91,7 @@ export const SubscriptionProvider = ({ children }) => {
         return;
       }
 
-      const status = await iapManager.checkSubscriptionStatus();
+      const status = await iapManager.getSubscriptionStatus();
       
       setSubscriptionState({
         isActive: status.isPremium || false,

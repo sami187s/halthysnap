@@ -88,8 +88,8 @@ export const analyzeIngredients = (productIngredients, productType = 'beauty', n
   } catch (error) {
     // Return a safe fallback analysis
     return {
-      score: 50,
-      overallScore: 50,
+      score: null,
+      overallScore: null,
       analyzedIngredients: [],
       goodIngredients: [],
       badIngredients: [],
@@ -109,8 +109,8 @@ export const analyzeIngredients = (productIngredients, productType = 'beauty', n
 export const analyzeNonFoodProduct = (productIngredients, productType) => {
   if (!productIngredients || typeof productIngredients !== 'string') {
     return {
-      score: 50,
-      overallScore: 50,
+      score: null, // no ingredient list → no score (never a made-up number)
+      overallScore: null,
       analyzedIngredients: [],
       goodIngredients: [],
       badIngredients: [],
@@ -132,6 +132,7 @@ export const analyzeNonFoodProduct = (productIngredients, productType) => {
     .split(/[,;:\n]/)
     .map(ingredient => ingredient.trim())
     .filter(ingredient => ingredient.length > 1)
+    .filter(ingredient => !/^[\d.,\s%]+$/.test(ingredient)) // "36%" is not an ingredient
     .filter(ingredient => !ingredient.match(/^(and|or|the|with|contains|may contain)$/));
 
   const analyzedIngredients = [];
@@ -183,6 +184,7 @@ export const analyzeNonFoodProduct = (productIngredients, productType) => {
     // 4. Fallback to enhanced lookup
     if (!analysis && enhancedIngredientLookup) {
       analysis = enhancedIngredientLookup(ingredient);
+      if (analysis && analysis.guessed) analysis = null; // name-based guess ≠ real data
       if (analysis) databaseSource = 'enhanced-lookup';
     }
     
@@ -301,11 +303,13 @@ export const analyzeNonFoodProduct = (productIngredients, productType) => {
     
     // Fuzzy matching
     for (const [dbKey, data] of Object.entries(database)) {
-      if (dbKey.includes(key) || key.includes(dbKey.replace(/_/g, ' '))) {
+      // Whole-word match only — loose substring matching pulled in wrong ingredients.
+      const dbName = dbKey.replace(/_/g, ' ');
+      if (dbName.length >= 4 && (hasTerm(ingredient, dbName) || hasTerm(dbName, ingredient))) {
         return data;
       }
-      // Check INCI name if available
-      if (data.inci && data.inci.toLowerCase().includes(ingredient)) {
+      // Check INCI name if available (exact)
+      if (data.inci && String(data.inci).toLowerCase().trim() === ingredient) {
         return data;
       }
     }
@@ -317,8 +321,8 @@ export const analyzeNonFoodProduct = (productIngredients, productType) => {
   const totalIngredients = analyzedIngredients.length;
   if (totalIngredients === 0) {
     return {
-      score: 50,
-      overallScore: 50,
+      score: null,
+      overallScore: null,
       analyzedIngredients: [],
       goodIngredients: [],
       badIngredients: [],
@@ -339,12 +343,22 @@ export const analyzeNonFoodProduct = (productIngredients, productType) => {
   const badCount = badIngredients.length;
   const unknownCount = unknownIngredients.length;
 
-  // Weight calculation based on safety levels
-  const score = Math.round(
-    (excellentCount * 95 + goodCount * 80 + moderateCount * 60 + badCount * 25 + unknownCount * 50) / totalIngredients
-  );
-
-  const finalScore = Math.max(0, Math.min(100, score));
+  // Score only the ingredients we actually recognise. Unknown ingredients are
+  // NOT given a made-up 50 — they are reported (see `coverage`) but not averaged in.
+  // If nothing is recognised there is no honest score.
+  const knownCount = excellentCount + goodCount + moderateCount + badCount;
+  let finalScore = null;
+  if (knownCount > 0) {
+    let s = Math.round((excellentCount * 95 + goodCount * 80 + moderateCount * 60 + badCount * 25) / knownCount);
+    // An average hides danger: ONE hazardous ingredient among 30 harmless ones would still score
+    // "Good". So every concerning ingredient costs points, a very hazardous one (safety < 35,
+    // e.g. parabens, oxybenzone) caps the product at "Poor", and any concerning one caps it below "Good".
+    const veryBad = badIngredients.filter((i) => i.score < 35).length;
+    s -= Math.min(32, badCount * 8);
+    if (veryBad > 0) s = Math.min(s, 49);
+    else if (badCount > 0) s = Math.min(s, 69);
+    finalScore = Math.max(0, Math.min(100, s));
+  }
 
   if (unknownIngredients.length > 0) _saveTrustDb(unknownIngredients).catch(() => {});
 
@@ -454,6 +468,20 @@ const SPECIFIC_INGREDIENT_LOOKUP = {
   'miel':               { status: 'GOOD',     reason: 'Honey — natural sweetener with antimicrobial properties and trace antioxidants' },
 };
 
+// Whole-word match (letters incl. accents count as word characters).
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const termCache = new Map();
+const hasTerm = (text, term) => {
+  let re = termCache.get(term);
+  if (!re) {
+    re = new RegExp(`(^|[^a-zà-ÿ0-9])${escapeRe(term)}([^a-zà-ÿ0-9]|$)`, 'i');
+    termCache.set(term, re);
+  }
+  return re.test(text);
+};
+// Longest keys first so the most specific entry wins ("natural and artificial flavor" before "artificial flavor").
+const SPECIFIC_KEYS_BY_LENGTH = Object.keys(SPECIFIC_INGREDIENT_LOOKUP).sort((a, b) => b.length - a.length);
+
 // Food product analysis
 export const analyzeFoodProduct = (productIngredients, nutriments = {}, productData = null) => {
   const score = calculateNutriScore(nutriments);
@@ -499,7 +527,7 @@ export const analyzeFoodProduct = (productIngredients, nutriments = {}, productD
     const lowerIng = ingredient.toLowerCase().trim();
 
     // 1. Check specific lookup table first (most accurate)
-    const specificKey = Object.keys(SPECIFIC_INGREDIENT_LOOKUP).find(key => lowerIng.includes(key));
+    const specificKey = SPECIFIC_KEYS_BY_LENGTH.find(key => hasTerm(lowerIng, key));
     if (specificKey) {
       const entry = SPECIFIC_INGREDIENT_LOOKUP[specificKey];
       const colorMap = { EXCELLENT: '#067A4F', GOOD: '#067A4F', MODERATE: '#FF9800', POOR: '#D32F2F' };
@@ -514,9 +542,12 @@ export const analyzeFoodProduct = (productIngredients, nutriments = {}, productD
 
     // 2. Fall back to general patterns
     // Check POOR first so "natural and artificial flavor" doesn't get caught by "natural"
-    const isPoor      = poorPatterns.some(p => lowerIng.includes(p));
-    const isExcellent = !isPoor && excellentPatterns.some(p => lowerIng.includes(p));
-    const isGood      = !isPoor && !isExcellent && goodPatterns.some(p => lowerIng.includes(p));
+    // Whole-word matching ("coating" is not "oat"), and processed forms are never "good":
+    // "vegetable oil" / "vegetable shortening" must not count as a beneficial vegetable.
+    const isProcessedForm = /\b(oil|fat|shortening|starch|gum|extract|protein|flavou?r)\b/.test(lowerIng);
+    const isPoor      = poorPatterns.some(p => hasTerm(lowerIng, p));
+    const isExcellent = !isPoor && excellentPatterns.some(p => hasTerm(lowerIng, p));
+    const isGood      = !isPoor && !isExcellent && !isProcessedForm && goodPatterns.some(p => hasTerm(lowerIng, p));
 
     let reason;
     if (isPoor) {
@@ -595,13 +626,14 @@ export const analyzeFoodProduct = (productIngredients, nutriments = {}, productD
 // Simple Nutri-Score calculation
 function calculateNutriScore(nutriments) {
   let score = 70; // Base score
+  let presentFields = 0;
 
   const readVal = (keys) => {
     for (const key of keys) {
       const raw = nutriments?.[key];
       if (raw !== undefined && raw !== null && raw !== '') {
         const val = Number(raw);
-        if (Number.isFinite(val)) return val;
+        if (Number.isFinite(val)) { presentFields += 1; return val; }
       }
     }
     return 0;
@@ -621,7 +653,10 @@ function calculateNutriScore(nutriments) {
   
   if (fiber > 3) score += 5;
   if (proteins > 8) score += 5;
-  
+
+  // No real nutrition fields → no score (never a made-up base of 70).
+  if (presentFields < 3) return null;
+
   return Math.max(0, Math.min(100, score));
 }
 
@@ -668,6 +703,18 @@ export const getProductTypeFromCategories = (categories = '', productName = '', 
     'grocery', 'sugar', 'salt', 'spice', 'sauce', 'oil', 'butter',
     'egg', 'flour', 'rice', 'grain', 'protein', 'nutrition',
   ];
+
+  // Unambiguous cosmetic words in the NAME win over food words — otherwise
+  // "Protein Shampoo", "Milk Cleanser" or "Coconut Oil Conditioner" would be scored as food.
+  const strongCosmeticNameKeywords = [
+    'shampoo', 'conditioner', 'moisturizer', 'moisturiser', 'sunscreen', 'deodorant',
+    'antiperspirant', 'aftershave', 'mascara', 'lipstick', 'eyeshadow', 'eyeliner',
+    'nail polish', 'face wash', 'body wash', 'shower gel', 'micellar',
+    'eau de toilette', 'eau de parfum', 'skincare', 'hair mask',
+  ];
+  if (strongCosmeticNameKeywords.some((k) => nameLower.includes(k))) {
+    return 'beauty';
+  }
 
   // Check food category first — food wins over cosmetic categories
   for (const keyword of foodKeywords) {

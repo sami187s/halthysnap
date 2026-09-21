@@ -61,6 +61,13 @@ const SourcesScreen = ({ navigation }) => {
           <Text style={st.cardText}>
             Our primary database for product information, ingredients, and nutritional data. A collaborative, free, and open database of food and cosmetic products from around the world.
           </Text>
+          <Text style={[st.cardText, { marginTop: 8 }]}>
+            Contains information from Open Food Facts and Open Beauty Facts, made available under the Open Database License (ODbL). Individual contents are under the Database Contents License; product photos are CC BY-SA. Nutrition details also come from USDA FoodData Central (public domain).
+          </Text>
+          <TouchableOpacity style={st.linkRow} onPress={() => openURL('https://opendatacommons.org/licenses/odbl/1-0/')}>
+            <Text style={st.linkText}>Read the ODbL licence</Text>
+            <Ionicons name="open-outline" size={14} color="#067A4F" />
+          </TouchableOpacity>
           <TouchableOpacity style={st.linkRow} onPress={() => openURL('https://world.openfoodfacts.org')}>
             <Text style={st.linkText}>Visit openfoodfacts.org</Text>
             <Ionicons name="open-outline" size={14} color="#067A4F" />

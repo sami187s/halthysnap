@@ -22,7 +22,9 @@ export const checkAndResetDailyCounters = async () => {
       await AsyncStorage.multiSet([
         ['lastResetDate', today],
         ['premiumTrialUsedToday', '0'], // Reset daily scan usage to 0
-        ['premiumSearchUsedToday', '0'], // Reset daily search usage to 0        ['freeRecommendationUsedToday', '0'], // Reset free recommendation usage to 0        ['subscriptionPromptDismissedToday', 'false'], // Reset subscription prompt dismissal
+        ['premiumSearchUsedToday', '0'], // Reset daily search usage to 0
+        ['freeRecommendationUsedToday', '0'], // Reset free recommendation usage to 0
+        ['subscriptionPromptDismissedToday', 'false'], // Reset subscription prompt dismissal
         // Keep trial activated if user was already in trial mode
         ['premiumTrialActivated', wasInTrialMode ? 'true' : 'false']
       ]);

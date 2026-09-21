@@ -296,7 +296,12 @@ class IAPManager {
             checkedAt: new Date().toISOString(),
           })],
           ['subscriptionType', 'Premium'],
-          ['subscriptionExpiresAt', (Date.now() + (365 * 24 * 60 * 60 * 1000)).toString()]
+          // Real expiry from the store when available; rolling year only for non-expiring entitlements.
+          ['subscriptionExpiresAt', String(
+            (this.customerInfo.entitlements.active[ENTITLEMENT_ID]?.expirationDate
+              ? Date.parse(this.customerInfo.entitlements.active[ENTITLEMENT_ID].expirationDate)
+              : NaN) || (Date.now() + (365 * 24 * 60 * 60 * 1000))
+          )]
         ]);
       } else {
         // Clear premium status if not active
@@ -312,6 +317,19 @@ class IAPManager {
       console.error('⚠️ Error checking subscription status:', error);
       return false;
     }
+  }
+
+  /**
+   * Detailed subscription status: { isPremium, expiresAt (ms | null), daysRemaining }.
+   * (checkSubscriptionStatus() returns only the boolean, as other callers expect.)
+   */
+  async getSubscriptionStatus() {
+    const isPremium = await this.checkSubscriptionStatus();
+    const ent = this.customerInfo?.entitlements?.active?.[ENTITLEMENT_ID];
+    const parsed = ent?.expirationDate ? Date.parse(ent.expirationDate) : NaN;
+    const expiresAt = Number.isFinite(parsed) ? parsed : null;
+    const daysRemaining = expiresAt ? Math.max(0, Math.ceil((expiresAt - Date.now()) / 86400000)) : null;
+    return { isPremium: !!isPremium, expiresAt, daysRemaining };
   }
 
   /**
@@ -552,7 +570,6 @@ class IAPManager {
       // Restore purchases
       this.customerInfo = await Purchases.restorePurchases();
       
-      console.log('📊 Customer Info after restore:', JSON.stringify(this.customerInfo, null, 2));
       console.log('🔑 Active entitlements:', Object.keys(this.customerInfo.entitlements.active));
       console.log('🔍 Looking for entitlement:', ENTITLEMENT_ID);
 
@@ -590,7 +607,6 @@ class IAPManager {
         if (callbacks.onLoading) callbacks.onLoading(false);
         
         console.log('⚠️ No active subscriptions found');
-        console.log('⚠️ Customer info:', JSON.stringify(this.customerInfo, null, 2));
         
         if (callbacks.onRestoreFailed) {
           callbacks.onRestoreFailed();

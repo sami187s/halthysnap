@@ -3,7 +3,8 @@
     "owner": "sami187s1",
     "name": "Vee",
     "slug": "healthyscan",
-    "version": "4.1.0",
+    "scheme": "vee",
+    "version": "4.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -24,18 +25,18 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.healthyscan.app",
-      "buildNumber": "69",
+      "buildNumber": "70",
       "config": {
         "usesNonExemptEncryption": false
       },
-      "appStoreUrl": "https://apps.apple.com/app/healthyscan/id123456789",
+      "appStoreUrl": "https://apps.apple.com/us/app/vee-product-check/id6751061358",
       "infoPlist": {
         "UIDeviceFamily": [
           1,
           2
         ],
-        "NSCameraUsageDescription": "HealthyScan uses the camera to scan product barcodes for health analysis.",
-        "NSPhotoLibraryUsageDescription": "HealthyScan needs access to your photo library to select product images for analysis.",
+        "NSCameraUsageDescription": "Vee uses the camera to scan product barcodes for health analysis.",
+        "NSPhotoLibraryUsageDescription": "Vee needs access to your photo library to select images for analysis.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
           "NSExceptionDomains": {
@@ -128,7 +129,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Allow HealthyScan to access camera to scan product barcodes for health analysis."
+          "cameraPermission": "Allow Vee to access the camera to scan product barcodes for health analysis."
         }
       ],
       [
@@ -147,8 +148,7 @@
       "eas": {
         "projectId": "451587d1-e392-4242-9abe-071672afc861"
       },
-      "usdaApiKey": "9PFcnzr3jitMIFX7wwluYn8FMIh56ioCiYoy0prl",
-      "goMarketMeApiKey": "wNFYLjrCan85Ra1KMqYxI87W2gBwbQPr1RHvw0yj"
+      "usdaApiKey": "9PFcnzr3jitMIFX7wwluYn8FMIh56ioCiYoy0prl"
     },
     "runtimeVersion": {
       "policy": "sdkVersion"

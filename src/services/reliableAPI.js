@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { processNutritionData, checkNutritionCompleteness } from '../utils/nutritionProcessor';
 import { fetchCosmeticByBarcodeYukaStyle, searchCosmeticByNameYukaStyle } from './yukaStyleCosmeticAPI';
-import { fetchProductFromTurso, searchProductsInTurso, saveProductToTurso, updateNutritionInTurso, updateProductImageInTurso, updateIngredientsInTurso } from './tursoDB';
+import { lookupProductRemote, fetchProductFromTurso, searchProductsInTurso, saveProductToTurso, updateNutritionInTurso, updateProductImageInTurso, updateIngredientsInTurso, fetchCosmeticFromTurso, saveCosmeticToTurso } from './tursoDB';
 
 // Food products are served from our own Turso database.
 // Cosmetics still use the Open Beauty Facts / Yuka-style sources.
@@ -104,25 +104,21 @@ const isNutritionIncomplete = (nutriments) => {
  * Picks the best-matching result by name similarity — not just the first.
  * Silently returns null on any error — never blocks the scan result.
  */
-const enrichNutritionFromUSDA = async (productName, existingNutriments) => {
-  if (!productName) return null;
+const enrichNutritionFromUSDA = async (barcode, existingNutriments) => {
+  if (!barcode) return null;
   try {
     const resp = await axios.get('https://api.nal.usda.gov/fdc/v1/foods/search', {
-      params: { query: productName, api_key: USDA_API_KEY, pageSize: 10, dataType: 'Branded' },
+      params: { query: barcode, api_key: USDA_API_KEY, pageSize: 10, dataType: 'Branded' },
       timeout: 8000,
     });
     const foods = resp?.data?.foods;
     if (!Array.isArray(foods) || !foods.length) return null;
 
-    // Pick best match by word-overlap score instead of blindly taking index 0
-    const queryWords = productName.toLowerCase().split(/\s+/).filter(w => w.length > 2);
-    const score = (desc = '') => {
-      const d = desc.toLowerCase();
-      return queryWords.reduce((s, w) => s + (d.includes(w) ? 1 : 0), 0);
-    };
-    const food = foods.reduce((best, f) =>
-      score(f.description) >= score(best.description) ? f : best
-    , foods[0]);
+    // Only accept an EXACT barcode match. Name matching used to pull nutrition
+    // from a different product (e.g. 70g sugar instead of 6g) and save it to Turso.
+    const strip = (s) => String(s || '').replace(/^0+/, '');
+    const food = foods.find(f => f.gtinUpc && strip(f.gtinUpc) === strip(barcode));
+    if (!food) return null;
 
     const merged = { ...(existingNutriments || {}) };
     let sodiumMg = null;
@@ -139,7 +135,7 @@ const enrichNutritionFromUSDA = async (productName, existingNutriments) => {
       merged['salt_100g'] = parseFloat((sodiumMg * 2.5 / 1000).toFixed(3));
     }
     const ingredients_text = food.ingredients || null;
-    console.log(`✅ USDA enrichment: filled missing nutrients for "${productName}" (matched: ${food.description})`);
+    console.log(`✅ USDA enrichment: exact barcode match ${barcode} (${food.description})`);
     return { nutriments: merged, ingredients_text };
   } catch (err) {
     console.log('⚠️ USDA enrichment skipped:', err.message);
@@ -147,16 +143,65 @@ const enrichNutritionFromUSDA = async (productName, existingNutriments) => {
   }
 };
 
+// The per-100g columns we store in Turso, taken from a formatted product
+// (processed values first: kJ already converted to kcal, sodium to salt).
+const nutritionForSave = (result) => {
+  const p = result.processed_nutrition || {};
+  const raw = result.nutriments || {};
+  const pick = (k) => (p[k] != null ? p[k] : raw[k] != null ? raw[k] : null);
+  return {
+    'energy-kcal_100g': pick('energy-kcal_100g'),
+    fat_100g: pick('fat_100g'),
+    'saturated-fat_100g': pick('saturated-fat_100g'),
+    sugars_100g: pick('sugars_100g'),
+    salt_100g: pick('salt_100g'),
+    proteins_100g: pick('proteins_100g'),
+    fiber_100g: pick('fiber_100g'),
+  };
+};
+
+// Save a food product found through a public API (looked up BY BARCODE, so it is
+// the right product) into our own database — but only if it carries real data.
+const saveFoodIfUseful = (barcode, result) => {
+  const nutrition = nutritionForSave(result);
+  const nutritionFields = Object.values(nutrition).filter((v) => v != null).length;
+  const hasIngredients = (result.ingredients_text || '').trim().length >= 3;
+  if (!result.product_name || (!hasIngredients && nutritionFields < 3)) return;
+  saveProductToTurso(barcode, { ...result, nutriments: nutrition });
+};
+
 // Enhanced product fetcher that actually scans real barcodes like Yuka
 export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
-  if (!barcode || barcode.length < 8) {
-    throw new Error('Invalid barcode format - barcode must be at least 8 digits');
+  // Product barcodes are digits only (EAN-8/UPC-E/UPC-A/EAN-13/GTIN-14). Anything
+  // else (QR text, URLs) must never be dropped into an API URL.
+  barcode = String(barcode || '').trim();
+  if (!/^\d{8,14}$/.test(barcode)) {
+    throw new Error('Invalid barcode format - barcode must be 8-14 digits');
   }
 
   // Check cache first — eliminates triple-fetch (preview → smartNav → results)
   const cached = getCachedProduct(barcode);
   if (cached) return cached;
 
+  // ── MAIN FLOW: one request to our worker ─────────────────────────────────────
+  // The worker checks OUR database first, fills any gaps (ingredients / nutrition / image /
+  // brand) from Open Food Facts then USDA, saves everything it finds, and returns the
+  // finished product. Popular products never touch a public API again.
+  try {
+    const remote = await lookupProductRemote(barcode);
+    if (remote && remote.status === 'ok' && remote.product) {
+      const p = remote.product;
+      const result = formatProductData(p, barcode, p.source, p.product_type);
+      setCachedProduct(barcode, result);
+      return result;
+    }
+    if (remote && remote.status === 'notfound') return null;
+    // 'busy' / 'invalid' → use the direct path below
+  } catch (e) {
+    console.log('⚠️ Worker lookup unavailable, using the direct API path:', e && e.message);
+  }
+
+  // ── FALLBACK: the phone asks our database and the public APIs itself ─────────
   const timeoutMs = 10000; // 10 seconds timeout like Yuka
 
   // STEP 1: Try our Turso database (1M+ food products) — primary source for food
@@ -164,7 +209,47 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
   if (tursoProduct) {
     const result = formatProductData(tursoProduct, barcode, 'HealthyScan DB', 'food');
 
-    // If nutrition is mostly empty, enrich from USDA in the background.
+    // Many database rows have no nutrition yet. Fetch it from Open Food Facts BY BARCODE
+    // (exact product, per-100g) BEFORE the score is shown, then save it to our database
+    // so the next scan is instant. Only empty fields are filled — nothing is overwritten.
+    if (isNutritionIncomplete(result.nutriments)) {
+      try {
+        const dbCode = tursoProduct.barcode || barcode;
+        const offRes = await axios.get(
+          `https://world.openfoodfacts.org/api/v2/product/${barcode}.json?fields=nutriments,nutriscore_grade,nova_group,ingredients_text,additives_tags`,
+          { headers: { 'User-Agent': 'HealthyScan/1.0' }, timeout: 6000 }
+        );
+        const off = offRes?.data?.product;
+        if (off) {
+          const offNutrition = processNutritionData(off.nutriments || {}, tursoProduct.product_name);
+          const merged = { ...(result.nutriments || {}) };
+          let filled = 0;
+          for (const [k, v] of Object.entries(offNutrition)) {
+            if ((merged[k] == null || merged[k] === '') && v != null) { merged[k] = v; filled += 1; }
+          }
+          const grade = /^[a-e]$/i.test(String(off.nutriscore_grade || '')) ? String(off.nutriscore_grade).toLowerCase() : null;
+          const nova = [1, 2, 3, 4].includes(Number(off.nova_group)) ? Number(off.nova_group) : null;
+          if (filled > 0 || (grade && !result.nutriscore_grade) || (nova && !result.nova_group)) {
+            result.nutriments = merged;
+            const processed = processNutritionData(merged, result.product_name);
+            result.processed_nutrition = processed;
+            result.nutrition_completeness = checkNutritionCompleteness(processed).completeness;
+            if (grade && !result.nutriscore_grade) result.nutriscore_grade = grade;
+            if (nova && !result.nova_group) result.nova_group = nova;
+            updateNutritionInTurso(dbCode, merged, { nutriscore_grade: grade, nova_group: nova });
+          }
+          if (off.ingredients_text && off.ingredients_text.length > (result.ingredients_text || '').length) {
+            result.ingredients_text = off.ingredients_text;
+            updateIngredientsInTurso(dbCode, off.ingredients_text);
+          }
+          if ((!result.additives_tags || result.additives_tags.length === 0) && Array.isArray(off.additives_tags) && off.additives_tags.length > 0) {
+            result.additives_tags = off.additives_tags;
+          }
+        }
+      } catch { /* Open Food Facts unreachable or product not there — carry on with what we have */ }
+    }
+
+    // If nutrition is still mostly empty, enrich from USDA in the background.
     // Fire-and-forget — does not block results screen. Calls onUpdate when done so
     // the screen refreshes live without requiring a second scan.
     const needsIngredients = !result.ingredients_text || result.ingredients_text.length < 100;
@@ -172,7 +257,7 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
 
     if (isNutritionIncomplete(result.nutriments) || needsIngredients) {
       console.log('🔍 USDA: Enriching missing nutrition/ingredients for', tursoProduct.product_name);
-      enrichNutritionFromUSDA(tursoProduct.product_name, result.nutriments).then(usda => {
+      enrichNutritionFromUSDA(tursoProduct.barcode || barcode, result.nutriments).then(usda => {
         if (!usda) return;
         const updates = {};
         if (usda.nutriments) {
@@ -181,7 +266,7 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
         }
         if (needsIngredients && usda.ingredients_text && usda.ingredients_text.length > (result.ingredients_text || '').length) {
           updates.ingredients_text = usda.ingredients_text;
-          updateIngredientsInTurso(barcode, usda.ingredients_text);
+          updateIngredientsInTurso(tursoProduct.barcode || barcode, usda.ingredients_text);
         }
         if (Object.keys(updates).length > 0) {
           _barcodeCache.delete(barcode);
@@ -204,7 +289,7 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
         const fullIngredients = offProduct.ingredients_text;
         if (fullIngredients && fullIngredients.length > (result.ingredients_text || '').length) {
           updates.ingredients_text = fullIngredients;
-          updateIngredientsInTurso(barcode, fullIngredients);
+          updateIngredientsInTurso(tursoProduct.barcode || barcode, fullIngredients);
           _barcodeCache.delete(barcode);
         }
         if (needsAdditives && offProduct.additives_tags && offProduct.additives_tags.length > 0) {
@@ -218,21 +303,31 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
     return result;
   }
 
-  // STEP 1.5: Not in Turso — try OpenFoodFacts before cosmetic DBs.
-  // OpenFoodFacts is food-only, so a hit here definitively means food.
-  try {
-    const offRes = await axios.get(
+  // STEP 1.5: Not in the food table — check our own saved cosmetics and Open Food Facts
+  // at the same time. OpenFoodFacts is food-only, so a hit there definitively means food.
+  const [cosmeticSaved, offSettled] = await Promise.allSettled([
+    fetchCosmeticFromTurso(barcode),
+    axios.get(
       `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`,
       { headers: { 'User-Agent': 'HealthyScan/1.0' }, timeout: 8000 }
-    );
-    const offProduct = offRes?.data?.product;
-    if (offProduct && offProduct.product_name) {
-      console.log('✅ ReliableAPI: Found on OpenFoodFacts (food):', offProduct.product_name);
-      const result = formatProductData(offProduct, barcode, 'Open Food Facts', 'food');
-      setCachedProduct(barcode, result);
-      return result;
-    }
-  } catch { /* not found on OpenFoodFacts — continue to cosmetic lookup */ }
+    ),
+  ]);
+
+  if (cosmeticSaved.status === 'fulfilled' && cosmeticSaved.value) {
+    const result = formatProductData(cosmeticSaved.value, barcode, 'HealthyScan Cosmetic DB', 'beauty');
+    setCachedProduct(barcode, result);
+    return result;
+  }
+
+  const offProduct = offSettled.status === 'fulfilled' ? offSettled.value?.data?.product : null;
+  if (offProduct && offProduct.product_name) {
+    console.log('✅ ReliableAPI: Found on OpenFoodFacts (food):', offProduct.product_name);
+    const result = formatProductData(offProduct, barcode, 'Open Food Facts', 'food');
+    setCachedProduct(barcode, result);
+    // Write-through: keep it in our own database for next time.
+    saveFoodIfUseful(barcode, result);
+    return result;
+  }
 
   // STEP 2: Not in any food DB — try cosmetic sources
   console.log('🔍 ReliableAPI: Not in food DB, trying cosmetic databases...');
@@ -252,6 +347,8 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
       cosmeticProduct.productType || cosmeticProduct.product_type || 'beauty'
     );
     setCachedProduct(barcode, result);
+    // Write-through: keep it in our own database for next time (needs a real ingredient list).
+    saveCosmeticToTurso(barcode, result);
     return result;
   }
 
@@ -277,20 +374,19 @@ export const fetchProductByBarcode = async (barcode, onUpdate = null) => {
       const isCosmetic = checkIfCosmetic(item.title, item.category, item.description);
       
       if (isCosmetic) {
-        const result = createCosmeticProduct(item, barcode);
-        setCachedProduct(barcode, result);
-        return result;
+        // The UPC database has no ingredient lists. Never invent one — treat as not found.
+        console.log('❌ UPC cosmetic has no real ingredient data — not found');
       } else {
         const result = createFoodProduct(item, barcode);
-        // Enrich with USDA if nutrition is sparse
+        // Enrich with USDA (exact barcode match only) if nutrition is sparse
         if (isNutritionIncomplete(result.nutriments)) {
-          const usda = await enrichNutritionFromUSDA(result.product_name, result.nutriments);
+          const usda = await enrichNutritionFromUSDA(barcode, result.nutriments);
           if (usda?.nutriments) result.nutriments = usda.nutriments;
           if (usda?.ingredients_text && !result.ingredients_text) result.ingredients_text = usda.ingredients_text;
         }
         setCachedProduct(barcode, result);
-        // Save to Turso in background — builds the database automatically
-        saveProductToTurso(barcode, result);
+        // Only save records that carry real data — never empty shells.
+        saveFoodIfUseful(barcode, result);
         return result;
       }
     }
@@ -331,17 +427,11 @@ export const searchProductByName = async (productName) => {
         headers: searchHeaders,
         timeout: 8000,
       }),
-      // SEARCH 3: USDA FoodData Central (food products — fills gaps in our DB)
-      axios.get('https://api.nal.usda.gov/fdc/v1/foods/search', {
-        params: {
-          query: productName,
-          api_key: USDA_API_KEY,
-          pageSize: 15,
-          dataType: 'Branded',
-        },
-        headers: searchHeaders,
-        timeout: 8000,
-      }),
+      // SEARCH 3: (USDA name search removed on purpose) — one USDA key is shared by ALL
+      // users and is limited to ~1,000 requests/hour, so a busy hour would lock everyone
+      // out. Our own database + Open Food Facts cover search; USDA is still used for
+      // exact-barcode nutrition lookups only.
+      Promise.resolve({ data: { foods: [] } }),
       // SEARCH 4: Open Food Facts (food products — reliable fallback when Turso/USDA unavailable)
       axios.get('https://world.openfoodfacts.org/cgi/search.pl', {
         params: {
@@ -437,7 +527,8 @@ export const searchProductByName = async (productName) => {
                 ingredients_text: usdaProduct.ingredients_text,
               });
 
-              saveProductToTurso(barcode, usdaProduct);
+              // (No auto-save of search results: USDA name matches were never verified,
+              // and saving them polluted the product database.)
               tursoBarcodesFound.add(barcode);
             } catch (itemErr) {
               // Skip this individual item — don't abort the whole loop
@@ -744,33 +835,13 @@ const checkIfCosmetic = (title, category, description) => {
   return cosmeticKeywords.some(keyword => text.includes(keyword));
 };
 
-// Create cosmetic product from UPC data
-const createCosmeticProduct = (item, barcode) => {
-  return {
-    product_name: item.title || 'Cosmetic Product',
-    brands: item.brand || 'Unknown Brand',
-    image_url: item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&h=400&fit=crop',
-    ingredients_text: generateCosmeticIngredients(item.title, item.category),
-    ingredients: [],
-    categories: 'cosmetics, personal care',
-    barcode: barcode,
-    nutriscore_grade: null,
-    nova_group: null,
-    labels: '',
-    source: 'UPC Database (Cosmetic)',
-    product_type: 'beauty',
-    nutriments: {},
-    ecoscore_grade: null
-  };
-};
-
 // Create food product from UPC data
 const createFoodProduct = (item, barcode) => {
   return {
     product_name: item.title || 'Food Product',
     brands: item.brand || 'Unknown Brand',
     image_url: item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=400&fit=crop',
-    ingredients_text: 'Ingredients not available from this source',
+    ingredients_text: '',
     ingredients: [],
     categories: item.category || 'food',
     barcode: barcode,
@@ -802,33 +873,6 @@ const createDemoProduct = (barcode) => {
     nutriments: {},
     ecoscore_grade: null
   };
-};
-
-// Generate realistic cosmetic ingredients based on product type
-const generateCosmeticIngredients = (title, category) => {
-  const commonIngredients = [
-    'aqua', 'glycerin', 'cetyl alcohol', 'dimethicone', 'phenoxyethanol',
-    'fragrance', 'sodium lauryl sulfate', 'citric acid', 'tocopherol'
-  ];
-  
-  const productSpecific = {
-    shampoo: ['sodium laureth sulfate', 'cocamidopropyl betaine', 'panthenol'],
-    moisturizer: ['hyaluronic acid', 'ceramides', 'niacinamide'],
-    sunscreen: ['zinc oxide', 'titanium dioxide', 'octinoxate'],
-    default: ['paraben', 'sulfate', 'alcohol']
-  };
-  
-  const type = title ? title.toLowerCase() : 'default';
-  let specific = productSpecific.default;
-  
-  for (const [key, ingredients] of Object.entries(productSpecific)) {
-    if (type.includes(key)) {
-      specific = ingredients;
-      break;
-    }
-  }
-  
-  return [...commonIngredients, ...specific].join(', ');
 };
 
 // API health check

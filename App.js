@@ -33,9 +33,7 @@ if (Platform.OS === 'web' && typeof document !== 'undefined') {
 }
 
 // Screens and components
-import { AI_CHAT_ENABLED } from './src/config/featureFlags';
 import HomeScreen from './src/screens/HomeScreen';
-import ResultsScreen from './src/screens/ResultsScreen';
 import ResultsScreenV2 from './src/screens/ResultsScreenV2';
 import CosmeticResultsScreen from './src/screens/CosmeticResultsScreen';
 import FoodPhotoResultsScreen from './src/screens/FoodPhotoResultsScreen';
@@ -51,7 +49,6 @@ import PremiumFeaturesScreen from './src/screens/PremiumFeaturesScreen';
 import HistoryScreen from './src/screens/HistoryScreen';
 import VeeListScreen from './src/screens/VeeListScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
-import AINutritionistScreen from './src/screens/AINutritionistScreen';
 // import TestSubscriptionScreen from './src/screens/TestSubscriptionScreen';
 import DevScreen from './src/screens/DevScreen';
 import { localCrashReporter } from './src/utils/crashReporting';
@@ -66,17 +63,10 @@ import * as Sentry from '@sentry/react-native';
 Sentry.init({
   dsn: 'https://29911f628f7b9a4dbde3a2164f504187@o4510499972448256.ingest.us.sentry.io/4510499973955584',
 
-  // Adds more context data to events (IP address, cookies, user, etc.)
-  // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
-
-  // Enable Logs
-  enableLogs: true,
-
-  // Configure Session Replay
-  replaysSessionSampleRate: 0.1,
-  replaysOnErrorSampleRate: 1,
-  integrations: [Sentry.mobileReplayIntegration(), Sentry.feedbackIntegration()],
+  // Privacy: this is a health app — don't send IPs/user identifiers and don't record
+  // the screen (replays could capture names and scanned products). Crash reports stay on.
+  sendDefaultPii: false,
+  enableLogs: false,
 
   // uncomment the line below to enable Spotlight (https://spotlightjs.com)
   // spotlight: __DEV__,
@@ -134,8 +124,6 @@ function MainTabs() {
             iconName = focused ? 'scan' : 'scan-outline';
           } else if (route.name === 'Search') {
             iconName = focused ? 'search' : 'search-outline';
-          } else if (route.name === 'AIChat') {
-            iconName = focused ? 'nutrition' : 'nutrition-outline';
           } else if (route.name === 'VeeList') {
             iconName = focused ? 'ribbon' : 'ribbon-outline';
           }
@@ -195,13 +183,6 @@ function MainTabs() {
         component={VeeListScreen}
         options={{ tabBarLabel: 'Top' }}
       />
-      {(AI_CHAT_ENABLED || Platform.OS === 'android') && (
-        <Tab.Screen
-          name="AIChat"
-          component={AINutritionistScreen}
-          options={{ tabBarLabel: 'AI' }}
-        />
-      )}
     </Tab.Navigator>
 
     {/* Floating Dev Menu Button — only in development */}
@@ -274,20 +255,23 @@ class ErrorBoundary extends React.Component {
             </View>
           )}
           <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View 
-              style={{ 
-                backgroundColor: '#067A4F', 
-                paddingHorizontal: 30, 
-                paddingVertical: 15, 
+            <RNTouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#067A4F',
+                paddingHorizontal: 30,
+                paddingVertical: 15,
                 borderRadius: 25,
                 flexDirection: 'row',
                 alignItems: 'center'
               }}
-              onTouchEnd={this.handleReset}
+              onPress={this.handleReset}
             >
               <Ionicons name="refresh" size={20} color="#FFF" />
               <Text style={{ color: '#FFF', fontSize: 16, fontWeight: 'bold', marginLeft: 8 }}>Try Again</Text>
-            </View>
+            </RNTouchableOpacity>
           </View>
           <Text style={{ fontSize: 14, color: '#999', marginTop: 20, textAlign: 'center' }}>
             If this keeps happening, try restarting the app
@@ -350,14 +334,6 @@ function App() {
         // Check if user has seen onboarding
         await checkOnboarding();
 
-        // AI chatbot: enabled + free on Android (no paywall there), still
-        // "coming soon" on iOS until launch. Set on every launch so no stale
-        // value lingers.
-        await AsyncStorage.setItem(
-          'chatbotAccess',
-          Platform.OS === 'android' ? 'enabled' : 'coming_soon'
-        );
-
         // 🎁 Referral program — ensure this device has an install id + share code,
         // send any captured referral code, and refresh unlock status. All calls
         // are network-resilient and never throw.
@@ -391,7 +367,7 @@ function App() {
               console.log('✅ IAP system ready');
               
               // Check and restore existing subscription
-              const subStatus = await iapManager.checkSubscriptionStatus();
+              const subStatus = await iapManager.getSubscriptionStatus();
               if (subStatus.isPremium) {
                 console.log('✅ Active subscription found:', subStatus.daysRemaining, 'days remaining');
               } else {
@@ -474,13 +450,12 @@ function App() {
     return () => subscription.remove();
   }, []);
 
+  // Custom scheme (vee://) so referral links like vee://?ref=SG-XXXXXXX open the app.
+  // Only screens that can open without extra params are linkable (Results needs a barcode).
   const linking = {
-    prefixes: [],
+    prefixes: ['vee://'],
     config: {
       screens: {
-        Home: 'home',
-        Results: 'results',
-        Search: 'search',
         About: 'about',
         Sources: 'sources',
       },
